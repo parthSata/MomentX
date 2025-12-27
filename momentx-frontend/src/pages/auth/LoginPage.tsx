@@ -1,12 +1,14 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Eye, EyeOff, Mail, Lock, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
+import { api } from "@/lib/axios"
 
 export default function LoginPage() {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState("")
@@ -15,16 +17,27 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    
-    // Simulate login
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    toast.success("Welcome back to MomentX!", {
-      description: "You've successfully logged in.",
-    })
-    
-    setIsLoading(false)
-    window.location.href = "/"
+
+    try {
+      const response = await api.post("/login", { email, password })
+
+      // Store user info (not token) in localStorage if needed
+      localStorage.setItem("momentx_user", JSON.stringify(response.data.data.user))
+
+      toast.success("Welcome back!", {
+        description: "Login successful.",
+      })
+
+      navigate("/")
+
+    } catch (error: any) {
+      console.error("Login Error:", error)
+      toast.error("Login Failed", {
+        description: error.response?.data?.message || "Invalid credentials",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -51,7 +64,8 @@ export default function LoginPage() {
             className="flex flex-col items-center mb-8"
           >
             <div className="relative w-20 h-20 mb-4">
-              <div className="absolute inset-0 bg-gradient-to-r from-neon-indigo via-neon-violet to-neon-pink rounded-2xl animate-gradient animate-glow" />
+              {/* FIX: Removed 'animate-glow' to prevent conflict with 'animate-gradient' */}
+              <div className="absolute inset-0 bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink rounded-2xl animate-gradient" />
               <div className="absolute inset-1 bg-background rounded-xl flex items-center justify-center">
                 <span className="text-3xl font-bold gradient-text">M</span>
               </div>
@@ -61,11 +75,7 @@ export default function LoginPage() {
           </motion.div>
 
           <form onSubmit={handleLogin} className="space-y-5">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-            >
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -74,17 +84,12 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-11"
-                  inputSize="lg"
                   required
                 />
               </div>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-            >
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -93,7 +98,6 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-11 pr-11"
-                  inputSize="lg"
                   required
                 />
                 <button
@@ -106,64 +110,20 @@ export default function LoginPage() {
               </div>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 }}
-              className="flex items-center justify-between text-sm"
-            >
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="rounded border-border" />
-                <span className="text-muted-foreground">Remember me</span>
-              </label>
-              <Link to="/forgot-password" className="text-primary hover:underline">
-                Forgot password?
-              </Link>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="space-y-3 pt-2"
-            >
-              <Button
-                type="submit"
-                variant="gradient"
-                size="xl"
-                className="w-full"
-                disabled={isLoading}
-              >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="space-y-3 pt-2">
+              <Button type="submit" variant="default" size="lg" className="w-full" disabled={isLoading}>
                 {isLoading ? (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  >
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
                     <Sparkles className="w-5 h-5" />
                   </motion.div>
                 ) : (
                   "Login"
                 )}
               </Button>
-
-              <Button
-                type="button"
-                variant="glass"
-                size="xl"
-                className="w-full"
-                onClick={() => toast.info("OTP login coming soon!")}
-              >
-                Login with OTP
-              </Button>
             </motion.div>
           </form>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.7 }}
-            className="mt-8 text-center"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-8 text-center">
             <p className="text-muted-foreground">
               Don't have an account?{" "}
               <Link to="/signup" className="text-primary hover:underline font-medium">

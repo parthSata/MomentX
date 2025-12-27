@@ -1,18 +1,26 @@
 import { useState, useRef } from "react"
 import { motion } from "framer-motion"
-import { Link } from "react-router-dom"
-import { Eye, EyeOff, Mail, Lock, User, Phone, Camera, Sparkles } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
+import { Eye, EyeOff, Mail, Lock, User, Phone, Camera, Sparkles, UserCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
+import { api } from "@/lib/axios"
 
 export default function SignupPage() {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [avatar, setAvatar] = useState<string | null>(null)
+
+  // UI Preview State
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  // Actual File State
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+
   const [formData, setFormData] = useState({
+    name: "", // Required by your Backend Model
     username: "",
     email: "",
     phone: "",
@@ -22,9 +30,10 @@ export default function SignupPage() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      setAvatarFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
-        setAvatar(reader.result as string)
+        setAvatarPreview(reader.result as string)
       }
       reader.readAsDataURL(file)
     }
@@ -33,20 +42,44 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    toast.success("Welcome to MomentX!", {
-      description: "Your account has been created successfully.",
-    })
-    
-    setIsLoading(false)
-    window.location.href = "/"
+
+    try {
+      // 1. Prepare FormData for file upload
+      const data = new FormData()
+      data.append("name", formData.name)
+      data.append("username", formData.username)
+      data.append("email", formData.email)
+      data.append("password", formData.password)
+      data.append("phone", formData.phone) // Optional based on schema, but good to send
+
+      if (avatarFile) {
+        data.append("profilePic", avatarFile) // Must match backend upload.fields name
+      }
+
+      // 2. Send Request
+      await api.post("/register", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+
+      toast.success("Account Created!", {
+        description: "Welcome to MomentX.",
+      })
+
+      navigate("/")
+
+    } catch (error: any) {
+      console.error("Signup error:", error)
+      toast.error("Registration Failed", {
+        description: error.response?.data?.message || "Something went wrong",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background */}
+      {/* Background Animation */}
       <div className="absolute inset-0 bg-background">
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-neon-violet/20 rounded-full blur-3xl animate-pulse-slow" />
         <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-neon-pink/20 rounded-full blur-3xl animate-pulse-slow delay-1000" />
@@ -60,7 +93,6 @@ export default function SignupPage() {
         className="w-full max-w-md relative z-10"
       >
         <div className="glass-strong rounded-3xl p-8 shadow-glow">
-          {/* Logo */}
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -83,10 +115,10 @@ export default function SignupPage() {
               onClick={() => fileInputRef.current?.click()}
               className="relative group"
             >
-              <div className="w-24 h-24 rounded-full bg-gradient-to-r from-neon-indigo via-neon-violet to-neon-pink p-0.5 animate-gradient">
+              <div className="w-24 h-24 rounded-full bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink p-0.5 animate-gradient">
                 <div className="w-full h-full rounded-full bg-background flex items-center justify-center overflow-hidden">
-                  {avatar ? (
-                    <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
                     <Camera className="w-8 h-8 text-muted-foreground" />
                   )}
@@ -106,11 +138,24 @@ export default function SignupPage() {
           </motion.div>
 
           <form onSubmit={handleSignup} className="space-y-4">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-            >
+
+            {/* Name Field (New) */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.35 }}>
+              <div className="relative">
+                <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Full Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="pl-11"
+                  required
+                />
+              </div>
+            </motion.div>
+
+            {/* Username */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -119,17 +164,13 @@ export default function SignupPage() {
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   className="pl-11"
-                  inputSize="lg"
                   required
                 />
               </div>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 }}
-            >
+            {/* Email */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -138,17 +179,13 @@ export default function SignupPage() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="pl-11"
-                  inputSize="lg"
                   required
                 />
               </div>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6 }}
-            >
+            {/* Phone */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -157,17 +194,12 @@ export default function SignupPage() {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="pl-11"
-                  inputSize="lg"
-                  required
                 />
               </div>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.7 }}
-            >
+            {/* Password */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }}>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -176,7 +208,6 @@ export default function SignupPage() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="pl-11 pr-11"
-                  inputSize="lg"
                   required
                 />
                 <button
@@ -189,24 +220,10 @@ export default function SignupPage() {
               </div>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-              className="pt-2"
-            >
-              <Button
-                type="submit"
-                variant="gradient"
-                size="xl"
-                className="w-full"
-                disabled={isLoading}
-              >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="pt-2">
+              <Button type="submit" variant="default" size="lg" className="w-full" disabled={isLoading}>
                 {isLoading ? (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  >
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
                     <Sparkles className="w-5 h-5" />
                   </motion.div>
                 ) : (
@@ -216,12 +233,7 @@ export default function SignupPage() {
             </motion.div>
           </form>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.9 }}
-            className="mt-6 text-center"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="mt-6 text-center">
             <p className="text-muted-foreground text-sm">
               Already have an account?{" "}
               <Link to="/login" className="text-primary hover:underline font-medium">

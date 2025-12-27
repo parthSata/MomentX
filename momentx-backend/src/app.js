@@ -4,6 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import http from "http";
 import { ApiError } from "./utils/ApiError.js";
+import userRouter from "./routes/user.routes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -31,8 +32,6 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-
-
 // Middleware
 app.use(cors(corsOptions)); // Use the cors options for all API routes
 
@@ -47,6 +46,8 @@ app.get("/", (req, res) => {
     message: "Welcome to Chat App API",
   });
 });
+
+app.use("/api/v1/users", userRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
