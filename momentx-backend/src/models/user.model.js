@@ -31,14 +31,20 @@ const userSchema = new mongoose.Schema(
     bio: { type: String, default: "" },
     profilePic: { type: String, default: "" },
     website: { type: String, default: "" },
-
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
     isPrivate: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: false },
     isAdmin: { type: Boolean, default: false },
-
+    resetPasswordOTP: {
+      type: String,
+      default: undefined,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: undefined,
+    },
     savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Post" }],
 
     lastActive: { type: Date, default: Date.now },

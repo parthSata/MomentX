@@ -7,6 +7,7 @@ import ExplorePage from "@/pages/ExplorePage";
 import LoginPage from "@/pages/auth/LoginPage";
 import SignupPage from "@/pages/auth/SignupPage";
 import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/auth/ResetPasswordPage"; // ✅ Added Import
 import AdminLoginPage from "@/pages/auth/AdminLoginPage";
 import NotFound from "@/pages/NotFound";
 import ChatListPage from "@/pages/ChatListPage";
@@ -34,6 +35,7 @@ export function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
+        {/* Main Feed */}
         <Route
           path="/"
           element={
@@ -42,6 +44,8 @@ export function AnimatedRoutes() {
             </PageTransition>
           }
         />
+
+        {/* Profile & Explore */}
         <Route
           path="/profile"
           element={
@@ -58,6 +62,8 @@ export function AnimatedRoutes() {
             </PageTransition>
           }
         />
+
+        {/* --- Authentication Routes --- */}
         <Route
           path="/login"
           element={
@@ -83,6 +89,17 @@ export function AnimatedRoutes() {
           }
         />
         <Route
+          path="/reset-password"
+          element={
+            <PageTransition>
+              <ResetPasswordPage />
+            </PageTransition>
+          }
+        />
+        {/* ----------------------------- */}
+
+        {/* Chat Features */}
+        <Route
           path="/chat"
           element={
             <PageTransition>
@@ -98,6 +115,8 @@ export function AnimatedRoutes() {
             </PageTransition>
           }
         />
+
+        {/* Social Features */}
         <Route
           path="/reels"
           element={
@@ -123,6 +142,16 @@ export function AnimatedRoutes() {
           }
         />
         <Route
+          path="/followers/:type"
+          element={
+            <PageTransition>
+              <FollowersPage />
+            </PageTransition>
+          }
+        />
+
+        {/* Admin Area */}
+        <Route
           path="/admin/login"
           element={
             <PageTransition>
@@ -140,14 +169,8 @@ export function AnimatedRoutes() {
             </AdminRoute>
           }
         />
-        <Route
-          path="/followers/:type"
-          element={
-            <PageTransition>
-              <FollowersPage />
-            </PageTransition>
-          }
-        />
+
+        {/* 404 Not Found */}
         <Route
           path="*"
           element={

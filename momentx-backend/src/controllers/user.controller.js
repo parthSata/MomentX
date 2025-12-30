@@ -5,6 +5,7 @@ import { ApiError } from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { sendEmail } from "../utils/sendEmail.js";
 
 const cookieOptions = {
   httpOnly: true,
@@ -302,6 +303,106 @@ const getAllUsers = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Users fetched successfully", formattedUsers));
 });
 
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  // 1. Validation
+  if (!email) {
+    throw new ApiError(400, "Email is required");
+  }
+
+  // 2. CHECK: Does the account exist in MongoDB?
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    // 🚨 USER DOES NOT EXIST
+    // We throw a 404 so the Frontend knows to show "Account not found"
+    throw new ApiError(404, "Account does not exist. Please Sign up.");
+  }
+
+  // 3. Generate OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // 4. Save to DB
+  user.resetPasswordOTP = otp;
+  user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 mins
+  await user.save({ validateBeforeSave: false });
+
+  // 5. CHECK: Does the email address actually exist / can receive mail?
+  const message = `Your Password Reset OTP is: ${otp}. It expires in 15 minutes.`;
+
+  try {
+    const isSent = await sendEmail(
+      user.email,
+      "Password Reset Request",
+      message
+    );
+
+    if (!isSent) {
+      // If sendEmail returned false (internal logic)
+      throw new Error("Email sending failed internally");
+    }
+  } catch (error) {
+    // 🚨 EMAIL SENDING FAILED
+    // If Nodemailer fails (e.g., invalid domain "gmaillll.com"), we catch it here
+
+    // Clean up the DB (remove the OTP since user didn't get it)
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    // Throw specific error to Frontend
+    throw new ApiError(
+      400,
+      "Failed to send email. The address might be invalid or unreachable."
+    );
+  }
+
+  // 6. Success
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "OTP sent successfully. Check your inbox.", {}));
+});
+
+// 2. RESET PASSWORD (Verifies OTP & Sets New Password)
+const resetPassword = asyncHandler(async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    throw new ApiError(400, "Email, OTP, and new password are required");
+  }
+
+  const user = await User.findOne({
+    email,
+    resetPasswordOTP: otp,
+    resetPasswordExpires: { $gt: Date.now() }, // Check if expiry time is in the future
+  });
+
+  if (!user) {
+    throw new ApiError(400, "Invalid or expired OTP");
+  }
+
+  // Update Password
+  // Note: Your pre('save') hook in the model will automatically hash this password!
+  user.password = newPassword;
+
+  // Clear OTP fields
+  user.resetPasswordOTP = undefined;
+  user.resetPasswordExpires = undefined;
+
+  await user.save();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Password reset successfully. You can now login.",
+        {}
+      )
+    );
+});
+
 export {
   registerUser,
   loginUser,
@@ -311,4 +412,6 @@ export {
   refreshToken,
   updateProfile,
   getAllUsers,
+  forgotPassword,
+  resetPassword,
 };

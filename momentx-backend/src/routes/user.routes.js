@@ -10,6 +10,8 @@ import {
   refreshToken,
   updateProfile,
   getAllUsers,
+  forgotPassword,
+  resetPassword,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -39,6 +41,9 @@ router
     ],
     loginUser
   );
+
+router.route("/forgot-password").post(forgotPassword);
+router.route("/reset-password").post(resetPassword);
 
 router.route("/logout").post(verifyJWT, logoutUser);
 router.get("/me", verifyJWT, getCurrentUser);

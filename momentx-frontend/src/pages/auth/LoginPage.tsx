@@ -64,7 +64,6 @@ export default function LoginPage() {
             className="flex flex-col items-center mb-8"
           >
             <div className="relative w-20 h-20 mb-4">
-              {/* FIX: Removed 'animate-glow' to prevent conflict with 'animate-gradient' */}
               <div className="absolute inset-0 bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink rounded-2xl animate-gradient" />
               <div className="absolute inset-1 bg-background rounded-xl flex items-center justify-center">
                 <span className="text-3xl font-bold gradient-text">M</span>
@@ -107,6 +106,15 @@ export default function LoginPage() {
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
+              </div>
+              {/* Forgot Password Link */}
+              <div className="flex justify-end mt-2">
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-muted-foreground hover:text-primary transition-colors font-medium"
+                >
+                  Forgot password?
+                </Link>
               </div>
             </motion.div>
 
