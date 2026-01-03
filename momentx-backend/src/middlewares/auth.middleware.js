@@ -4,40 +4,48 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
 
 export const verifyJWT = asyncHandler(async (req, _, next) => {
-  const token =
-    req.cookies?.accessToken ||
-    req.header("Authorization")?.replace("Bearer ", "");
-
-  if (!token) throw new ApiError(401, "Unauthorized: No access token");
-
-  let decodedInfo;
   try {
-    decodedInfo = jwt.verify(token, process.env.VITE_ACCESS_TOKEN_SECRET);
-    if (!decodedInfo?._id)
-      throw new ApiError(401, "Invalid access token: No user ID");
+    const token =
+      req.cookies?.accessToken ||
+      req.header("Authorization")?.replace("Bearer ", "");
+
+    if (!token) {
+      throw new ApiError(401, "Unauthorized request");
+    }
+
+    // 🔍 DEBUG CHECK (Optional: Remove after fixing)
+    if (!process.env.ACCESS_TOKEN_SECRET) {
+      console.error("FATAL: ACCESS_TOKEN_SECRET is missing in .env");
+      throw new ApiError(500, "Server Configuration Error");
+    }
+
+    // ✅ FIX: Removed 'VITE_' prefix. It should match your .env file exactly.
+    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+
+    const user = await User.findById(decodedToken?._id).select(
+      "-password -refreshToken"
+    );
+
+    if (!user) {
+      throw new ApiError(401, "Invalid Access Token");
+    }
+
+    req.user = user;
+    next();
   } catch (error) {
-    throw new ApiError(401, `Invalid access token: ${error.message}`);
+    throw new ApiError(401, error?.message || "Invalid access token");
   }
-
-  const user = await User.findById(decodedInfo._id).select(
-    "-password -refreshToken"
-  );
-  if (!user) throw new ApiError(401, "Invalid access token: User not found");
-
-  req.user = user;
-  next();
 });
 
+// (Keep authorizeRoles as is)
 export const authorizeRoles = (allowedRoles) => {
   return (req, res, next) => {
-    // Check if the user's role is in the list of allowed roles
     if (!allowedRoles.includes(req.user.role)) {
       throw new ApiError(
         403,
         `Forbidden: Role '${req.user.role}' is not authorized to access this resource.`
       );
     }
-    // If the user's role is allowed, proceed to the next middleware
     next();
   };
 };

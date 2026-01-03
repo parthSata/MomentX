@@ -44,9 +44,9 @@ router
 
 router.route("/forgot-password").post(forgotPassword);
 router.route("/reset-password").post(resetPassword);
+router.route("/current-user").get(verifyJWT, getCurrentUser);
 
 router.route("/logout").post(verifyJWT, logoutUser);
-router.get("/me", verifyJWT, getCurrentUser);
 
 router.get(
   "/search",

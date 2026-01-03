@@ -1,10 +1,11 @@
-import fs from "fs";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
 
-const uploadPath = path.resolve("public/temp");
+// Ensure we use the path relative to the project root
+const uploadPath = "./public/temp";
 
-// Create the directory if it doesn't exist
+// Create directory if it doesn't exist
 if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
 }
@@ -14,8 +15,15 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    cb(null, file.originalname);
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+    );
   },
 });
 
-export const upload = multer({ storage });
+export const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit (video)
+});

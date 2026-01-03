@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
 
     try {
       // API Call
-      await api.post("/forgot-password", { email })
+      await api.post("/users/forgot-password", { email })
 
       // ✅ SUCCESS CASE
       toast.success("OTP Sent!", {

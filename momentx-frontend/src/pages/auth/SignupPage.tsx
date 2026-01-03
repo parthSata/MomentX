@@ -6,21 +6,21 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { api } from "@/lib/axios"
+import { useAuth } from "@/context/AuthContext" // ✅ Import
 
 export default function SignupPage() {
   const navigate = useNavigate()
+  const { login } = useAuth() // ✅ Use Context
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  // UI Preview State
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  // Actual File State
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
-    name: "", // Required by your Backend Model
+    name: "",
     username: "",
     email: "",
     phone: "",
@@ -44,22 +44,26 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
-      // 1. Prepare FormData for file upload
       const data = new FormData()
       data.append("name", formData.name)
       data.append("username", formData.username)
       data.append("email", formData.email)
       data.append("password", formData.password)
-      data.append("phone", formData.phone) // Optional based on schema, but good to send
+      data.append("phone", formData.phone)
 
       if (avatarFile) {
-        data.append("profilePic", avatarFile) // Must match backend upload.fields name
+        data.append("profilePic", avatarFile)
       }
 
-      // 2. Send Request
-      await api.post("/register", data, {
+      // ✅ Corrected Route: /users/register
+      const response = await api.post("/users/register", data, {
         headers: { "Content-Type": "multipart/form-data" },
       })
+
+      // ✅ Auto-login if backend returns user data
+      if (response.data?.data) {
+        login(response.data.data)
+      }
 
       toast.success("Account Created!", {
         description: "Welcome to MomentX.",
@@ -103,7 +107,7 @@ export default function SignupPage() {
             <p className="text-muted-foreground mt-1 text-sm">Create your account</p>
           </motion.div>
 
-          {/* Avatar Upload */}
+          {/* Avatar Upload UI */}
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -138,8 +142,6 @@ export default function SignupPage() {
           </motion.div>
 
           <form onSubmit={handleSignup} className="space-y-4">
-
-            {/* Name Field (New) */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.35 }}>
               <div className="relative">
                 <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -154,7 +156,6 @@ export default function SignupPage() {
               </div>
             </motion.div>
 
-            {/* Username */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -169,7 +170,6 @@ export default function SignupPage() {
               </div>
             </motion.div>
 
-            {/* Email */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -184,7 +184,6 @@ export default function SignupPage() {
               </div>
             </motion.div>
 
-            {/* Phone */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -198,7 +197,6 @@ export default function SignupPage() {
               </div>
             </motion.div>
 
-            {/* Password */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }}>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
