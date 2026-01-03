@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/axios";
 
 export interface StoryUser {
+  profilePic: string;
   _id: string; // ✅ Added _id to fix type error
   username: string;
   displayName: string;
@@ -37,23 +38,31 @@ export function useStories() {
     fetchStories();
   }, []);
 
-  const createStory = async (file: File) => {
+  const createStory = async (files: File[]) => {
+    if (files.length === 0) return;
+
     setIsUploading(true);
     const formData = new FormData();
-    formData.append("file", file); // Multer looks for "file" field
+
+    // Append each file with the same key "files" (matches backend multer)
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
 
     try {
-      // No change needed here, just ensuring headers are correct
       const { data } = await api.post("/stories", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setStories((prev) => [data.data, ...prev]);
+
+      // ✅ Handle array response
+      const newStories = Array.isArray(data.data) ? data.data : [data.data];
+      setStories((prev) => [...newStories, ...prev]);
     } catch (error) {
-      console.error("Failed to upload story", error);
+      console.error("Failed to upload stories", error);
     } finally {
       setIsUploading(false);
     }
-  };  
+  };
 
   const markAsViewed = async (storyId: string) => {
     try {

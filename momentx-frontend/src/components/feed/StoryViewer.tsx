@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ChevronLeft, ChevronRight, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -10,7 +10,7 @@ interface StoryViewerProps {
   onClose: () => void
   initialIndex: number
   stories: Story[]
-  onViewStory: (id: string, index: number) => void
+  onViewStory: (id: string) => void
   onDeleteStory?: (id: string) => void
   currentUserId?: string
 }
@@ -40,41 +40,56 @@ export function StoryViewer({
     }
   }, [isOpen, initialIndex])
 
-  // Safety Check
+  // Safety Check: Close if story becomes invalid
   useEffect(() => {
     if (isOpen && !currentStory) {
       onClose()
     }
   }, [currentStory, isOpen, onClose])
 
-  // Mark as viewed
+  // Mark as viewed logic
   useEffect(() => {
     if (isOpen && currentStory && !currentStory.isViewed) {
-      onViewStory(currentStory._id, currentStoryIndex)
+      const timer = setTimeout(() => {
+        onViewStory(currentStory._id)
+      }, 500); // Increased slightly to ensure view counts as intentional
+      return () => clearTimeout(timer);
     }
   }, [currentStoryIndex, isOpen, currentStory, onViewStory])
 
+  // Navigation Handlers
+  const handlePrev = useCallback(() => {
+    if (currentStoryIndex > 0) {
+      setCurrentStoryIndex(prev => prev - 1);
+      setProgress(0);
+    }
+  }, [currentStoryIndex]);
+
+  const handleNext = useCallback(() => {
+    if (currentStoryIndex < stories.length - 1) {
+      setCurrentStoryIndex(prev => prev + 1);
+      setProgress(0);
+    } else {
+      onClose();
+    }
+  }, [currentStoryIndex, stories.length, onClose]);
+
   // Progress Bar
   useEffect(() => {
-    if (!isOpen || isPaused || isDeleting || !currentStory) return
+    if (!isOpen || isPaused || isDeleting || !currentStory || currentStory.type === 'video') return
 
     const interval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 100) {
-          if (currentStoryIndex < stories.length - 1) {
-            setCurrentStoryIndex(prev => prev + 1)
-            return 0
-          } else {
-            onClose()
-            return 100
-          }
+          handleNext();
+          return 0;
         }
         return prev + 2
       })
     }, 100)
 
     return () => clearInterval(interval)
-  }, [isOpen, currentStoryIndex, isPaused, isDeleting, onClose, stories.length, currentStory])
+  }, [isOpen, isPaused, isDeleting, currentStory, handleNext])
 
   const handleDelete = async () => {
     if (!currentStory || !onDeleteStory) return;
@@ -85,6 +100,7 @@ export function StoryViewer({
 
     try {
       await onDeleteStory(currentStory._id);
+      if (stories.length <= 1) onClose();
     } catch (error) {
       console.error("Delete failed", error);
       setIsDeleting(false);
@@ -92,29 +108,14 @@ export function StoryViewer({
     }
   }
 
-  const handlePrev = () => {
-    if (currentStoryIndex > 0) {
-      setCurrentStoryIndex(prev => prev - 1); setProgress(0);
-    }
-  }
-
-  const handleNext = () => {
-    if (currentStoryIndex < stories.length - 1) {
-      setCurrentStoryIndex(prev => prev + 1); setProgress(0);
-    } else {
-      onClose();
-    }
-  }
-
   if (!currentStory) return null
 
-  // ✅ FIX: Robust comparison logic
-  // 1. Get Story Owner ID safely (handle object vs string)
-  const storyOwnerId = typeof currentStory.user._id === 'object'
-    ? (currentStory.user._id as any).toString()
-    : currentStory.user._id;
+  // ✅ FIXED: Safer ID extraction logic to resolve TypeScript error
+  // Checks if 'user' is an Object (populated) or String (ID only)
+  const storyOwnerId = typeof currentStory.user === 'object' && '_id' in currentStory.user
+    ? (currentStory.user as any)._id
+    : (currentStory.user as unknown as string);
 
-  // 2. Compare strings
   const isOwner = currentUserId && storyOwnerId
     ? currentUserId.toString() === storyOwnerId.toString()
     : false;
@@ -126,12 +127,12 @@ export function StoryViewer({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-black"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm"
         >
           <div className="relative w-full h-full flex items-center justify-center">
 
             {/* Progress Bars */}
-            <div className="absolute top-4 left-4 right-4 flex gap-1 z-20">
+            <div className="absolute top-4 left-4 right-4 flex gap-1 z-20 max-w-md mx-auto">
               {stories.map((_, index) => (
                 <div key={index} className="h-1 flex-1 rounded-full bg-white/20 overflow-hidden">
                   <motion.div
@@ -140,23 +141,28 @@ export function StoryViewer({
                     animate={{
                       width: index < currentStoryIndex ? "100%" : index === currentStoryIndex ? `${progress}%` : "0%",
                     }}
-                    transition={{ duration: 0.1 }}
+                    transition={{ duration: 0.1, ease: "linear" }}
                   />
                 </div>
               ))}
             </div>
 
             {/* Header */}
-            <div className="absolute top-10 left-4 right-4 flex items-center justify-between z-20 text-white">
+            <div className="absolute top-8 left-4 right-4 flex items-center justify-between z-20 text-white max-w-md mx-auto">
               <div className="flex items-center gap-3">
                 <AvatarRing
-                  src={currentStory.user.avatar}
-                  alt={currentStory.user.displayName}
+                  // Handle safe access for populated vs unpopulated user
+                  src={(typeof currentStory.user === 'object' ? currentStory.user.profilePic : "") || "/default-avatar.png"}
+                  alt={(typeof currentStory.user === 'object' ? currentStory.user.username : "User")}
                   size="sm"
+                  hasStory={false}
                 />
-                <div>
+                <div className="flex flex-col">
                   <span className="font-semibold text-sm drop-shadow-md">
-                    {currentStory.user.username}
+                    {typeof currentStory.user === 'object' ? currentStory.user.username : "User"}
+                  </span>
+                  <span className="text-xs text-white/70">
+                    {new Date(currentStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               </div>
@@ -167,7 +173,7 @@ export function StoryViewer({
                   <button
                     onClick={handleDelete}
                     disabled={isDeleting}
-                    className="p-2 bg-black/20 hover:bg-red-500/80 backdrop-blur-md rounded-full transition-colors group"
+                    className="p-2 bg-black/20 hover:bg-red-500/80 backdrop-blur-md rounded-full transition-colors group pointer-events-auto"
                     title="Delete Story"
                   >
                     <Trash2 className="w-5 h-5 text-white/90 group-hover:text-white" />
@@ -176,16 +182,16 @@ export function StoryViewer({
 
                 <button
                   onClick={onClose}
-                  className="p-2 bg-black/20 hover:bg-white/20 backdrop-blur-md rounded-full transition-colors"
+                  className="p-2 bg-black/20 hover:bg-white/20 backdrop-blur-md rounded-full transition-colors pointer-events-auto"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            {/* Content */}
+            {/* Content Area */}
             <div
-              className="w-full h-full md:max-w-md mx-auto flex items-center justify-center bg-gray-900"
+              className="w-full max-w-md aspect-9/16 relative bg-gray-900 overflow-hidden rounded-none md:rounded-xl shadow-2xl"
               onMouseDown={() => setIsPaused(true)}
               onMouseUp={() => setIsPaused(false)}
               onTouchStart={() => setIsPaused(true)}
@@ -198,6 +204,16 @@ export function StoryViewer({
                   autoPlay
                   muted
                   playsInline
+                  onEnded={handleNext}
+                  onTimeUpdate={(e) => {
+                    // Sync video time with progress bar
+                    if (!isPaused) {
+                      const vid = e.currentTarget;
+                      if (vid.duration) {
+                        setProgress((vid.currentTime / vid.duration) * 100);
+                      }
+                    }
+                  }}
                 />
               ) : (
                 <img
@@ -209,11 +225,11 @@ export function StoryViewer({
               )}
             </div>
 
-            {/* Navigation */}
+            {/* Navigation Buttons (Desktop) */}
             <button
               onClick={handlePrev}
               className={cn(
-                "absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-20 text-white",
+                "hidden md:flex absolute left-8 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-20 text-white",
                 currentStoryIndex === 0 && "opacity-50 pointer-events-none"
               )}
             >
@@ -222,10 +238,14 @@ export function StoryViewer({
 
             <button
               onClick={handleNext}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-20 text-white"
+              className="hidden md:flex absolute right-8 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-20 text-white"
             >
               <ChevronRight className="w-8 h-8" />
             </button>
+
+            {/* Mobile Touch Areas */}
+            <div className="md:hidden absolute inset-y-0 left-0 w-1/4 z-10" onClick={handlePrev} />
+            <div className="md:hidden absolute inset-y-0 right-0 w-1/4 z-10" onClick={handleNext} />
 
           </div>
         </motion.div>

@@ -1,10 +1,7 @@
 import { Story } from "../models/story.model.js";
-import {
-  uploadInCloudinary,
-  deleteFromCloudinary,
-} from "../utils/cloudinary.js";
+import { uploadInCloudinary } from "../utils/cloudinary.js";
 
-// @desc    Create a new story
+// @desc    Create multiple stories
 // @route   POST /api/v1/stories
 export const createStory = async (req, res) => {
   try {
@@ -12,42 +9,64 @@ export const createStory = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // 1. Check if file is provided by Multer
-    const localFilePath = req.file?.path;
-    if (!localFilePath) {
-      return res.status(400).json({ message: "No file uploaded" });
+    // ✅ CHANGED: Check for req.files (array) instead of req.file
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No files uploaded" });
     }
 
-    // 2. Upload to Cloudinary
-    console.log("Uploading to Cloudinary...");
-    const cloudResponse = await uploadInCloudinary(localFilePath);
+    console.log(`Uploading ${files.length} stories for user: ${req.user._id}`);
 
-    if (!cloudResponse) {
-      return res.status(500).json({ message: "Failed to upload to cloud" });
-    }
+    const createdStories = [];
 
-    // 3. Determine Type (image/video)
-    const type = cloudResponse.resource_type === "video" ? "video" : "image";
+    // Process files in parallel for speed
+    const uploadPromises = files.map(async (file) => {
+      const localFilePath = file.path;
 
-    // 4. Save to DB with Public ID
-    const newStory = new Story({
-      user: req.user._id,
-      type: type,
-      url: cloudResponse.secure_url, // Cloud URL
-      publicId: cloudResponse.public_id, // ✅ Save Public ID
-      viewers: [],
+      // 1. Upload to Cloudinary
+      const cloudResponse = await uploadInCloudinary(localFilePath);
+
+      if (!cloudResponse) {
+        console.error(`Failed to upload file: ${file.originalname}`);
+        return null;
+      }
+
+      const type = cloudResponse.resource_type === "video" ? "video" : "image";
+
+      // 2. Create DB Entry
+      const newStory = new Story({
+        user: req.user._id,
+        type: type,
+        url: cloudResponse.secure_url,
+        publicId: cloudResponse.public_id,
+        viewers: [],
+      });
+
+      await newStory.save();
+      return newStory;
     });
 
-    await newStory.save();
-    await newStory.populate("user", "username avatar displayName");
+    // Wait for all uploads to finish
+    const results = await Promise.all(uploadPromises);
 
-    console.log("✅ Story Created:", newStory._id);
-    res.status(201).json({ success: true, data: newStory });
+    // Filter out any failed uploads (nulls)
+    const successfulStories = results.filter((s) => s !== null);
+
+    // Populate user data for the first one (or all) to return to frontend
+    if (successfulStories.length > 0) {
+      await Story.populate(successfulStories, {
+        path: "user",
+        select: "username avatar displayName",
+      });
+    }
+
+    console.log(`✅ Successfully created ${successfulStories.length} stories.`);
+    res.status(201).json({ success: true, data: successfulStories });
   } catch (error) {
     console.error("❌ Create Story Error:", error);
     res
       .status(500)
-      .json({ message: "Failed to create story", error: error.message });
+      .json({ message: "Failed to create stories", error: error.message });
   }
 };
 
@@ -55,7 +74,7 @@ export const createStory = async (req, res) => {
 export const getStories = async (req, res) => {
   try {
     const stories = await Story.find({ expiresAt: { $gt: new Date() } })
-      .populate("user", "username avatar displayName")
+      .populate("user", "username avatar displayName profilePic")
       .sort({ createdAt: -1 });
 
     const currentUserId = req.user?._id?.toString();

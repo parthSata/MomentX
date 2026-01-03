@@ -7,10 +7,10 @@ import type { Story } from "@/hooks/useStories"
 
 interface StoriesBarProps {
   stories: Story[];
-  onStoryClick: (storyIndex: number) => void;
+  onStoryClick: (storyId: string) => void; // Changed to ID for safer lookup
   isUploading: boolean;
   onFileSelect: (file: File) => void;
-  currentUser: any; // ✅ Accept currentUser from parent
+  currentUser: any;
 }
 
 export function StoriesBar({
@@ -21,11 +21,19 @@ export function StoriesBar({
   currentUser
 }: StoriesBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-
   const safeStories = Array.isArray(stories) ? stories : [];
 
-  // ✅ Check if current user already has a story
-  const myStory = safeStories.find(s => s.user._id === currentUser?._id);
+  // 1. Find Current User's latest story
+  const myStory = safeStories.find(s => {
+    const storyUserId = typeof s.user === 'object' ? s.user._id : s.user;
+    return storyUserId === currentUser?._id;
+  });
+
+  // 2. Filter out Current User from the main list so they don't appear twice
+  const otherStories = safeStories.filter(s => {
+    const storyUserId = typeof s.user === 'object' ? s.user._id : s.user;
+    return storyUserId !== currentUser?._id;
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -34,6 +42,8 @@ export function StoriesBar({
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
+
+  const triggerUpload = () => fileInputRef.current?.click();
 
   return (
     <div className="glass rounded-2xl p-4 overflow-hidden">
@@ -46,76 +56,80 @@ export function StoriesBar({
       />
 
       <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-        {/* 'Your Story' Button */}
-        <motion.button
+        {/* === CURRENT USER STORY BUTTON === */}
+        <motion.div
+          className="relative flex flex-col items-center gap-2 shrink-0 cursor-pointer group"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            // If I have a story, view it. If not, open upload dialog.
-            if (myStory) {
-              const index = stories.findIndex(s => s._id === myStory._id);
-              if (index !== -1) onStoryClick(index);
-            } else {
-              fileInputRef.current?.click();
-            }
-          }}
-          disabled={isUploading}
-          className="flex flex-col items-center gap-2 shrink-0"
         >
-          <div className="relative">
-            {/* ✅ Display User Avatar or Their Story Thumbnail */}
+          <div className="relative" onClick={() => {
+            if (myStory) {
+              onStoryClick(myStory._id); // View my story
+            } else {
+              triggerUpload(); // Upload new
+            }
+          }}>
             <AvatarRing
-              src={myStory && myStory.type === 'image' ? myStory.url : (currentUser?.avatar || "/default-avatar.png")}
+              // Priority: Story Image -> User Avatar -> Default
+              src={myStory ? (myStory.type === 'image' ? myStory.url : currentUser?.avatar) : (currentUser?.avatar || "/default-avatar.png")}
               alt="Your Story"
               size="lg"
-              hasStory={!!myStory} // Show ring if story exists
+              hasStory={!!myStory}
               isViewed={myStory?.isViewed}
             />
 
-            {/* Show Plus icon only if NO story */}
-            {!myStory && (
+            {/* Upload Indicator logic */}
+            {!myStory ? (
               <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center border-2 border-background">
                 <Plus className="w-4 h-4 text-primary-foreground" />
               </div>
+            ) : (
+              // If already has story, small plus button to add another
+              <motion.button
+                whileHover={{ scale: 1.2 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerUpload();
+                }}
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-500 hover:bg-blue-600 flex items-center justify-center border-2 border-background z-10"
+              >
+                <Plus className="w-4 h-4 text-white" />
+              </motion.button>
             )}
           </div>
-          <span className="text-xs text-muted-foreground">
+
+          <span className="text-xs text-muted-foreground font-medium">
             {isUploading ? "Posting..." : "Your Story"}
           </span>
-        </motion.button>
+        </motion.div>
 
-        {/* Other Users' Stories */}
-        {safeStories
-          .filter(s => s.user._id !== currentUser?._id) // Don't show myself again in the list
-          .map((story) => {
-
-            const originalIndex = stories.findIndex(s => s._id === story._id);
-
-            return (
-              <motion.button
-                key={story._id}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => onStoryClick(originalIndex)}
-                className="flex flex-col items-center gap-2 shrink-0"
-              >
-                {/* Thumbnail: Use story image if available, else user avatar */}
-                <AvatarRing
-                  src={story.type === 'image' ? story.url : story.user.avatar}
-                  alt={story.user.displayName}
-                  size="lg"
-                  hasStory
-                  isViewed={story.isViewed}
-                />
-                <span className={cn(
-                  "text-xs truncate w-16 text-center",
-                  story.isViewed ? "text-muted-foreground" : "text-foreground"
-                )}>
-                  {story.user.username?.split('.')[0]}
-                </span>
-              </motion.button>
-            )
-          })}
+        {/* === OTHER USERS STORIES === */}
+        {otherStories.map((story) => (
+          <motion.button
+            key={story._id}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onStoryClick(story._id)}
+            className="flex flex-col items-center gap-2 shrink-0"
+          >
+            <AvatarRing
+              // Ensure we access the populated user avatar correctly
+              src={story.user?.avatar || "/default-avatar.png"}
+              alt={story.user?.username || "User"}
+              size="lg"
+              hasStory
+              isViewed={story.isViewed}
+            />
+            <span className={cn(
+              "text-xs truncate w-16 text-center font-medium",
+              story.isViewed ? "text-muted-foreground" : "text-foreground"
+            )}>
+              {/* Display username safely */}
+              {story.user?.username?.split('.')[0] || "User"}
+            </span>
+          </motion.button>
+        ))}
       </div>
     </div>
   )

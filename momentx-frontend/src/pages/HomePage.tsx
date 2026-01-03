@@ -15,35 +15,66 @@ import type { Post } from "@/types"
 
 export default function HomePage() {
   const navigate = useNavigate()
-
-  // ✅ Get loading state from auth
   const { user: currentUser, loading: authLoading } = useAuth()
 
+  // Assuming 'stories' contains all stories sorted by Date or User
+  // IMPORTANT: Backend must populate 'user' field in stories
   const { stories, markAsViewed, createStory, isUploading, deleteStory } = useStories()
 
-  // State for Viewers and Dialogs
+  // --- State ---
   const [storyViewerOpen, setStoryViewerOpen] = useState(false)
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0)
-
-  // Upload Preview State
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
-
-  // Unique users logic
-  const uniqueUserStories = useMemo(() => {
-    const seenUsers = new Set();
-    return stories.filter(story => {
-      if (seenUsers.has(story.user._id)) return false;
-      seenUsers.add(story.user._id);
-      return true;
-    });
-  }, [stories]);
-
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
 
+  // --- Logic ---
+
+  // Filter stories to show only ONE bubble per User in the top bar (The latest one)
+  const uniqueUserStories = useMemo(() => {
+    const seenUsers = new Set();
+    const result = [];
+
+    // Iterate through stories. Since they are usually sorted Newest -> Oldest,
+    // the first time we see a user, that's their latest story.
+    for (const story of stories) {
+      // Handle case where user might be null or populated object
+      const userId = story.user?._id || story.user;
+      if (userId && !seenUsers.has(userId)) {
+        seenUsers.add(userId);
+        result.push(story);
+      }
+    }
+    return result;
+  }, [stories]);
+
+  // When clicking a bubble, find that story's index in the FULL 'stories' list
+  // so the Viewer opens at the correct spot and can scroll to previous/next.
+  const handleStoryClick = (storyId: string) => {
+    const index = stories.findIndex(s => s._id === storyId);
+    if (index !== -1) {
+      setSelectedStoryIndex(index);
+      setStoryViewerOpen(true);
+    }
+  }
+
+  const handleFileSelect = (file: File) => {
+    setUploadFile(file);
+    setIsUploadDialogOpen(true);
+  }
+
+  const handleConfirmUpload = async () => {
+    if (uploadFile) {
+      await createStory([uploadFile]);
+      setIsUploadDialogOpen(false);
+      setUploadFile(null);
+    }
+  }
+
+  // --- Infinite Scroll for Posts ---
   const observer = useRef<IntersectionObserver | null>(null)
   const lastPostElementRef = useCallback((node: HTMLDivElement) => {
     if (isLoading) return
@@ -73,37 +104,14 @@ export default function HomePage() {
 
   useEffect(() => { fetchPosts() }, [page])
 
-  // Handlers
-  const handleStoryClick = (storyId: string) => {
-    const index = stories.findIndex(s => s._id === storyId);
-    if (index !== -1) {
-      setSelectedStoryIndex(index);
-      setStoryViewerOpen(true);
-    }
-  }
-
-  const handleFileSelect = (file: File) => {
-    setUploadFile(file);
-    setIsUploadDialogOpen(true);
-  }
-
-  const handleConfirmUpload = async () => {
-    if (uploadFile) {
-      await createStory(uploadFile);
-      setIsUploadDialogOpen(false);
-      setUploadFile(null);
-    }
-  }
-
   return (
     <MainLayout>
       <div className="space-y-6 pb-20">
 
-        {/* Stories Bar */}
-        {/* ✅ Pass currentUser only if loaded */}
+        {/* Stories Bar - Uses Unique List */}
         <StoriesBar
           stories={uniqueUserStories}
-          onStoryClick={(index) => handleStoryClick(uniqueUserStories[index]._id)}
+          onStoryClick={handleStoryClick} // Passes ID up
           onFileSelect={handleFileSelect}
           isUploading={isUploading}
           currentUser={currentUser}
@@ -142,18 +150,16 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* FAB */}
+      {/* FAB for Mobile */}
       <motion.button
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => navigate("/create")}
-        className="fixed bottom-24 md:bottom-8 right-4 z-50 w-14 h-14 bg-linear-to-r from-indigo-500 to-pink-500 rounded-full shadow-lg flex items-center justify-center md:hidden text-white"
-      >
+        className="fixed bottom-24 md:bottom-8 right-4 z-50 w-14 h-14 bg-linear-to-r from-indigo-500 to-pink-500 rounded-full shadow-lg flex items-center justify-center md:hidden text-white"      >
         <Plus className="w-7 h-7" />
       </motion.button>
 
-      {/* Story Viewer */}
-      {/* ✅ Only render Viewer if not loading auth */}
+      {/* Story Viewer - Uses FULL List */}
       {!authLoading && (
         <StoryViewer
           isOpen={storyViewerOpen}
@@ -166,7 +172,7 @@ export default function HomePage() {
         />
       )}
 
-      {/* Upload Confirmation Dialog */}
+      {/* Upload Dialog */}
       <StoryUploadDialog
         isOpen={isUploadDialogOpen}
         onClose={() => setIsUploadDialogOpen(false)}
@@ -174,7 +180,6 @@ export default function HomePage() {
         onConfirm={handleConfirmUpload}
         isUploading={isUploading}
       />
-
     </MainLayout>
   )
 }
