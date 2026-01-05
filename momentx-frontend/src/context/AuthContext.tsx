@@ -4,14 +4,15 @@ import { api } from "@/lib/axios";
 import type { User } from "@/types";
 import { toast } from "sonner";
 
-
+// ✅ FIX: Added 'refreshUser' to the interface
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
-    isLoading: boolean;
+    loading: boolean;
     login: (data: any) => Promise<void>;
     register: (data: FormData) => Promise<void>;
     logout: () => Promise<void>;
+    refreshUser: () => Promise<void>; // <--- New function type definition
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,7 +24,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const skipAuthCheck = useRef(false);
 
     // --- SECURITY HELPER: Sanitize User Data ---
-    // Removes sensitive fields before saving to state/localStorage
     const sanitizeUser = (userData: any) => {
         if (!userData) return null;
 
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             resetPasswordOTP,
             resetPasswordExpires,
             refreshToken,
-            accessToken, // Token should be in cookie, not localstorage user object
+            accessToken,
             __v,
             ...safeUser
         } = userData;
@@ -40,45 +40,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return safeUser;
     };
 
+    // --- HELPER: Fetch Current User (Reusable) ---
+    // We extracted this logic so it can be called on mount AND manually via refreshUser
+    const fetchCurrentUser = async () => {
+        try {
+            // 1. Backend Fetch (Source of Truth)
+            const { data } = await api.get("/users/current-user");
+
+            // Handle nested response structure
+            const rawUser = data?.message?.user || data?.data?.user || data?.data;
+
+            if (rawUser) {
+                const safeUser = sanitizeUser(rawUser);
+                setUser(safeUser);
+                // Update local storage so we have the new Bio/Name on next reload
+                localStorage.setItem("momentx_user", JSON.stringify(safeUser));
+            }
+        } catch (error: any) {
+            console.error("Fetch user failed:", error);
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                setUser(null);
+                localStorage.removeItem("momentx_user");
+            }
+        }
+    };
+
+    // Exposed function
+    const refreshUser = async () => {
+        setIsLoading(true); // Optional: Trigger loading state if you want UI spinners
+        await fetchCurrentUser();
+        setIsLoading(false);
+    };
+
     // --- 1. Check Session on Load ---
     useEffect(() => {
         const checkAuth = async () => {
             if (skipAuthCheck.current) return;
 
-            try {
-                // 1. Try LocalStorage (Fast load)
-                const stored = localStorage.getItem("momentx_user");
-                if (stored && stored !== "undefined" && stored !== "null") {
-                    setUser(JSON.parse(stored));
-                }
-
-                // 2. Verify with Backend (Source of Truth)
-                const { data } = await api.get("/users/current-user");
-
-                // Handle various backend response structures
-                const rawUser = data?.message?.user || data?.data || data?.message?.user || data?.user;
-
-                if (rawUser) {
-                    const safeUser = sanitizeUser(rawUser);
-                    setUser(safeUser);
-                    localStorage.setItem("momentx_user", JSON.stringify(safeUser));
-                }
-            } catch (error) {
-                // Only clear if 401 (Unauthorized) or 403 (Forbidden)
-                // @ts-ignore
-                if (error.response?.status === 401 || error.response?.status === 403) {
-                    setUser(null);
-                    localStorage.removeItem("momentx_user");
-                }
-            } finally {
-                setIsLoading(false);
-            }
+            await fetchCurrentUser();
+            setIsLoading(false);
         };
 
         checkAuth();
     }, []);
 
-    // --- 2. Login Logic ---
+    // --- 2. NEW: Refresh User Logic ---
+    // Call this after updating profile to update the header/sidebar instantly
+
+
+    // --- 3. Login Logic ---
     const login = async (credentials: any) => {
         try {
             setIsLoading(true);
@@ -86,7 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const response = await api.post("/users/login", credentials);
             const resData = response.data;
 
-            // Extract User (Support multiple backend structures)
             const rawUser = resData?.message?.user || resData?.data?.user || resData?.data;
 
             if (!rawUser || !rawUser._id) {
@@ -104,7 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error: any) {
             console.error("Login Failed:", error);
             const msg = error.response?.data?.message || "Validation Failed";
-            // Handle case where message might be an object
             const toastMsg = typeof msg === 'object' ? "Login failed" : msg;
 
             toast.error(toastMsg);
@@ -114,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    // --- 3. Register Logic ---
+    // --- 4. Register Logic ---
     const register = async (formData: FormData) => {
         try {
             setIsLoading(true);
@@ -125,7 +133,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const rawUser = data?.message?.user || data?.data?.user || data?.data;
 
             if (rawUser) {
-                // ✅ SECURITY: Sanitize before saving
                 const safeUser = sanitizeUser(rawUser);
 
                 setUser(safeUser);
@@ -143,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    // --- 4. Logout Logic ---
+    // --- 5. Logout Logic ---
     const logout = async () => {
         skipAuthCheck.current = true;
         try {
@@ -157,7 +164,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout }}>
+        <AuthContext.Provider value={{
+            user,
+            isAuthenticated: !!user,
+            loading: isLoading,
+            login,
+            register,
+            logout,
+            refreshUser // ✅ Exposed to the app
+        }}>
             {children}
         </AuthContext.Provider>
     );

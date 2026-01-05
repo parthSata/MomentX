@@ -5,6 +5,7 @@ import { ApiError } from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadInCloudinary } from "../utils/cloudinary.js";
+import mongoose from "mongoose";
 
 // --- 1. CREATE POST ---
 const createPost = asyncHandler(async (req, res) => {
@@ -171,4 +172,33 @@ const deletePost = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { postId }, "Post deleted successfully"));
 });
 
-export { createPost, getHomeFeed, togglePostLike, toggleSavePost, deletePost };
+const getUserPosts = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  // 1. Validate User ID format
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid User ID format");
+  }
+
+
+  // 2. Fetch Posts
+  // ⚠️ CRITICAL: Check your Post Model. Is the field 'user', 'owner', or 'author'?
+  // I am using 'user' here as it's the most common convention.
+  // If your model says 'owner', change 'user: userId' to 'owner: userId'
+  const posts = await Post.find({ user: userId })
+    .populate("user", "username profilePic") // Ensure this matches the field name above
+    .sort({ createdAt: -1 });
+
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, posts, "User posts fetched successfully"));
+});
+export {
+  createPost,
+  getHomeFeed,
+  togglePostLike,
+  toggleSavePost,
+  deletePost,
+  getUserPosts,
+};

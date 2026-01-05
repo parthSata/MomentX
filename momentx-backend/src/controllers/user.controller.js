@@ -9,8 +9,27 @@ import { sendEmail } from "../utils/sendEmail.js";
 
 const cookieOptions = {
   httpOnly: true,
-  secure: true, // Set to true if using HTTPS/Production
-  sameSite: "None", // Needed for cross-site cookies
+  // only use 'secure: true' in production (HTTPS), otherwise false for localhost
+  secure: process.env.NODE_ENV === "production",
+  // 'Lax' allows the cookie to be sent on localhost navigation
+  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Days in milliseconds
+};
+
+const generateAccessAndRefereshTokens = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    // We return the user instance too, so we can save it later in the controller
+    return { accessToken, refreshToken, user };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "Something went wrong while generating refresh and access token"
+    );
+  }
 };
 
 const registerUser = asyncHandler(async (req, res) => {
@@ -22,47 +41,33 @@ const registerUser = asyncHandler(async (req, res) => {
     !email?.trim() ||
     !password?.trim()
   ) {
-    throw new ApiError(400, "Name, Username, email, and password are required");
+    throw new ApiError(400, "All fields are required");
   }
 
   const existingUser = await User.findOne({ $or: [{ email }, { username }] });
   if (existingUser) {
-    throw new ApiError(400, "User with email or username already exists");
+    throw new ApiError(400, "User already exists");
   }
 
-  // Initialize userData
   const userData = {
     name: name.trim(),
     username: username.trim(),
     email: email.trim(),
     password,
-    profilePic: "", // Default empty
+    profilePic: "",
   };
 
-  // 3. Check and Upload Image
-  if (req.files && req.files.profilePic && req.files.profilePic.length > 0) {
-    const profilePicFile = req.files.profilePic[0];
-
-    const uploadResult = await uploadInCloudinary(profilePicFile.path);
-
-    if (uploadResult) {
-      userData.profilePic = uploadResult.secure_url; // Use secure_url
-    } else {
-      console.log("⚠️ Upload Result was null/undefined.");
-    }
-  } else {
-    console.log("⚠️ No 'profilePic' found in req.files");
+  if (req.files?.profilePic?.length > 0) {
+    const uploadResult = await uploadInCloudinary(req.files.profilePic[0].path);
+    if (uploadResult) userData.profilePic = uploadResult.secure_url;
   }
 
   const newUser = new User(userData);
   await newUser.save();
 
-  const accessToken = newUser.generateAccessToken();
-  const refreshToken = newUser.generateRefreshToken();
-
-  newUser.accessToken = accessToken;
-  newUser.refreshToken = refreshToken;
-  await newUser.save({ validateBeforeSave: false });
+  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
+    newUser._id
+  );
 
   const loggedInUser = await User.findById(newUser._id).select(
     "-password -refreshToken"
@@ -70,14 +75,8 @@ const registerUser = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .cookie("accessToken", accessToken, {
-      ...cookieOptions,
-      maxAge: 24 * 60 * 60 * 1000,
-    })
-    .cookie("refreshToken", refreshToken, {
-      ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
     .json(
       new ApiResponse(201, "User registered successfully", {
         user: loggedInUser,
@@ -89,20 +88,18 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    throw new ApiError(400, "Email and password are required");
-  }
+  if (!email || !password)
+    throw new ApiError(400, "Email and password required");
 
   const user = await User.findOne({ email }).select("+password");
   if (!user || !(await user.isPasswordCorrect(password))) {
-    throw new ApiError(401, "Invalid email or password");
+    throw new ApiError(401, "Invalid credentials");
   }
 
-  const accessToken = user.generateAccessToken();
-  const refreshToken = user.generateRefreshToken();
+  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
+    user._id
+  );
 
-  user.accessToken = accessToken;
-  user.refreshToken = refreshToken;
   user.isOnline = true;
   await user.save({ validateBeforeSave: false });
 
@@ -112,14 +109,8 @@ const loginUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .cookie("accessToken", accessToken, {
-      ...cookieOptions,
-      maxAge: 24 * 60 * 60 * 1000,
-    })
-    .cookie("refreshToken", refreshToken, {
-      ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
     .json(
       new ApiResponse(200, "Login successful", {
         user: loggedInUser,
@@ -135,13 +126,11 @@ const logoutUser = asyncHandler(async (req, res) => {
       $set: {
         isOnline: false,
         lastSeen: new Date(),
-        refreshToken: undefined, // Remove token
-        accessToken: undefined,
+        refreshToken: undefined,
       },
     });
   }
 
-  // Clear cookies properly before sending JSON
   return res
     .status(200)
     .clearCookie("accessToken", cookieOptions)
@@ -150,47 +139,38 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 
 const refreshToken = asyncHandler(async (req, res) => {
-  const incomingRefreshToken = req.cookies?.refreshToken;
-  if (!incomingRefreshToken) {
-    throw new ApiError(401, "No refresh token provided");
-  }
+  // Use cookies OR body for flexibility
+  const incomingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
+
+  if (!incomingRefreshToken) throw new ApiError(401, "Unauthorized request");
 
   try {
-    // FIX: Removed 'VITE_' prefix
     const decoded = jwt.verify(
       incomingRefreshToken,
       process.env.REFRESH_TOKEN_SECRET
     );
-
     const user = await User.findById(decoded._id);
-    if (!user || user.refreshToken !== incomingRefreshToken) {
-      throw new ApiError(401, "Invalid or expired refresh token");
-    }
 
-    const newAccessToken = user.generateAccessToken();
-    const newRefreshToken = user.generateRefreshToken();
+    if (!user) throw new ApiError(401, "Invalid refresh token");
+    if (incomingRefreshToken !== user?.refreshToken)
+      throw new ApiError(401, "Refresh token is expired or used");
 
-    user.accessToken = newAccessToken;
-    user.refreshToken = newRefreshToken;
-    await user.save({ validateBeforeSave: false });
+    const { accessToken, refreshToken: newRefreshToken } =
+      await generateAccessAndRefereshTokens(user._id);
 
     return res
       .status(200)
-      .cookie("accessToken", newAccessToken, {
-        ...cookieOptions,
-        maxAge: 24 * 60 * 60 * 1000,
-      })
-      .cookie("refreshToken", newRefreshToken, {
-        ...cookieOptions,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      })
+      .cookie("accessToken", accessToken, cookieOptions)
+      .cookie("refreshToken", newRefreshToken, cookieOptions)
       .json(
         new ApiResponse(200, "Token refreshed successfully", {
-          accessToken: newAccessToken,
+          accessToken,
+          refreshToken: newRefreshToken,
         })
       );
   } catch (error) {
-    throw new ApiError(401, "Invalid or expired refresh token");
+    throw new ApiError(401, error?.message || "Invalid refresh token");
   }
 });
 
@@ -217,45 +197,64 @@ const searchUser = asyncHandler(async (req, res) => {
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
-  const { username, email, password, status } = req.body;
-  const userId = req.user._id;
+  // 1. Extract Data
+  // Frontend sends 'name' (Display Name), 'username', 'bio', 'website'
+  const { name, username, bio, website } = req.body;
 
-  const updateData = {};
-  if (username) updateData.username = username;
-  if (email) updateData.email = email;
-  if (password) updateData.password = await bcrypt.hash(password, 10);
-  if (status) updateData.status = status;
-
-  if (req.files?.profilePic) {
-    const profilePicFile = req.files.profilePic[0];
-    const uploadResult = await uploadInCloudinary(profilePicFile.path);
-    if (uploadResult) {
-      updateData.profilePic = uploadResult.secure_url;
-    }
+  // 2. Validate mandatory fields
+  if (!name?.trim() || !username?.trim()) {
+    throw new ApiError(400, "Name and Username are required");
   }
 
+  const userId = req.user?._id;
+
+  // 3. Check for unique username (if it's being changed)
+  const existingUser = await User.findOne({
+    username: username.toLowerCase().trim(),
+    _id: { $ne: userId }, // Exclude current user
+  });
+
+  if (existingUser) {
+    throw new ApiError(409, "Username already taken");
+  }
+
+  // 4. Prepare Update Object
+  const updateData = {
+    name: name.trim(),
+    username: username.toLowerCase().trim(),
+    bio: bio || "",
+    website: website || "",
+  };
+
+  // 5. Handle File Upload
+  // Since route uses upload.fields([{ name: "profilePic" }])
+  // The file will be in req.files.profilePic[0]
+  if (req.files && req.files.profilePic && req.files.profilePic.length > 0) {
+    const localFilePath = req.files.profilePic[0].path;
+
+    const avatar = await uploadInCloudinary(localFilePath);
+
+    if (!avatar) {
+      throw new ApiError(500, "Error uploading image");
+    }
+
+    updateData.profilePic = avatar.secure_url;
+  }
+
+  // 6. Update Database
   const updatedUser = await User.findByIdAndUpdate(
     userId,
     { $set: updateData },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true } // Return updated doc
   ).select("-password -refreshToken");
 
   if (!updatedUser) {
     throw new ApiError(404, "User not found");
   }
 
-  const userResponse = {
-    _id: updatedUser._id.toString(),
-    username: updatedUser.username,
-    email: updatedUser.email,
-    profilePic: updatedUser.profilePic || "",
-    status: updatedUser.status,
-    isOnline: updatedUser.isOnline,
-  };
-
   return res
     .status(200)
-    .json(new ApiResponse(200, "Profile updated successfully", userResponse));
+    .json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
@@ -275,9 +274,15 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     _id: userData._id.toString(),
     username: userData.username,
     email: userData.email,
+    name: userData.name, // <--- Added
+    bio: userData.bio || "", // <--- Added
+    website: userData.website || "", // <--- Added
     profilePic: userData.profilePic || "",
     status: userData.status,
     isOnline: userData.isOnline,
+    followers: userData.followers, // <--- Added
+    following: userData.following, // <--- Added
+    posts: userData.posts,
   };
 
   return res
@@ -364,7 +369,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "OTP sent successfully. Check your inbox.", {}));
 });
 
-// 2. RESET PASSWORD (Verifies OTP & Sets New Password)
 const resetPassword = asyncHandler(async (req, res) => {
   const { email, otp, newPassword } = req.body;
 
@@ -403,6 +407,62 @@ const resetPassword = asyncHandler(async (req, res) => {
     );
 });
 
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  // 1. Extract data (Frontend sends 'name', not 'displayName')
+  const { name, username, bio, website } = req.body;
+
+  // 2. Validate essential data
+  if (!name || !username) {
+    throw new ApiError(400, "Name and Username are required");
+  }
+
+  const userId = req.user?._id;
+
+  // 3. Check if Username is taken (if changed)
+  // We check if a user exists with this username AND it is NOT the current user
+  const existingUser = await User.findOne({
+    username: username.toLowerCase(),
+    _id: { $ne: userId },
+  });
+
+  if (existingUser) {
+    throw new ApiError(409, "Username already taken");
+  }
+
+  // 4. Prepare Update Object
+  const updateData = {
+    name,
+    username: username.toLowerCase(),
+    bio: bio || "",
+    website: website || "",
+  };
+
+  const profileLocalPath = req.file?.path;
+
+  if (profileLocalPath) {
+    const avatar = await uploadInCloudinary(profileLocalPath);
+
+    if (!avatar) {
+      throw new ApiError(500, "Error uploading image");
+    }
+
+    updateData.profilePic = avatar.secure_url;
+  }
+
+  // 6. Update Database
+  const user = await User.findByIdAndUpdate(
+    userId,
+    {
+      $set: updateData,
+    },
+    { new: true } // Returns the updated document
+  ).select("-password -refreshToken");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Account details updated successfully"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -414,4 +474,5 @@ export {
   getAllUsers,
   forgotPassword,
   resetPassword,
+  updateAccountDetails,
 };

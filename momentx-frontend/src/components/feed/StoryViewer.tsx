@@ -110,10 +110,12 @@ export function StoryViewer({
 
   if (!currentStory) return null
 
-  // ✅ FIXED: Safer ID extraction logic to resolve TypeScript error
-  // Checks if 'user' is an Object (populated) or String (ID only)
-  const storyOwnerId = typeof currentStory.user === 'object' && '_id' in currentStory.user
-    ? (currentStory.user as any)._id
+  // ✅ FIXED: Extract User object safely once
+  const storyUser = typeof currentStory.user === 'object' ? currentStory.user : null;
+
+  // ✅ FIXED: Safer ID extraction logic
+  const storyOwnerId = storyUser
+    ? (storyUser._id as any).toString()
     : (currentStory.user as unknown as string);
 
   const isOwner = currentUserId && storyOwnerId
@@ -151,15 +153,15 @@ export function StoryViewer({
             <div className="absolute top-8 left-4 right-4 flex items-center justify-between z-20 text-white max-w-md mx-auto">
               <div className="flex items-center gap-3">
                 <AvatarRing
-                  // Handle safe access for populated vs unpopulated user
-                  src={(typeof currentStory.user === 'object' ? currentStory.user.profilePic : "") || "/default-avatar.png"}
-                  alt={(typeof currentStory.user === 'object' ? currentStory.user.username : "User")}
+                  // ✅ FIXED: Checks both 'avatar' AND 'profilePic' to prevent broken images
+                  src={(storyUser?.avatar || storyUser?.profilePic) || "/default-avatar.png"}
+                  alt={storyUser?.username || "User"}
                   size="sm"
                   hasStory={false}
                 />
                 <div className="flex flex-col">
                   <span className="font-semibold text-sm drop-shadow-md">
-                    {typeof currentStory.user === 'object' ? currentStory.user.username : "User"}
+                    {storyUser?.username || "User"}
                   </span>
                   <span className="text-xs text-white/70">
                     {new Date(currentStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

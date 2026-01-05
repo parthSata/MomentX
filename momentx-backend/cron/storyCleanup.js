@@ -5,8 +5,6 @@ import { deleteFromCloudinary } from "../src/utils/cloudinary.js";
 // Run every hour: '0 * * * *'
 export const initStoryCleanup = () => {
   cron.schedule("0 * * * *", async () => {
-    console.log("⏳ Running Story Cleanup Job...");
-
     try {
       // Find stories that have expired (expiresAt < now)
       const expiredStories = await Story.find({
@@ -14,10 +12,6 @@ export const initStoryCleanup = () => {
       });
 
       if (expiredStories.length === 0) return;
-
-      console.log(
-        `🗑️ Found ${expiredStories.length} expired stories. Deleting...`
-      );
 
       for (const story of expiredStories) {
         // 1. Delete from Cloudinary
@@ -28,8 +22,6 @@ export const initStoryCleanup = () => {
         // 2. Delete from Database
         await story.deleteOne();
       }
-
-      console.log("✅ Cleanup Complete.");
     } catch (error) {
       console.error("❌ Story Cleanup Failed:", error);
     }

@@ -1,27 +1,40 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Link } from "react-router-dom"
-import { Settings, Share2, Grid3X3, Bookmark, Tag, Sparkles } from "lucide-react"
-import { currentUser, posts, highlights } from "@/data/mockData"
+import { Settings, Share2, Grid3X3, Bookmark, Tag, Sparkles, Loader2 } from "lucide-react"
 import { MainLayout } from "@/components/navigation/MainLayout"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog"
+import { useAuth } from "@/context/AuthContext"
+import { api } from "@/lib/axios"
+import type { Post } from "@/types"
 
 type TabType = "posts" | "saved" | "tagged"
 
 export default function ProfilePage() {
+  const { user: authUser, refreshUser } = useAuth()
   const [activeTab, setActiveTab] = useState<TabType>("posts")
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [userData, setUserData] = useState({
-    displayName: currentUser.displayName,
-    username: currentUser.username,
-    bio: currentUser.bio,
-    website: currentUser.website,
-    avatar: currentUser.avatar,
+  const [posts, setPosts] = useState<Post[]>([])
+  const [loadingPosts, setLoadingPosts] = useState(true)
+
+  // Local state to hold latest profile data
+  const [profileData, setProfileData] = useState({
+    _id: "",
+    name: "",
+    username: "",
+    bio: "",
+    website: "",
+    profilePic: "",
+    isVerified: false,
+    followers: [],
+    following: [],
+    postsCount: 0
   })
 
   const formatNumber = (num: number) => {
+    if (!num) return "0"
     if (num >= 1000000) return (num / 1000000).toFixed(1) + "M"
     if (num >= 1000) return (num / 1000).toFixed(1) + "K"
     return num.toString()
@@ -32,6 +45,58 @@ export default function ProfilePage() {
     { id: "saved", icon: Bookmark, label: "Saved" },
     { id: "tagged", icon: Tag, label: "Tagged" },
   ]
+
+  // ✅ Fetch Real Data with Debug Logs
+  const fetchData = async () => {
+    try {
+      if (!authUser) return;
+      // 1. Fetch Latest Profile Details
+      const userRes = await api.get("/users/current-user");
+      const user = userRes.data?.message?.user || userRes.data?.data?.user || userRes.data?.data;
+
+
+      let userPosts: Post[] = [];
+      try {
+        const postsRes = await api.get(`/posts/user-posts/${user._id}`);
+        userPosts = postsRes.data?.data || postsRes.data?.message || [];
+      } catch (postError) {
+        console.warn("⚠️ [ProfilePage] Could not fetch posts (Route might be missing):", postError);
+        userPosts = [];
+      }
+
+      setPosts(userPosts);
+
+      setProfileData({
+        _id: user._id,
+        name: user.name || "",
+        username: user.username,
+        bio: user.bio || "",
+        website: user.website || "",
+        profilePic: user.profilePic || "",
+        isVerified: user.isVerified || false,
+        followers: user.followers || [],
+        following: user.following || [],
+        postsCount: userPosts.length // Dynamically count posts
+      });
+
+    } catch (error) {
+      console.error("❌ [ProfilePage] Fatal Error fetching profile data:", error);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [authUser]);
+
+  // ✅ Function passed to EditDialog to refresh data after edit
+  const handleProfileUpdate = async () => {
+    await refreshUser(); // Update global auth state (Header avatar)
+    await fetchData();   // Update local profile page state (Bio, Name)
+  };
+
+  if (!authUser) return null;
 
   return (
     <MainLayout>
@@ -45,11 +110,11 @@ export default function ProfilePage() {
           <div className="flex flex-col md:flex-row items-center gap-6">
             {/* Avatar */}
             <div className="relative">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-r from-neon-indigo via-neon-violet to-neon-pink p-1 animate-gradient animate-glow">
+              <div className="w-32 h-32 rounded-full bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink p-1 animate-gradient">
                 <div className="w-full h-full rounded-full bg-background p-1">
                   <img
-                    src={currentUser.avatar}
-                    alt={currentUser.displayName}
+                    src={profileData.profilePic || "/default-avatar.png"}
+                    alt={profileData.username}
                     className="w-full h-full rounded-full object-cover"
                   />
                 </div>
@@ -60,8 +125,8 @@ export default function ProfilePage() {
             <div className="flex-1 text-center md:text-left space-y-4">
               <div className="flex flex-col md:flex-row items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-display font-bold">{currentUser.username}</h1>
-                  {currentUser.isVerified && (
+                  <h1 className="text-2xl font-display font-bold">{profileData.username}</h1>
+                  {profileData.isVerified && (
                     <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
                       <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
                     </div>
@@ -83,26 +148,28 @@ export default function ProfilePage() {
               {/* Stats */}
               <div className="flex justify-center md:justify-start gap-8">
                 <div className="text-center">
-                  <p className="font-bold text-lg">{formatNumber(currentUser.posts)}</p>
+                  <p className="font-bold text-lg">{formatNumber(profileData.postsCount)}</p>
                   <p className="text-sm text-muted-foreground">Posts</p>
                 </div>
-                <Link to="/followers/followers" className="text-center hover:opacity-80 transition-opacity">
-                  <p className="font-bold text-lg">{formatNumber(currentUser.followers)}</p>
+                <Link to="/followers" className="text-center hover:opacity-80 transition-opacity">
+                  <p className="font-bold text-lg">{formatNumber(profileData.followers.length)}</p>
                   <p className="text-sm text-muted-foreground">Followers</p>
                 </Link>
-                <Link to="/followers/following" className="text-center hover:opacity-80 transition-opacity">
-                  <p className="font-bold text-lg">{formatNumber(currentUser.following)}</p>
+                <Link to="/following" className="text-center hover:opacity-80 transition-opacity">
+                  <p className="font-bold text-lg">{formatNumber(profileData.following.length)}</p>
                   <p className="text-sm text-muted-foreground">Following</p>
                 </Link>
               </div>
 
               {/* Bio */}
               <div className="space-y-1">
-                <p className="font-semibold">{userData.displayName}</p>
-                <p className="text-sm text-muted-foreground whitespace-pre-line">{userData.bio}</p>
-                <a href={`https://${userData.website}`} className="text-sm text-primary hover:underline">
-                  {userData.website}
-                </a>
+                <p className="font-semibold">{profileData.name}</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-line">{profileData.bio}</p>
+                {profileData.website && (
+                  <a href={profileData.website.startsWith('http') ? profileData.website : `https://${profileData.website}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                    {profileData.website}
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -112,39 +179,23 @@ export default function ProfilePage() {
         <EditProfileDialog
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
-          user={userData}
-          onSave={(data) => setUserData({ ...userData, ...data })}
+          user={{
+            displayName: profileData.name,
+            username: profileData.username,
+            bio: profileData.bio,
+            website: profileData.website,
+            avatar: profileData.profilePic
+          }}
+          onProfileUpdate={handleProfileUpdate} // ✅ Use the new handler
         />
 
-        {/* Highlights */}
+        {/* Highlights Placeholder */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="flex gap-4 overflow-x-auto scrollbar-hide pb-2"
         >
-          {highlights.map((highlight, index) => (
-            <motion.button
-              key={highlight.id}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 + index * 0.05 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex flex-col items-center gap-2 flex-shrink-0"
-            >
-              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-neon-indigo via-neon-violet to-neon-pink p-0.5">
-                <div className="w-full h-full rounded-full bg-background p-0.5">
-                  <img
-                    src={highlight.cover}
-                    alt={highlight.name}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                </div>
-              </div>
-              <span className="text-xs">{highlight.name}</span>
-            </motion.button>
-          ))}
         </motion.div>
 
         {/* Tabs */}
@@ -164,7 +215,7 @@ export default function ProfilePage() {
                 {activeTab === tab.id && (
                   <motion.div
                     layoutId="profileTabIndicator"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-neon-indigo via-neon-violet to-neon-pink"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink"
                   />
                 )}
               </button>
@@ -173,27 +224,33 @@ export default function ProfilePage() {
 
           {/* Grid */}
           <div className="grid grid-cols-3 gap-0.5 p-0.5">
-            {posts.map((post, index) => (
-              <motion.button
-                key={post.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 }}
-                whileHover={{ scale: 1.02 }}
-                className="aspect-square relative group overflow-hidden"
-              >
-                <img
-                  src={post.image}
-                  alt={post.caption}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-                  <div className="flex items-center gap-1 text-foreground">
-                    <span className="font-semibold">{formatNumber(post.likes)}</span>
-                  </div>
-                </div>
-              </motion.button>
-            ))}
+            {loadingPosts ? (
+              <div className="col-span-3 flex justify-center py-10">
+                <Loader2 className="animate-spin text-primary" />
+              </div>
+            ) : posts.length === 0 ? (
+              <div className="col-span-3 text-center py-10 text-muted-foreground">
+                No posts yet.
+              </div>
+            ) : (
+              posts.map((post, index) => (
+                <motion.div
+                  key={post._id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ scale: 1.02 }}
+                  className="aspect-square relative group overflow-hidden cursor-pointer"
+                >
+                  <img
+                    src={post.images?.[0] || "/placeholder-image.jpg"}
+                    alt={post.caption || "Post"}
+                    className="w-full h-full object-cover"
+                  />
+                 
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </div>

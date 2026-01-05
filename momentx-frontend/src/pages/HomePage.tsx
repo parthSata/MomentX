@@ -10,7 +10,7 @@ import { StoryUploadDialog } from "@/components/feed/StoryUploadDialog"
 import { PostSkeleton } from "@/components/ui/skeleton-loader"
 import { api } from "@/lib/axios"
 import { useStories } from "@/hooks/useStories"
-import { useAuth } from "@/hooks/useAuth"
+import { useAuth } from "@/context/AuthContext"
 import type { Post } from "@/types"
 
 export default function HomePage() {

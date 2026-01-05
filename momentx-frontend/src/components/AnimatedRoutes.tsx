@@ -18,6 +18,9 @@ import AdminPage from "@/pages/AdminPage";
 import CreatePostPage from "@/pages/CreatePostPage";
 import FollowersPage from "@/pages/FollowersPage";
 
+// ✅ IMPORT THE NEW PAGE
+import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
+
 // Admin route protection
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const isAdminAuthenticated = sessionStorage.getItem("adminAuthenticated") === "true";
@@ -83,6 +86,17 @@ export function AnimatedRoutes() {
             </PageTransition>
           }
         />
+
+        {/* ✅ THIS IS THE MISSING ROUTE FIX */}
+        <Route
+          path="/reset-password"
+          element={
+            <PageTransition>
+              <ResetPasswordPage />
+            </PageTransition>
+          }
+        />
+
         <Route
           path="/chat"
           element={

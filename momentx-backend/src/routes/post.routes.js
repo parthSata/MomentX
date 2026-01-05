@@ -7,6 +7,7 @@ import {
   togglePostLike,
   toggleSavePost,
   deletePost, // ✅ Import
+  getUserPosts,
 } from "../controllers/post.controller.js";
 import {
   addComment,
@@ -31,11 +32,10 @@ router.route("/feed").get(getHomeFeed);
 router.route("/:postId/like").post(togglePostLike);
 router.route("/:postId/save").post(toggleSavePost);
 router.route("/:postId/delete").delete(deletePost); // ✅ Delete Post
-
+router.route("/user-posts/:userId").get(verifyJWT, getUserPosts);
 // --- COMMENT ROUTES ---
 router.route("/:postId/comments").get(getPostComments).post(addComment);
 router.route("/comments/:commentId/like").post(toggleCommentLike); // ✅ Toggle Comment Like
 router.route("/comments/:commentId/delete").delete(deleteComment); // ✅ Delete Comment
-
 
 export default router;

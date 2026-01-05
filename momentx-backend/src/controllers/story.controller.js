@@ -1,5 +1,5 @@
 import { Story } from "../models/story.model.js";
-import { uploadInCloudinary } from "../utils/cloudinary.js";
+import { uploadInCloudinary ,deleteFromCloudinary } from "../utils/cloudinary.js";
 
 // @desc    Create multiple stories
 // @route   POST /api/v1/stories
@@ -15,7 +15,6 @@ export const createStory = async (req, res) => {
       return res.status(400).json({ message: "No files uploaded" });
     }
 
-    console.log(`Uploading ${files.length} stories for user: ${req.user._id}`);
 
     const createdStories = [];
 
@@ -60,7 +59,6 @@ export const createStory = async (req, res) => {
       });
     }
 
-    console.log(`✅ Successfully created ${successfulStories.length} stories.`);
     res.status(201).json({ success: true, data: successfulStories });
   } catch (error) {
     console.error("❌ Create Story Error:", error);

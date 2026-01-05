@@ -19,13 +19,29 @@ import { ApiError } from "../utils/ApiError.js";
 
 const router = express.Router();
 
+// --- Helper: Validation Middleware ---
 const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    throw new ApiError(400, "Validation failed", errors.array());
+    // Return the first error message to the frontend for cleaner toast notifications
+    throw new ApiError(400, errors.array()[0].msg, errors.array());
   }
   next();
 };
+
+// --- Helper: Rate Limiter (Security) ---
+// Limits repeated requests to auth endpoints (max 10 requests per 15 mins)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: "Too many attempts, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ==========================================
+// 🔓 PUBLIC ROUTES (No Token Required)
+// ==========================================
 
 router
   .route("/register")
@@ -34,6 +50,7 @@ router
 router
   .route("/login")
   .post(
+    authLimiter,
     [
       body("email").isEmail().withMessage("Please provide a valid email"),
       body("password").notEmpty().withMessage("Password is required"),
@@ -42,26 +59,53 @@ router
     loginUser
   );
 
-router.route("/forgot-password").post(forgotPassword);
-router.route("/reset-password").post(resetPassword);
-router.route("/current-user").get(verifyJWT, getCurrentUser);
+router
+  .route("/forgot-password")
+  .post(
+    authLimiter,
+    [
+      body("email").isEmail().withMessage("Please provide a valid email"),
+      validate,
+    ],
+    forgotPassword
+  );
 
+router
+  .route("/reset-password")
+  .post(
+    authLimiter,
+    [
+      body("email").isEmail().withMessage("Email is required"),
+      body("otp")
+        .isLength({ min: 6, max: 6 })
+        .withMessage("Invalid OTP format"),
+      body("newPassword")
+        .isLength({ min: 6 })
+        .withMessage("Password must be at least 6 characters"),
+      validate,
+    ],
+    resetPassword
+  );
+
+router.post("/refresh-token", refreshToken);
+
+// ==========================================
+// 🔒 SECURED ROUTES (Token Required)
+// ==========================================
+
+router.route("/current-user").get(verifyJWT, getCurrentUser);
 router.route("/logout").post(verifyJWT, logoutUser);
+router.get("/all", verifyJWT, getAllUsers);
 
 router.get(
   "/search",
   verifyJWT,
-  // [
-  //   query("username")
-  //     .trim()
-  //     .isLength({ min: 1 })
-  //     .withMessage("Username query is required"),
-  //   validate,
-  // ],
+  [
+    query("username").trim().optional(), // Optional validation
+    validate,
+  ],
   searchUser
 );
-
-router.get("/all", verifyJWT, getAllUsers);
 
 router
   .route("/update-profile")
@@ -69,7 +113,11 @@ router
     verifyJWT,
     upload.fields([{ name: "profilePic", maxCount: 1 }]),
     [
-      body("username").optional().trim().isLength({ min: 3 }),
+      body("username")
+        .optional()
+        .trim()
+        .isLength({ min: 3 })
+        .withMessage("Username too short"),
       body("email").optional().isEmail(),
       body("password").optional().isLength({ min: 6 }),
       body("status").optional().trim(),
@@ -77,7 +125,5 @@ router
     ],
     updateProfile
   );
-
-router.post("/refresh-token", refreshToken);
 
 export default router;

@@ -7,7 +7,7 @@ import type { Story } from "@/hooks/useStories"
 
 interface StoriesBarProps {
   stories: Story[];
-  onStoryClick: (storyId: string) => void; // Changed to ID for safer lookup
+  onStoryClick: (storyId: string) => void;
   isUploading: boolean;
   onFileSelect: (file: File) => void;
   currentUser: any;
@@ -23,17 +23,19 @@ export function StoriesBar({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const safeStories = Array.isArray(stories) ? stories : [];
 
-  // 1. Find Current User's latest story
-  const myStory = safeStories.find(s => {
-    const storyUserId = typeof s.user === 'object' ? s.user._id : s.user;
-    return storyUserId === currentUser?._id;
-  });
+  // Helper to safely get string ID
+  const getUserId = (user: any) => {
+    if (!user) return "";
+    return typeof user === 'object' ? user._id?.toString() : user.toString();
+  }
 
-  // 2. Filter out Current User from the main list so they don't appear twice
-  const otherStories = safeStories.filter(s => {
-    const storyUserId = typeof s.user === 'object' ? s.user._id : s.user;
-    return storyUserId !== currentUser?._id;
-  });
+  const currentUserId = getUserId(currentUser);
+
+  // 1. Find Current User's latest story
+  const myStory = safeStories.find(s => getUserId(s.user) === currentUserId);
+
+  // 2. Filter out Current User
+  const otherStories = safeStories.filter(s => getUserId(s.user) !== currentUserId);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -44,6 +46,11 @@ export function StoriesBar({
   }
 
   const triggerUpload = () => fileInputRef.current?.click();
+
+  // Helper to get image safely
+  const getUserAvatar = (user: any) => {
+    return user?.avatar || user?.profilePic || "/default-avatar.png";
+  }
 
   return (
     <div className="glass rounded-2xl p-4 overflow-hidden">
@@ -64,27 +71,24 @@ export function StoriesBar({
         >
           <div className="relative" onClick={() => {
             if (myStory) {
-              onStoryClick(myStory._id); // View my story
+              onStoryClick(myStory._id);
             } else {
-              triggerUpload(); // Upload new
+              triggerUpload();
             }
           }}>
             <AvatarRing
-              // Priority: Story Image -> User Avatar -> Default
-              src={myStory ? (myStory.type === 'image' ? myStory.url : currentUser?.avatar) : (currentUser?.avatar || "/default-avatar.png")}
+              src={myStory ? (myStory.type === 'image' ? myStory.url : getUserAvatar(currentUser)) : getUserAvatar(currentUser)}
               alt="Your Story"
               size="lg"
               hasStory={!!myStory}
               isViewed={myStory?.isViewed}
             />
 
-            {/* Upload Indicator logic */}
             {!myStory ? (
               <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center border-2 border-background">
                 <Plus className="w-4 h-4 text-primary-foreground" />
               </div>
             ) : (
-              // If already has story, small plus button to add another
               <motion.button
                 whileHover={{ scale: 1.2 }}
                 whileTap={{ scale: 0.9 }}
@@ -114,8 +118,8 @@ export function StoriesBar({
             className="flex flex-col items-center gap-2 shrink-0"
           >
             <AvatarRing
-              // Ensure we access the populated user avatar correctly
-              src={story.user?.avatar || "/default-avatar.png"}
+              // ✅ FIX: Checks both avatar AND profilePic
+              src={getUserAvatar(story.user)}
               alt={story.user?.username || "User"}
               size="lg"
               hasStory
@@ -125,7 +129,6 @@ export function StoriesBar({
               "text-xs truncate w-16 text-center font-medium",
               story.isViewed ? "text-muted-foreground" : "text-foreground"
             )}>
-              {/* Display username safely */}
               {story.user?.username?.split('.')[0] || "User"}
             </span>
           </motion.button>
