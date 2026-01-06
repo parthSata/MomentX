@@ -1,4 +1,5 @@
 import { User } from "../models/user.model.js";
+import { Post } from "../models/post.model.js";
 import { uploadInCloudinary } from "../utils/cloudinary.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -270,6 +271,8 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
+  const postsCount = await Post.countDocuments({ user: user._id });
+
   const userResponse = {
     _id: userData._id.toString(),
     username: userData.username,
@@ -283,6 +286,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     followers: userData.followers, // <--- Added
     following: userData.following, // <--- Added
     posts: userData.posts,
+    postsCount: postsCount,
   };
 
   return res
@@ -463,6 +467,65 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "Account details updated successfully"));
 });
 
+const toggleFollowUser = asyncHandler(async (req, res) => {
+  const { id } = req.params; // The ID of the user to follow/unfollow
+  const currentUserId = req.user._id;
+
+  if (id === currentUserId.toString()) {
+    throw new ApiError(400, "You cannot follow yourself");
+  }
+
+  const targetUser = await User.findById(id);
+  const currentUser = await User.findById(currentUserId);
+
+  if (!targetUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Check if already following
+  const isFollowing = currentUser.following.includes(id);
+
+  if (isFollowing) {
+    // Unfollow logic
+    await User.findByIdAndUpdate(currentUserId, { $pull: { following: id } });
+    await User.findByIdAndUpdate(id, { $pull: { followers: currentUserId } });
+    
+    return res.status(200).json(new ApiResponse(200, { isFollowing: false }, "Unfollowed successfully"));
+  } else {
+    // Follow logic
+    await User.findByIdAndUpdate(currentUserId, { $push: { following: id } });
+    await User.findByIdAndUpdate(id, { $push: { followers: currentUserId } });
+
+    return res.status(200).json(new ApiResponse(200, { isFollowing: true }, "Followed successfully"));
+  }
+});
+
+// --- 🆕 2. GET USER FOLLOWERS ---
+const getUserFollowers = asyncHandler(async (req, res) => {
+  const { id } = req.params; // User ID whose followers we want to see
+
+  const user = await User.findById(id).populate("followers", "name username profilePic isVerified");
+  
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res.status(200).json(new ApiResponse(200, user.followers, "Followers fetched successfully"));
+});
+
+// --- 🆕 3. GET USER FOLLOWING ---
+const getUserFollowing = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const user = await User.findById(id).populate("following", "name username profilePic isVerified");
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res.status(200).json(new ApiResponse(200, user.following, "Following list fetched successfully"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -475,4 +538,7 @@ export {
   forgotPassword,
   resetPassword,
   updateAccountDetails,
+  toggleFollowUser,
+  getUserFollowers,
+  getUserFollowing,
 };

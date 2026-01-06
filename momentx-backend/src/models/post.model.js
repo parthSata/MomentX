@@ -24,6 +24,7 @@ const postSchema = new mongoose.Schema(
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
     hashtags: [{ type: String }],
+    taggedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
     location: {
       type: String,

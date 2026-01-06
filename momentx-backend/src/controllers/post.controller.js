@@ -1,4 +1,4 @@
-import { Post } from "../models/post.model.js"; // Ensure you export Post properly in model
+import { Post } from "../models/post.model.js";
 import { User } from "../models/user.model.js";
 import { Comment } from "../models/comment.model.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -7,26 +7,64 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadInCloudinary } from "../utils/cloudinary.js";
 import mongoose from "mongoose";
 
+// --- HELPER: Format Posts to include isLiked, likes Count, etc. ---
+const formatPosts = async (posts, currentUserId) => {
+  const currentUser = await User.findById(currentUserId).select("savedPosts");
+  const savedPostIds = currentUser?.savedPosts.map((id) => id.toString()) || [];
+
+  return await Promise.all(
+    posts.map(async (post) => {
+      // Ensure we work with a plain object
+      const postObj = post.toObject ? post.toObject() : post;
+      const commentCount = await Comment.countDocuments({ post: postObj._id });
+
+      return {
+        ...postObj,
+        user: {
+          ...postObj.user,
+          profilePic: postObj.user?.profilePic || "",
+          avatar: postObj.user?.profilePic || "", // Compatibility
+        },
+        image: postObj.images?.[0] || "",
+        // ✅ FIX: Calculate boolean status
+        isLiked: postObj.likes.some(
+          (id) => id.toString() === currentUserId.toString()
+        ),
+        isSaved: savedPostIds.includes(postObj._id.toString()),
+        // ✅ FIX: Convert Array to Count
+        likes: postObj.likes.length,
+        comments: commentCount,
+      };
+    })
+  );
+};
+
 // --- 1. CREATE POST ---
 const createPost = asyncHandler(async (req, res) => {
-  const { caption, location } = req.body;
+  const { caption, location, taggedUsers } = req.body;
   const userId = req.user._id;
 
   if (!req.files?.images || req.files.images.length === 0) {
     throw new ApiError(400, "Please upload at least one image");
   }
 
-  // Upload all images to Cloudinary
   const imagesLocalPaths = req.files.images.map((file) => file.path);
   const imageUrls = [];
-
   for (const path of imagesLocalPaths) {
     const uploaded = await uploadInCloudinary(path);
     if (uploaded) imageUrls.push(uploaded.secure_url);
   }
 
-  // Extract Hashtags from caption (e.g. "Hello #world" -> ["#world"])
   const hashtags = caption.match(/#[a-z0-9_]+/gi) || [];
+  let parsedTags = [];
+  if (taggedUsers) {
+    try {
+      parsedTags =
+        typeof taggedUsers === "string" ? JSON.parse(taggedUsers) : taggedUsers;
+    } catch (e) {
+      console.warn("Could not parse taggedUsers", e);
+    }
+  }
 
   const post = await Post.create({
     user: userId,
@@ -34,71 +72,112 @@ const createPost = asyncHandler(async (req, res) => {
     images: imageUrls,
     location,
     hashtags,
+    taggedUsers: parsedTags,
     likes: [],
   });
 
-  // Update User's post count
   await User.findByIdAndUpdate(userId, { $inc: { posts: 1 } });
 
-  return res.status(201).json(new ApiResponse(201, "Post created", post));
+  return res
+    .status(201)
+    .json(new ApiResponse(201, post, "Post created successfully"));
 });
 
-// --- 2. GET FEED (Infinite Scroll) ---
+// --- 2. GET FEED ---
 const getHomeFeed = asyncHandler(async (req, res) => {
   const { page = 1, limit = 5 } = req.query;
   const skip = (page - 1) * limit;
   const currentUserId = req.user._id;
 
-  // Fetch posts sorted by newest
   const posts = await Post.find()
     .sort({ createdAt: -1 })
     .skip(parseInt(skip))
     .limit(parseInt(limit))
-    .populate("user", "username name profilePic isVerified") // Populate author details
-    .lean();
+    .populate("user", "username name profilePic isVerified")
+    .populate("taggedUsers", "username");
 
-  // Get current user's saved posts to check "isSaved" status
-  const currentUser = await User.findById(currentUserId).select("savedPosts");
-  const savedPostIds = currentUser.savedPosts.map((id) => id.toString());
-
-  // Add frontend-specific fields (isLiked, isSaved, commentsCount)
-  const postsWithStatus = await Promise.all(
-    posts.map(async (post) => {
-      const commentCount = await Comment.countDocuments({ post: post._id });
-
-      return {
-        ...post,
-        // Map backend 'profilePic' to frontend 'avatar' if needed, or update frontend to use profilePic
-        user: {
-          ...post.user,
-          avatar: post.user.profilePic, // Compatibility mapping
-        },
-        image: post.images[0], // Frontend expects single 'image' string currently
-        isLiked: post.likes.some(
-          (id) => id.toString() === currentUserId.toString()
-        ),
-        isSaved: savedPostIds.includes(post._id.toString()),
-        likes: post.likes.length, // Frontend expects number
-        comments: commentCount, // Frontend expects number
-      };
-    })
-  );
+  // Use the helper to format
+  const formattedPosts = await formatPosts(posts, currentUserId);
 
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-        // ✅ DATA GOES HERE (2nd Argument)
-        posts: postsWithStatus,
+        posts: formattedPosts,
         currentPage: parseInt(page),
         hasMore: posts.length === parseInt(limit),
       },
-      "Feed fetched successfully" // ✅ MESSAGE GOES HERE (3rd Argument)
+      "Feed fetched successfully"
     )
   );
 });
 
-// --- 3. TOGGLE LIKE ---
+// --- 3. GET USER CREATED POSTS (Updated) ---
+const getUserPosts = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const currentUserId = req.user._id;
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid User ID format");
+  }
+
+  const posts = await Post.find({ user: userId })
+    .populate("user", "username profilePic")
+    .sort({ createdAt: -1 });
+
+  // ✅ Use helper to fix Likes/isLiked
+  const formattedPosts = await formatPosts(posts, currentUserId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, formattedPosts, "User posts fetched"));
+});
+
+// --- 4. GET USER SAVED POSTS (Updated) ---
+const getUserSavedPosts = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const currentUserId = req.user._id;
+
+  if (!mongoose.Types.ObjectId.isValid(userId))
+    throw new ApiError(400, "Invalid User ID");
+
+  const user = await User.findById(userId).populate({
+    path: "savedPosts",
+    options: { sort: { createdAt: -1 } },
+    populate: { path: "user", select: "username profilePic" },
+  });
+
+  if (!user) throw new ApiError(404, "User not found");
+
+  // ✅ Use helper to fix Likes/isLiked
+  const formattedPosts = await formatPosts(user.savedPosts, currentUserId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, formattedPosts, "Saved posts fetched"));
+});
+
+// --- 5. GET USER TAGGED POSTS (Updated) ---
+const getUserTaggedPosts = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const currentUserId = req.user._id;
+
+  if (!mongoose.Types.ObjectId.isValid(userId))
+    throw new ApiError(400, "Invalid User ID");
+
+  const posts = await Post.find({ taggedUsers: userId })
+    .populate("user", "username profilePic")
+    .sort({ createdAt: -1 });
+
+  // ✅ Use helper to fix Likes/isLiked
+  const formattedPosts = await formatPosts(posts, currentUserId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, formattedPosts, "Tagged posts fetched"));
+});
+
+// --- INTERACTIONS ---
 const togglePostLike = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const userId = req.user._id;
@@ -109,9 +188,9 @@ const togglePostLike = asyncHandler(async (req, res) => {
   const isLiked = post.likes.includes(userId);
 
   if (isLiked) {
-    post.likes.pull(userId); // Un-like
+    post.likes.pull(userId);
   } else {
-    post.likes.push(userId); // Like
+    post.likes.push(userId);
   }
 
   await post.save();
@@ -124,7 +203,6 @@ const togglePostLike = asyncHandler(async (req, res) => {
   );
 });
 
-// --- 4. TOGGLE SAVE (Bookmark) ---
 const toggleSavePost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const userId = req.user._id;
@@ -158,13 +236,8 @@ const deletePost = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You are not authorized to delete this post");
   }
 
-  // Delete associated comments first
   await Comment.deleteMany({ post: postId });
-
-  // Delete the post
   await Post.findByIdAndDelete(postId);
-
-  // Decrease user post count
   await User.findByIdAndUpdate(userId, { $inc: { posts: -1 } });
 
   return res
@@ -172,28 +245,6 @@ const deletePost = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { postId }, "Post deleted successfully"));
 });
 
-const getUserPosts = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-
-  // 1. Validate User ID format
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new ApiError(400, "Invalid User ID format");
-  }
-
-
-  // 2. Fetch Posts
-  // ⚠️ CRITICAL: Check your Post Model. Is the field 'user', 'owner', or 'author'?
-  // I am using 'user' here as it's the most common convention.
-  // If your model says 'owner', change 'user: userId' to 'owner: userId'
-  const posts = await Post.find({ user: userId })
-    .populate("user", "username profilePic") // Ensure this matches the field name above
-    .sort({ createdAt: -1 });
-
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, posts, "User posts fetched successfully"));
-});
 export {
   createPost,
   getHomeFeed,
@@ -201,4 +252,6 @@ export {
   toggleSavePost,
   deletePost,
   getUserPosts,
+  getUserSavedPosts,
+  getUserTaggedPosts,
 };

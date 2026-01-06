@@ -12,6 +12,9 @@ import {
   getAllUsers,
   forgotPassword,
   resetPassword,
+  toggleFollowUser,
+  getUserFollowers,
+  getUserFollowing,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -96,6 +99,10 @@ router.post("/refresh-token", refreshToken);
 router.route("/current-user").get(verifyJWT, getCurrentUser);
 router.route("/logout").post(verifyJWT, logoutUser);
 router.get("/all", verifyJWT, getAllUsers);
+
+router.route("/follow/:id").post(verifyJWT, toggleFollowUser);
+router.route("/followers/:id").get(verifyJWT, getUserFollowers);
+router.route("/following/:id").get(verifyJWT, getUserFollowing);
 
 router.get(
   "/search",

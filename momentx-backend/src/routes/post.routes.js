@@ -6,36 +6,44 @@ import {
   getHomeFeed,
   togglePostLike,
   toggleSavePost,
-  deletePost, // ✅ Import
+  deletePost,
   getUserPosts,
+  getUserSavedPosts, // ✅ Import
+  getUserTaggedPosts, // ✅ Import
 } from "../controllers/post.controller.js";
 import {
   addComment,
   getPostComments,
-  toggleCommentLike, // ✅ Import
-  deleteComment, // ✅ Import
+  toggleCommentLike,
+  deleteComment,
 } from "../controllers/comment.controller.js";
 
 const router = Router();
 
-// 🔒 All routes require Authentication
 router.use(verifyJWT);
 
-// --- POST ROUTES ---
+// --- Creation & Feed ---
 router
   .route("/create")
   .post(upload.fields([{ name: "images", maxCount: 5 }]), createPost);
-
 router.route("/feed").get(getHomeFeed);
 
-// --- INTERACTION ROUTES ---
+// --- Profile Tabs Data ---
+// 1. Posts Tab (Created by user)
+router.route("/user-posts/:userId").get(getUserPosts);
+// 2. Saved Tab (Saved by user)
+router.route("/saved-posts/:userId").get(getUserSavedPosts);
+// 3. Tagged Tab (User is tagged in)
+router.route("/tagged-posts/:userId").get(getUserTaggedPosts);
+
+// --- Interactions ---
 router.route("/:postId/like").post(togglePostLike);
 router.route("/:postId/save").post(toggleSavePost);
-router.route("/:postId/delete").delete(deletePost); // ✅ Delete Post
-router.route("/user-posts/:userId").get(verifyJWT, getUserPosts);
-// --- COMMENT ROUTES ---
+router.route("/:postId/delete").delete(deletePost);
+
+// --- Comments ---
 router.route("/:postId/comments").get(getPostComments).post(addComment);
-router.route("/comments/:commentId/like").post(toggleCommentLike); // ✅ Toggle Comment Like
-router.route("/comments/:commentId/delete").delete(deleteComment); // ✅ Delete Comment
+router.route("/comments/:commentId/like").post(toggleCommentLike);
+router.route("/comments/:commentId/delete").delete(deleteComment);
 
 export default router;

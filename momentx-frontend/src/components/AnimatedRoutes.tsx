@@ -163,6 +163,11 @@ export function AnimatedRoutes() {
             </PageTransition>
           }
         />
+
+        <Route
+          path="/followers"
+          element={<Navigate to="/followers/followers" replace />}
+        />
         <Route
           path="/followers/:type"
           element={
