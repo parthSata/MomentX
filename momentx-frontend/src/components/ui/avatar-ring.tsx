@@ -48,7 +48,7 @@ export function AvatarRing({
   return (
     <Wrapper
       className={cn(
-        "relative flex-shrink-0",
+        "relative shrink-0",
         onClick && "cursor-pointer",
         className
       )}

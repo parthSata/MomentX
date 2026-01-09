@@ -1,12 +1,19 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/axios";
+import { io, Socket } from "socket.io-client";
+import { useAuth } from "@/context/AuthContext";
 
 export interface StoryUser {
-  profilePic: string;
-  _id: string; // ✅ Added _id to fix type error
+  _id: string;
   username: string;
   displayName: string;
-  avatar: string;
+  avatar?: string;
+  profilePic?: string;
+}
+
+export interface StoryViewer {
+  user: StoryUser;
+  viewedAt: string;
 }
 
 export interface Story {
@@ -16,12 +23,17 @@ export interface Story {
   type: "image" | "video";
   isViewed: boolean;
   createdAt: string;
+  viewers?: StoryViewer[];
 }
+
+let socket: Socket;
 
 export function useStories() {
   const [stories, setStories] = useState<Story[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false); // Add this if missing
+
+  const { user } = useAuth();
 
   const fetchStories = async () => {
     try {
@@ -38,31 +50,57 @@ export function useStories() {
     fetchStories();
   }, []);
 
-  const createStory = async (files: File[]) => {
-    if (files.length === 0) return;
+  // ✅ REAL-TIME SOCKET LISTENER
+  useEffect(() => {
+    if (!user?._id) return;
 
-    setIsUploading(true);
-    const formData = new FormData();
-
-    // Append each file with the same key "files" (matches backend multer)
-    files.forEach((file) => {
-      formData.append("files", file);
+    // Connect to Backend URL
+    socket = io("http://localhost:3000", {
+      transports: ["websocket"],
+      reconnectionAttempts: 5,
     });
 
-    try {
-      const { data } = await api.post("/stories", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+    socket.emit("join_user_room", user._id);
 
-      // ✅ Handle array response
-      const newStories = Array.isArray(data.data) ? data.data : [data.data];
-      setStories((prev) => [...newStories, ...prev]);
-    } catch (error) {
-      console.error("Failed to upload stories", error);
-    } finally {
-      setIsUploading(false);
-    }
-  };
+    // Listen for Views
+    socket.on(
+      "story_view_updated",
+      (data: { storyId: string; newViewer: any }) => {
+        setStories((prevStories) => {
+          // Create a new array to force re-render
+          return prevStories.map((story) => {
+            if (story._id === data.storyId) {
+              // Check duplicates safely
+              const exists = story.viewers?.some(
+                (v) => v.user._id === data.newViewer.user._id
+              );
+
+              if (exists) {
+                return story;
+              }
+
+              // Return new story object with updated viewers
+              const updatedStory = {
+                ...story,
+                viewers: [data.newViewer, ...(story.viewers || [])],
+              };
+
+              return updatedStory;
+            }
+            return story;
+          });
+        });
+      }
+    );
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [user?._id]);
+
+  // Actions
+  const addStoryToState = (newStories: Story[]) =>
+    setStories((prev) => [...newStories, ...prev]);
 
   const markAsViewed = async (storyId: string) => {
     try {
@@ -75,7 +113,6 @@ export function useStories() {
     }
   };
 
-  // ✅ New function to handle deletion
   const deleteStory = async (storyId: string) => {
     try {
       await api.delete(`/stories/${storyId}`);
@@ -89,8 +126,10 @@ export function useStories() {
     stories,
     loading,
     isUploading,
-    createStory,
+    setIsUploading,
+    fetchStories,
+    addStoryToState,
     markAsViewed,
-    deleteStory, // ✅ Exported here
+    deleteStory,
   };
 }

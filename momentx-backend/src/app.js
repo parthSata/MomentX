@@ -5,6 +5,7 @@ import http from "http";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { Server } from "socket.io";
 import { ApiError } from "./utils/ApiError.js";
 import { initStoryCleanup } from "../cron/StoryCleanup.js";
 
@@ -16,20 +17,40 @@ import authRoutes from "./routes/auth.routes.js";
 
 const app = express();
 const server = http.createServer(app);
+
+// 1. Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  },
+});
+
+// 2. Handle Socket Connections
+io.on("connection", (socket) => {
+
+  socket.on("join_user_room", (userId) => {
+    socket.join(userId);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User Disconnected", socket.id);
+  });
+});
+
 initStoryCleanup();
-// --- 1. Path Setup ---
+
+// Path Setup
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- 2. Create 'public/temp' Directory ---
-// This prevents the 500 Error during upload
+// Create 'public/temp' Directory
 const publicTempDir = path.join(process.cwd(), "public", "temp");
 if (!fs.existsSync(publicTempDir)) {
   fs.mkdirSync(publicTempDir, { recursive: true });
-  console.log("✅ Created public/temp directory");
 }
 
-// --- 3. Middleware ---
+// Middleware
 app.use(
   cors({
     origin: ["http://localhost:5173"],
@@ -42,11 +63,16 @@ app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
 
-// --- 4. Serve Static Files (Fixes Broken Images) ---
-// Files in 'public/temp' become accessible at 'http://localhost:3000/temp/image.jpg'
+// 3. Attach IO to Request
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+// Serve Static Files
 app.use(express.static("public"));
 
-// --- 5. Routes ---
+// Routes
 app.get("/", (req, res) => res.status(200).json({ message: "API Running" }));
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRouter);
@@ -67,5 +93,8 @@ app.use((err, req, res, next) => {
     error: err.message,
   });
 });
+
+// ❌ REMOVED: server.listen(...) from here.
+// It is already being called in index.js
 
 export { app, server };

@@ -22,8 +22,14 @@ const storySchema = new Schema(
     },
     viewers: [
       {
-        type: Schema.Types.ObjectId,
-        ref: "User",
+        user: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+        },
+        viewedAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
     // We removed the TTL index to handle cleanup manually via Cron

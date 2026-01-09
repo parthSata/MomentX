@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, ChevronLeft, ChevronRight, Trash2 } from "lucide-react"
+import { X, ChevronLeft, ChevronRight, Trash2, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AvatarRing } from "@/components/ui/avatar-ring"
 import { type Story } from "@/hooks/useStories"
+import { formatDistanceToNowStrict } from "date-fns"
 
 interface StoryViewerProps {
   isOpen: boolean
@@ -28,36 +29,42 @@ export function StoryViewer({
   const [progress, setProgress] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isViewersOpen, setIsViewersOpen] = useState(false)
 
   const currentStory = stories[currentStoryIndex]
 
-  // Reset state whenever 'isOpen' changes to true
+  // Reset state on open
   useEffect(() => {
     if (isOpen) {
       setCurrentStoryIndex(initialIndex)
       setProgress(0)
       setIsPaused(false)
+      setIsViewersOpen(false)
     }
   }, [isOpen, initialIndex])
 
-  // Safety Check: Close if story becomes invalid
+  // ✅ FIX: Console Error "Cannot update component..."
+  // We use setTimeout to ensure onClose doesn't trigger a re-render during the current render phase
   useEffect(() => {
     if (isOpen && !currentStory) {
-      onClose()
+      const timer = setTimeout(() => {
+        onClose();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [currentStory, isOpen, onClose])
 
-  // Mark as viewed logic
+  // Mark as Viewed Logic
   useEffect(() => {
     if (isOpen && currentStory && !currentStory.isViewed) {
       const timer = setTimeout(() => {
         onViewStory(currentStory._id)
-      }, 500); // Increased slightly to ensure view counts as intentional
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [currentStoryIndex, isOpen, currentStory, onViewStory])
 
-  // Navigation Handlers
+  // Handlers
   const handlePrev = useCallback(() => {
     if (currentStoryIndex > 0) {
       setCurrentStoryIndex(prev => prev - 1);
@@ -74,9 +81,11 @@ export function StoryViewer({
     }
   }, [currentStoryIndex, stories.length, onClose]);
 
-  // Progress Bar
+  const isActuallyPaused = isPaused || isViewersOpen || isDeleting;
+
+  // Progress Bar Logic
   useEffect(() => {
-    if (!isOpen || isPaused || isDeleting || !currentStory || currentStory.type === 'video') return
+    if (!isOpen || isActuallyPaused || !currentStory || currentStory.type === 'video') return
 
     const interval = setInterval(() => {
       setProgress(prev => {
@@ -89,7 +98,7 @@ export function StoryViewer({
     }, 100)
 
     return () => clearInterval(interval)
-  }, [isOpen, isPaused, isDeleting, currentStory, handleNext])
+  }, [isOpen, isActuallyPaused, currentStory, handleNext])
 
   const handleDelete = async () => {
     if (!currentStory || !onDeleteStory) return;
@@ -108,19 +117,16 @@ export function StoryViewer({
     }
   }
 
-  if (!currentStory) return null
+  // Early return if not open (Optimization)
+  if (!isOpen) return null;
+  if (!currentStory) return null;
 
-  // ✅ FIXED: Extract User object safely once
+  // User & Viewers Logic
   const storyUser = typeof currentStory.user === 'object' ? currentStory.user : null;
+  const storyOwnerId = storyUser ? (storyUser._id as any).toString() : (currentStory.user as unknown as string);
+  const isOwner = currentUserId && storyOwnerId ? currentUserId.toString() === storyOwnerId.toString() : false;
 
-  // ✅ FIXED: Safer ID extraction logic
-  const storyOwnerId = storyUser
-    ? (storyUser._id as any).toString()
-    : (currentStory.user as unknown as string);
-
-  const isOwner = currentUserId && storyOwnerId
-    ? currentUserId.toString() === storyOwnerId.toString()
-    : false;
+  const viewersList = Array.isArray(currentStory.viewers) ? currentStory.viewers : [];
 
   return (
     <AnimatePresence>
@@ -129,12 +135,13 @@ export function StoryViewer({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm"
+          // ✅ FIX: Z-Index 2000 ensures it is above everything (Header/Sidebar)
+          className="fixed inset-0 z-2000 bg-black/95 backdrop-blur-sm flex items-center justify-center"
         >
-          <div className="relative w-full h-full flex items-center justify-center">
+          <div className="relative w-full h-full max-w-md mx-auto flex flex-col justify-center">
 
             {/* Progress Bars */}
-            <div className="absolute top-4 left-4 right-4 flex gap-1 z-20 max-w-md mx-auto">
+            <div className="absolute top-4 left-4 right-4 flex gap-1 z-20">
               {stories.map((_, index) => (
                 <div key={index} className="h-1 flex-1 rounded-full bg-white/20 overflow-hidden">
                   <motion.div
@@ -150,70 +157,63 @@ export function StoryViewer({
             </div>
 
             {/* Header */}
-            <div className="absolute top-8 left-4 right-4 flex items-center justify-between z-20 text-white max-w-md mx-auto">
+            <div className="absolute top-8 left-4 right-4 flex items-center justify-between z-20 text-white">
               <div className="flex items-center gap-3">
                 <AvatarRing
-                  // ✅ FIXED: Checks both 'avatar' AND 'profilePic' to prevent broken images
                   src={(storyUser?.avatar || storyUser?.profilePic) || "/default-avatar.png"}
                   alt={storyUser?.username || "User"}
                   size="sm"
                   hasStory={false}
                 />
                 <div className="flex flex-col">
-                  <span className="font-semibold text-sm drop-shadow-md">
+                  <span className="font-semibold text-sm drop-shadow-md text-white">
                     {storyUser?.username || "User"}
                   </span>
-                  <span className="text-xs text-white/70">
+                  <span className="text-xs text-white/80">
                     {new Date(currentStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               </div>
 
               <div className="flex items-center gap-4">
-                {/* Delete Button */}
                 {isOwner && (
                   <button
                     onClick={handleDelete}
                     disabled={isDeleting}
                     className="p-2 bg-black/20 hover:bg-red-500/80 backdrop-blur-md rounded-full transition-colors group pointer-events-auto"
-                    title="Delete Story"
                   >
                     <Trash2 className="w-5 h-5 text-white/90 group-hover:text-white" />
                   </button>
                 )}
-
                 <button
                   onClick={onClose}
                   className="p-2 bg-black/20 hover:bg-white/20 backdrop-blur-md rounded-full transition-colors pointer-events-auto"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 text-white" />
                 </button>
               </div>
             </div>
 
-            {/* Content Area */}
+            {/* Story Content */}
             <div
-              className="w-full max-w-md aspect-9/16 relative bg-gray-900 overflow-hidden rounded-none md:rounded-xl shadow-2xl"
+              className="w-full aspect-9/16 relative bg-[#1a1a1a] overflow-hidden rounded-none md:rounded-xl shadow-2xl"
               onMouseDown={() => setIsPaused(true)}
-              onMouseUp={() => setIsPaused(false)}
+              onMouseUp={() => !isViewersOpen && setIsPaused(false)}
               onTouchStart={() => setIsPaused(true)}
-              onTouchEnd={() => setIsPaused(false)}
+              onTouchEnd={() => !isViewersOpen && setIsPaused(false)}
             >
               {currentStory.type === 'video' ? (
                 <video
                   src={currentStory.url}
-                  className="w-full h-full object-contain"
-                  autoPlay
+                  className="w-full h-full object-contain bg-black"
+                  autoPlay={!isActuallyPaused}
                   muted
                   playsInline
                   onEnded={handleNext}
                   onTimeUpdate={(e) => {
-                    // Sync video time with progress bar
-                    if (!isPaused) {
+                    if (!isActuallyPaused) {
                       const vid = e.currentTarget;
-                      if (vid.duration) {
-                        setProgress((vid.currentTime / vid.duration) * 100);
-                      }
+                      if (vid.duration) setProgress((vid.currentTime / vid.duration) * 100);
                     }
                   }}
                 />
@@ -221,17 +221,43 @@ export function StoryViewer({
                 <img
                   src={currentStory.url}
                   alt="Story"
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain bg-black"
                   onError={() => setIsPaused(true)}
                 />
               )}
+
+              {/* ✅ FIX: Viewers Button (Styled better & Moved up) */}
+              {isOwner && !isViewersOpen && (
+                <motion.button
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsViewersOpen(true);
+                    setIsPaused(true);
+                  }}
+                  className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 group cursor-pointer"
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 group-hover:bg-white/20 transition-all shadow-lg">
+                      <Eye className="w-4 h-4 text-white" />
+                      <span className="text-sm font-bold text-white">
+                        {viewersList.length}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-white/90 uppercase tracking-wider font-bold drop-shadow-md">
+                      Viewers
+                    </span>
+                  </div>
+                </motion.button>
+              )}
             </div>
 
-            {/* Navigation Buttons (Desktop) */}
+            {/* Nav Arrows */}
             <button
               onClick={handlePrev}
               className={cn(
-                "hidden md:flex absolute left-8 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-20 text-white",
+                "hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-20 text-white backdrop-blur-sm",
                 currentStoryIndex === 0 && "opacity-50 pointer-events-none"
               )}
             >
@@ -240,14 +266,91 @@ export function StoryViewer({
 
             <button
               onClick={handleNext}
-              className="hidden md:flex absolute right-8 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-20 text-white"
+              className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-20 text-white backdrop-blur-sm"
             >
               <ChevronRight className="w-8 h-8" />
             </button>
 
             {/* Mobile Touch Areas */}
-            <div className="md:hidden absolute inset-y-0 left-0 w-1/4 z-10" onClick={handlePrev} />
-            <div className="md:hidden absolute inset-y-0 right-0 w-1/4 z-10" onClick={handleNext} />
+            <div className="md:hidden absolute inset-y-0 left-0 w-1/3 z-10" onClick={handlePrev} />
+            <div className="md:hidden absolute inset-y-0 right-0 w-1/3 z-10" onClick={handleNext} />
+
+            {/* ✅ VIEWERS LIST SHEET */}
+            <AnimatePresence>
+              {isViewersOpen && (
+                <>
+                  {/* Backdrop */}
+                  <motion.div
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-black/60 z-40 backdrop-blur-sm"
+                    onClick={() => {
+                      setIsViewersOpen(false);
+                      setIsPaused(false);
+                    }}
+                  />
+
+                  {/* Sheet */}
+                  <motion.div
+                    initial={{ y: "100%" }}
+                    animate={{ y: 0 }}
+                    exit={{ y: "100%" }}
+                    transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                    className="absolute bottom-0 w-full bg-[#121212] rounded-t-3xl z-50 border-t border-white/10 flex flex-col max-h-[60vh] shadow-2xl"
+                  >
+                    <div className="flex items-center justify-between p-4 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <Eye className="w-5 h-5 text-indigo-400" />
+                        <h3 className="text-white font-semibold text-lg">
+                          {viewersList.length} Viewers
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsViewersOpen(false);
+                          setIsPaused(false);
+                        }}
+                        className="p-1 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                      >
+                        <X className="w-6 h-6 text-white/70 hover:text-white" />
+                      </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {viewersList.length === 0 ? (
+                        <div className="text-center text-white/40 py-12 flex flex-col items-center gap-2">
+                          <Eye className="w-8 h-8 opacity-20" />
+                          <p>No views yet</p>
+                        </div>
+                      ) : (
+                        viewersList.map((viewer: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <AvatarRing
+                                src={viewer.user?.avatar || viewer.user?.profilePic}
+                                size="sm"
+                                alt={viewer.user?.username}
+                                hasStory={false}
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-white text-sm font-medium">
+                                  {viewer.user?.username || "Unknown User"}
+                                </span>
+                                <span className="text-white/50 text-xs">
+                                  {viewer.user?.displayName}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-white/30 text-[10px] font-medium">
+                              {viewer.viewedAt ? formatDistanceToNowStrict(new Date(viewer.viewedAt), { addSuffix: true }) : ""}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
 
           </div>
         </motion.div>

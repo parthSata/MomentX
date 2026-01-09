@@ -1,56 +1,102 @@
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { motion } from "framer-motion"
 import { Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AvatarRing } from "@/components/ui/avatar-ring"
+import { api } from "@/lib/axios" // ✅ Ensure API is imported
+import { toast } from "sonner" // ✅ Ensure Toast is imported
 import type { Story } from "@/hooks/useStories"
+import { StoryUploadDialog } from "./StoryUploadDialog" // ✅ Import the dialog
 
 interface StoriesBarProps {
   stories: Story[];
   onStoryClick: (storyId: string) => void;
-  isUploading: boolean;
-  onFileSelect: (file: File) => void;
+  // isUploading is handled internally now, removed from props to avoid conflict
+  // isUploading: boolean; 
+  onFileSelect?: (file: File) => void;
   currentUser: any;
+  onUploadSuccess?: () => void;
 }
 
 export function StoriesBar({
   stories,
   onStoryClick,
-  isUploading,
-  onFileSelect,
-  currentUser
+  currentUser,
+  onUploadSuccess
 }: StoriesBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ✅ 1. Local State for Upload Management
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+
   const safeStories = Array.isArray(stories) ? stories : [];
 
-  // Helper to safely get string ID
+  // Helper functions
   const getUserId = (user: any) => {
     if (!user) return "";
     return typeof user === 'object' ? user._id?.toString() : user.toString();
   }
 
+  const getUserAvatar = (user: any) => {
+    return user?.avatar || user?.profilePic || "/default-avatar.png";
+  }
+
   const currentUserId = getUserId(currentUser);
-
-  // 1. Find Current User's latest story
   const myStory = safeStories.find(s => getUserId(s.user) === currentUserId);
-
-  // 2. Filter out Current User
   const otherStories = safeStories.filter(s => getUserId(s.user) !== currentUserId);
 
+  // ✅ 2. Handle File Selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      onFileSelect(file);
+      setSelectedFile(file)
+      setIsDialogOpen(true) // Open the dialog immediately
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
-  const triggerUpload = () => fileInputRef.current?.click();
+  // ✅ 3. Handle Upload with Realtime Progress
+  const handleUploadConfirm = async () => {
+    if (!selectedFile) return;
 
-  // Helper to get image safely
-  const getUserAvatar = (user: any) => {
-    return user?.avatar || user?.profilePic || "/default-avatar.png";
-  }
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    const formData = new FormData();
+    formData.append("files", selectedFile);
+
+    try {
+      await api.post("/stories", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        // 🚀 KEY: Capture Upload Progress here
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent.total || 1;
+          const current = progressEvent.loaded;
+          const percentage = Math.round((current / total) * 100);
+          setUploadProgress(percentage);
+        },
+      });
+
+      toast.success("Story uploaded successfully!");
+      setIsDialogOpen(false);
+      setSelectedFile(null);
+
+      // Refresh stories
+      if (onUploadSuccess) onUploadSuccess();
+      else window.location.reload();
+
+    } catch (error) {
+      console.error("Upload failed", error);
+      toast.error("Failed to upload story");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const triggerUpload = () => fileInputRef.current?.click();
 
   return (
     <div className="glass rounded-2xl p-4 overflow-hidden">
@@ -60,6 +106,16 @@ export function StoriesBar({
         className="hidden"
         accept="image/*,video/*"
         onChange={handleFileChange}
+      />
+
+      {/* ✅ 4. Render the Dialog with Progress Props */}
+      <StoryUploadDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        file={selectedFile}
+        onConfirm={handleUploadConfirm}
+        isUploading={isUploading}
+        uploadProgress={uploadProgress}
       />
 
       <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
@@ -118,7 +174,6 @@ export function StoriesBar({
             className="flex flex-col items-center gap-2 shrink-0"
           >
             <AvatarRing
-              // ✅ FIX: Checks both avatar AND profilePic
               src={getUserAvatar(story.user)}
               alt={story.user?.username || "User"}
               size="lg"
