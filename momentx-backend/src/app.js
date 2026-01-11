@@ -14,6 +14,7 @@ import userRouter from "./routes/user.routes.js";
 import postRouter from "./routes/post.routes.js";
 import storyRoutes from "./routes/story.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import notificationRouter from "./routes/notification.routes.js"; // ✅ Import
 
 const app = express();
 const server = http.createServer(app);
@@ -28,7 +29,6 @@ const io = new Server(server, {
 
 // 2. Handle Socket Connections
 io.on("connection", (socket) => {
-
   socket.on("join_user_room", (userId) => {
     socket.join(userId);
   });
@@ -78,6 +78,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/posts", postRouter);
 app.use("/api/v1/stories", storyRoutes);
+app.use("/api/v1/notifications", notificationRouter); // ✅ Use Notification Router
 
 // Error Handling
 app.use((err, req, res, next) => {

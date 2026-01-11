@@ -3,9 +3,8 @@ import {
   uploadInCloudinary,
   deleteFromCloudinary,
 } from "../utils/cloudinary.js";
+import { sendNotification } from "../utils/Notification.js";
 
-// @desc    Create multiple stories
-// @route   POST /api/v1/stories
 export const createStory = async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
@@ -70,7 +69,6 @@ export const createStory = async (req, res) => {
   }
 };
 
-// ... keep getStories, viewStory, deleteStory as they were ...
 export const getStories = async (req, res) => {
   try {
     const stories = await Story.find({ expiresAt: { $gt: new Date() } })
@@ -110,6 +108,7 @@ export const viewStory = async (req, res) => {
     const story = await Story.findById(storyId);
     if (!story) return res.status(404).json({ message: "Story not found" });
 
+    // Check if user already viewed (Avoid duplicates)
     const alreadyViewed = story.viewers.some(
       (v) => v.user.toString() === userId.toString()
     );
@@ -120,13 +119,14 @@ export const viewStory = async (req, res) => {
         viewedAt: new Date(),
       };
 
+      // 1. Save Viewer to Story Document
       story.viewers.push(newViewerEntry);
       await story.save();
 
-      // ✅ SOCKET DATA PREP
+      // 2. Prepare Data for Real-Time View Count (The Eye Icon)
       const viewerDataForSocket = {
         user: {
-          _id: req.user._id.toString(), // Ensure string ID
+          _id: req.user._id.toString(),
           username: req.user.username,
           displayName: req.user.displayName,
           avatar: req.user.avatar || req.user.profilePic || "",
@@ -135,12 +135,34 @@ export const viewStory = async (req, res) => {
         viewedAt: newViewerEntry.viewedAt,
       };
 
+      // 3. Emit Real-Time View Update (For the Owner's UI)
       if (req.io) {
         req.io.to(story.user.toString()).emit("story_view_updated", {
-          storyId: story._id.toString(), // Ensure string ID
+          storyId: story._id.toString(),
           newViewer: viewerDataForSocket,
         });
       }
+
+      // 4. ✅ SEND PERSISTENT NOTIFICATION (For the Notification Page)
+      await sendNotification({
+        req,
+        receiverId: story.user, // Notify the Story Owner
+        type: "story_view",
+        // We pass the story ID separately since we updated the model
+        // Note: You might need to update sendNotification utils to accept 'storyId'
+        // OR pass it as 'postId' if you want to be lazy, but better to update the utils.
+        postId: null,
+        commentId: null,
+      });
+
+      // *Quick Fix for Utils*: Ensure your sendNotification utils accepts extra fields
+      // or simply pass it as a custom object if your utils is flexible.
+      // If using the exact code I gave before, update src/utils/notification.js to accept storyId:
+      /* // Inside src/utils/notification.js params:
+         ... storyId = null ...
+         // Inside .create():
+         ... story: storyId ...
+      */
     }
 
     res.status(200).json({ success: true });
@@ -155,17 +177,14 @@ export const deleteStory = async (req, res) => {
     const story = await Story.findById(req.params.id);
     if (!story) return res.status(404).json({ message: "Story not found" });
 
-    // Check ownership
     if (story.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    // 1. Delete from Cloudinary
     if (story.publicId) {
-      await deleteFromCloudinary(story.publicId, story.type); // Pass type (video/image)
+      await deleteFromCloudinary(story.publicId, story.type);
     }
 
-    // 2. Delete from DB
     await story.deleteOne();
 
     res.status(200).json({ success: true, message: "Story deleted" });

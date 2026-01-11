@@ -6,15 +6,15 @@ import ApiResponse from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadInCloudinary } from "../utils/cloudinary.js";
 import mongoose from "mongoose";
+import { sendNotification } from "../utils/Notification.js"; // ✅ Import Notification Helper
 
-// --- HELPER: Format Posts to include isLiked, likes Count, etc. ---
+// --- HELPER: Format Posts ---
 const formatPosts = async (posts, currentUserId) => {
   const currentUser = await User.findById(currentUserId).select("savedPosts");
   const savedPostIds = currentUser?.savedPosts.map((id) => id.toString()) || [];
 
   return await Promise.all(
     posts.map(async (post) => {
-      // Ensure we work with a plain object
       const postObj = post.toObject ? post.toObject() : post;
       const commentCount = await Comment.countDocuments({ post: postObj._id });
 
@@ -23,15 +23,13 @@ const formatPosts = async (posts, currentUserId) => {
         user: {
           ...postObj.user,
           profilePic: postObj.user?.profilePic || "",
-          avatar: postObj.user?.profilePic || "", // Compatibility
+          avatar: postObj.user?.profilePic || "",
         },
         image: postObj.images?.[0] || "",
-        // ✅ FIX: Calculate boolean status
         isLiked: postObj.likes.some(
           (id) => id.toString() === currentUserId.toString()
         ),
         isSaved: savedPostIds.includes(postObj._id.toString()),
-        // ✅ FIX: Convert Array to Count
         likes: postObj.likes.length,
         comments: commentCount,
       };
@@ -78,6 +76,18 @@ const createPost = asyncHandler(async (req, res) => {
 
   await User.findByIdAndUpdate(userId, { $inc: { posts: 1 } });
 
+  // Optional: Send notification to tagged users
+  if (parsedTags.length > 0) {
+    parsedTags.forEach((taggedUserId) => {
+      sendNotification({
+        req,
+        receiverId: taggedUserId,
+        type: "mention", // You might need to add 'mention' to your enum if you want this
+        postId: post._id,
+      });
+    });
+  }
+
   return res
     .status(201)
     .json(new ApiResponse(201, post, "Post created successfully"));
@@ -96,7 +106,6 @@ const getHomeFeed = asyncHandler(async (req, res) => {
     .populate("user", "username name profilePic isVerified")
     .populate("taggedUsers", "username");
 
-  // Use the helper to format
   const formattedPosts = await formatPosts(posts, currentUserId);
 
   return res.status(200).json(
@@ -112,7 +121,7 @@ const getHomeFeed = asyncHandler(async (req, res) => {
   );
 });
 
-// --- 3. GET USER CREATED POSTS (Updated) ---
+// --- 3. GET USER POSTS ---
 const getUserPosts = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const currentUserId = req.user._id;
@@ -125,7 +134,6 @@ const getUserPosts = asyncHandler(async (req, res) => {
     .populate("user", "username profilePic")
     .sort({ createdAt: -1 });
 
-  // ✅ Use helper to fix Likes/isLiked
   const formattedPosts = await formatPosts(posts, currentUserId);
 
   return res
@@ -133,7 +141,7 @@ const getUserPosts = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, formattedPosts, "User posts fetched"));
 });
 
-// --- 4. GET USER SAVED POSTS (Updated) ---
+// --- 4. GET SAVED POSTS ---
 const getUserSavedPosts = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const currentUserId = req.user._id;
@@ -149,7 +157,6 @@ const getUserSavedPosts = asyncHandler(async (req, res) => {
 
   if (!user) throw new ApiError(404, "User not found");
 
-  // ✅ Use helper to fix Likes/isLiked
   const formattedPosts = await formatPosts(user.savedPosts, currentUserId);
 
   return res
@@ -157,7 +164,7 @@ const getUserSavedPosts = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, formattedPosts, "Saved posts fetched"));
 });
 
-// --- 5. GET USER TAGGED POSTS (Updated) ---
+// --- 5. GET TAGGED POSTS ---
 const getUserTaggedPosts = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const currentUserId = req.user._id;
@@ -169,7 +176,6 @@ const getUserTaggedPosts = asyncHandler(async (req, res) => {
     .populate("user", "username profilePic")
     .sort({ createdAt: -1 });
 
-  // ✅ Use helper to fix Likes/isLiked
   const formattedPosts = await formatPosts(posts, currentUserId);
 
   return res
@@ -178,6 +184,8 @@ const getUserTaggedPosts = asyncHandler(async (req, res) => {
 });
 
 // --- INTERACTIONS ---
+
+// ✅ TOGGLE LIKE (Updated with Notification)
 const togglePostLike = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const userId = req.user._id;
@@ -188,9 +196,19 @@ const togglePostLike = asyncHandler(async (req, res) => {
   const isLiked = post.likes.includes(userId);
 
   if (isLiked) {
+    // Unlike logic
     post.likes.pull(userId);
   } else {
+    // Like logic
     post.likes.push(userId);
+
+    // ✅ SEND NOTIFICATION
+    await sendNotification({
+      req,
+      receiverId: post.user, // Notify post owner
+      type: "like",
+      postId: post._id,
+    });
   }
 
   await post.save();

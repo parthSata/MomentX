@@ -7,6 +7,7 @@ import ApiResponse from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { sendEmail } from "../utils/sendEmail.js";
+import { sendNotification } from "../utils/Notification.js";
 
 const cookieOptions = {
   httpOnly: true,
@@ -489,14 +490,29 @@ const toggleFollowUser = asyncHandler(async (req, res) => {
     // Unfollow logic
     await User.findByIdAndUpdate(currentUserId, { $pull: { following: id } });
     await User.findByIdAndUpdate(id, { $pull: { followers: currentUserId } });
-    
-    return res.status(200).json(new ApiResponse(200, { isFollowing: false }, "Unfollowed successfully"));
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, { isFollowing: false }, "Unfollowed successfully")
+      );
   } else {
     // Follow logic
     await User.findByIdAndUpdate(currentUserId, { $push: { following: id } });
     await User.findByIdAndUpdate(id, { $push: { followers: currentUserId } });
 
-    return res.status(200).json(new ApiResponse(200, { isFollowing: true }, "Followed successfully"));
+    // ✅ SEND NOTIFICATION (New Follower)
+    await sendNotification({
+      req,
+      receiverId: id, // The user being followed
+      type: "follow",
+    });
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, { isFollowing: true }, "Followed successfully")
+      );
   }
 });
 
@@ -504,26 +520,44 @@ const toggleFollowUser = asyncHandler(async (req, res) => {
 const getUserFollowers = asyncHandler(async (req, res) => {
   const { id } = req.params; // User ID whose followers we want to see
 
-  const user = await User.findById(id).populate("followers", "name username profilePic isVerified");
-  
+  const user = await User.findById(id).populate(
+    "followers",
+    "name username profilePic isVerified"
+  );
+
   if (!user) {
     throw new ApiError(404, "User not found");
   }
 
-  return res.status(200).json(new ApiResponse(200, user.followers, "Followers fetched successfully"));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, user.followers, "Followers fetched successfully")
+    );
 });
 
 // --- 🆕 3. GET USER FOLLOWING ---
 const getUserFollowing = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const user = await User.findById(id).populate("following", "name username profilePic isVerified");
+  const user = await User.findById(id).populate(
+    "following",
+    "name username profilePic isVerified"
+  );
 
   if (!user) {
     throw new ApiError(404, "User not found");
   }
 
-  return res.status(200).json(new ApiResponse(200, user.following, "Following list fetched successfully"));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user.following,
+        "Following list fetched successfully"
+      )
+    );
 });
 
 export {

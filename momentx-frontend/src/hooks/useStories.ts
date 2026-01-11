@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/axios";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "@/context/AuthContext";
@@ -26,12 +26,13 @@ export interface Story {
   viewers?: StoryViewer[];
 }
 
-let socket: Socket;
-
 export function useStories() {
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false); // Add this if missing
+  const [isUploading, setIsUploading] = useState(false);
+
+  // ✅ FIX: Use ref for socket to persist across renders without re-initializing
+  const socketRef = useRef<Socket | null>(null);
 
   const { user } = useAuth();
 
@@ -54,20 +55,31 @@ export function useStories() {
   useEffect(() => {
     if (!user?._id) return;
 
-    // Connect to Backend URL
-    socket = io("http://localhost:3000", {
+    // 1. Initialize Socket (Using Port 3000 as requested)
+    socketRef.current = io("http://localhost:3000", {
       transports: ["websocket"],
       reconnectionAttempts: 5,
     });
 
-    socket.emit("join_user_room", user._id);
+    const socketInstance = socketRef.current;
 
-    // Listen for Views
-    socket.on(
+    // 2. Connect
+    socketInstance.on("connect", () => {
+      // console.log("✅ Story Socket Connected:", socketInstance.id);
+      socketInstance.emit("join_user_room", user._id);
+    });
+
+    socketInstance.on("connect_error", (err) => {
+      console.error("❌ Story Socket Error:", err.message);
+    });
+
+    // 3. Listen for Views
+    socketInstance.on(
       "story_view_updated",
       (data: { storyId: string; newViewer: any }) => {
+        // console.log("👁️ Story View Update Received:", data);
+
         setStories((prevStories) => {
-          // Create a new array to force re-render
           return prevStories.map((story) => {
             if (story._id === data.storyId) {
               // Check duplicates safely
@@ -75,17 +87,13 @@ export function useStories() {
                 (v) => v.user._id === data.newViewer.user._id
               );
 
-              if (exists) {
-                return story;
-              }
+              if (exists) return story;
 
               // Return new story object with updated viewers
-              const updatedStory = {
+              return {
                 ...story,
                 viewers: [data.newViewer, ...(story.viewers || [])],
               };
-
-              return updatedStory;
             }
             return story;
           });
@@ -93,8 +101,11 @@ export function useStories() {
       }
     );
 
+    // 4. Cleanup on Unmount
     return () => {
-      if (socket) socket.disconnect();
+      if (socketInstance) {
+        socketInstance.disconnect();
+      }
     };
   }, [user?._id]);
 
