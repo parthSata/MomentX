@@ -3,6 +3,7 @@ import { api } from "@/lib/axios";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "@/context/AuthContext";
 
+// ✅ UPDATE INTERFACE
 export interface Notification {
   _id: string;
   type: "like" | "comment" | "follow";
@@ -15,6 +16,12 @@ export interface Notification {
   post?: {
     _id: string;
     images: string[];
+  };
+  // ✅ ADD THIS
+  story?: {
+    _id: string;
+    url: string;
+    type: "image" | "video";
   };
   comment?: string;
   isRead: boolean;
@@ -51,7 +58,7 @@ export function useNotifications() {
   useEffect(() => {
     if (!user?._id) return;
 
-    socket = io("http://localhost:3000"); // Ensure port matches Backend
+    socket = io("http://localhost:3000");
     socket.emit("join_user_room", user._id);
 
     socket.on("new_notification", (newNotif: Notification) => {
@@ -68,12 +75,9 @@ export function useNotifications() {
   // 3. Actions
   const markAllRead = async () => {
     try {
-      // Optimistic UI update
       const updated = notifications.map((n) => ({ ...n, isRead: true }));
       setNotifications(updated);
       setUnreadCount(0);
-
-      // Backend call
       await api.post("/notifications/read");
     } catch (error) {
       console.error("Failed to mark read", error);

@@ -1,58 +1,49 @@
 import { Story } from "../models/story.model.js";
+import { User } from "../models/user.model.js";
+import Message from "../models/message.model.js";
+import Chat from "../models/chat.model.js";
 import {
   uploadInCloudinary,
   deleteFromCloudinary,
 } from "../utils/cloudinary.js";
-import { sendNotification } from "../utils/Notification.js";
+import { sendNotification } from "../utils/notification.js";
 
+// ... createStory (Same as before) ...
 export const createStory = async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // ✅ CHANGED: Check for req.files (array) instead of req.file
     const files = req.files;
     if (!files || files.length === 0) {
       return res.status(400).json({ message: "No files uploaded" });
     }
 
-    const createdStories = [];
-
-    // Process files in parallel for speed
     const uploadPromises = files.map(async (file) => {
       const localFilePath = file.path;
-
-      // 1. Upload to Cloudinary
       const cloudResponse = await uploadInCloudinary(localFilePath);
 
-      if (!cloudResponse) {
-        console.error(`Failed to upload file: ${file.originalname}`);
-        return null;
-      }
+      if (!cloudResponse) return null;
 
       const type = cloudResponse.resource_type === "video" ? "video" : "image";
 
-      // 2. Create DB Entry
       const newStory = new Story({
         user: req.user._id,
         type: type,
         url: cloudResponse.secure_url,
         publicId: cloudResponse.public_id,
         viewers: [],
+        likes: [],
       });
 
       await newStory.save();
       return newStory;
     });
 
-    // Wait for all uploads to finish
     const results = await Promise.all(uploadPromises);
-
-    // Filter out any failed uploads (nulls)
     const successfulStories = results.filter((s) => s !== null);
 
-    // Populate user data for the first one (or all) to return to frontend
     if (successfulStories.length > 0) {
       await Story.populate(successfulStories, {
         path: "user",
@@ -69,11 +60,11 @@ export const createStory = async (req, res) => {
   }
 };
 
+// ✅ FIXED GET STORIES
 export const getStories = async (req, res) => {
   try {
     const stories = await Story.find({ expiresAt: { $gt: new Date() } })
       .populate("user", "username avatar displayName profilePic")
-      // ✅ Populate viewers details (so we can show the list in frontend)
       .populate("viewers.user", "username avatar displayName profilePic")
       .sort({ createdAt: -1 });
 
@@ -83,14 +74,17 @@ export const getStories = async (req, res) => {
       const storyObj = story.toObject();
       return {
         ...storyObj,
-        // ✅ Fix check logic for object array
         isViewed: currentUserId
           ? storyObj.viewers.some(
               (v) => v.user?._id.toString() === currentUserId
             )
           : false,
-        // We keep the viewers array now because we need it for the UI
+        // ✅ Correctly check for likes using string comparison
+        isLiked: currentUserId
+          ? storyObj.likes?.some((id) => id.toString() === currentUserId)
+          : false,
         viewers: storyObj.viewers,
+        likes: storyObj.likes || [],
       };
     });
 
@@ -100,6 +94,7 @@ export const getStories = async (req, res) => {
   }
 };
 
+// ... viewStory (Same as before) ...
 export const viewStory = async (req, res) => {
   try {
     const storyId = req.params.id;
@@ -108,7 +103,6 @@ export const viewStory = async (req, res) => {
     const story = await Story.findById(storyId);
     if (!story) return res.status(404).json({ message: "Story not found" });
 
-    // Check if user already viewed (Avoid duplicates)
     const alreadyViewed = story.viewers.some(
       (v) => v.user.toString() === userId.toString()
     );
@@ -119,11 +113,9 @@ export const viewStory = async (req, res) => {
         viewedAt: new Date(),
       };
 
-      // 1. Save Viewer to Story Document
       story.viewers.push(newViewerEntry);
       await story.save();
 
-      // 2. Prepare Data for Real-Time View Count (The Eye Icon)
       const viewerDataForSocket = {
         user: {
           _id: req.user._id.toString(),
@@ -135,43 +127,128 @@ export const viewStory = async (req, res) => {
         viewedAt: newViewerEntry.viewedAt,
       };
 
-      // 3. Emit Real-Time View Update (For the Owner's UI)
       if (req.io) {
         req.io.to(story.user.toString()).emit("story_view_updated", {
           storyId: story._id.toString(),
           newViewer: viewerDataForSocket,
         });
       }
-
-      // 4. ✅ SEND PERSISTENT NOTIFICATION (For the Notification Page)
-      await sendNotification({
-        req,
-        receiverId: story.user, // Notify the Story Owner
-        type: "story_view",
-        // We pass the story ID separately since we updated the model
-        // Note: You might need to update sendNotification utils to accept 'storyId'
-        // OR pass it as 'postId' if you want to be lazy, but better to update the utils.
-        postId: null,
-        commentId: null,
-      });
-
-      // *Quick Fix for Utils*: Ensure your sendNotification utils accepts extra fields
-      // or simply pass it as a custom object if your utils is flexible.
-      // If using the exact code I gave before, update src/utils/notification.js to accept storyId:
-      /* // Inside src/utils/notification.js params:
-         ... storyId = null ...
-         // Inside .create():
-         ... story: storyId ...
-      */
     }
 
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error("View Story Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
 
+export const likeStory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const story = await Story.findById(id);
+    if (!story) return res.status(404).json({ message: "Story not found" });
+
+    if (!story.likes) story.likes = [];
+
+    // ✅ CRITICAL FIX: Convert ObjectIds to Strings for comparison
+    const isLiked = story.likes.some(
+      (likeId) => likeId.toString() === userId.toString()
+    );
+
+    if (isLiked) {
+      // Unlike: Filter out string matches
+      story.likes = story.likes.filter(
+        (likeId) => likeId.toString() !== userId.toString()
+      );
+    } else {
+      // Like
+      story.likes.push(userId);
+
+      // Send Notification
+      await sendNotification({
+        req,
+        receiverId: story.user,
+        type: "like",
+        story: story._id, // Links notification to story
+        postId: null,
+      });
+    }
+
+    await story.save();
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        isLiked: !isLiked,
+        likesCount: story.likes.length,
+      });
+  } catch (error) {
+    console.error("Like Story Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const replyStory = async (req, res) => {
+  try {
+    const { id } = req.params; // Story ID
+    const { message } = req.body;
+    const senderId = req.user._id;
+
+    if (!message)
+      return res.status(400).json({ message: "Message cannot be empty" });
+
+    const story = await Story.findById(id).populate("user"); // Populate to get receiver info
+    if (!story) return res.status(404).json({ message: "Story not found" });
+
+    const receiverId = story.user._id;
+
+    // 1. Find or Create Chat
+    let chat = await Chat.findOne({
+      participants: { $all: [senderId, receiverId] },
+    });
+
+    if (!chat) {
+      chat = await Chat.create({
+        participants: [senderId, receiverId],
+        lastMessage: "Replying to story...",
+        lastMessageAt: new Date(),
+      });
+    }
+
+    // 2. Create Message in DB
+    const newMessage = await Message.create({
+      chatId: chat._id,
+      sender: senderId,
+      text: message,
+      seenBy: [senderId],
+      storyReply: {
+        storyId: story._id,
+        storyUrl: story.url,
+        storyType: story.type,
+      },
+    });
+
+    // 3. Update Chat Last Message
+    await Chat.findByIdAndUpdate(chat._id, {
+      lastMessage: `Replied to story: ${message}`,
+      lastMessageAt: new Date(),
+    });
+
+    // 4. Emit Socket Event (Real-time)
+    if (req.io) {
+      req.io.to(receiverId.toString()).emit("newMessage", newMessage);
+    }
+
+    return res.status(200).json({ success: true, message: "Reply sent" });
+  } catch (error) {
+    console.error("Reply Story Error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ... deleteStory (Same as before) ...
 export const deleteStory = async (req, res) => {
   try {
     const story = await Story.findById(req.params.id);

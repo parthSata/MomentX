@@ -6,6 +6,7 @@ export const sendNotification = async ({
   type,
   postId = null,
   commentId = null,
+  story= null,
 }) => {
   try {
     const senderId = req.user._id;
@@ -20,12 +21,14 @@ export const sendNotification = async ({
       type,
       post: postId,
       comment: commentId,
+      story: story,
     });
 
     // 3. Populate sender info for real-time UI
     const populatedNotification = await Notification.findById(notification._id)
       .populate("sender", "username profilePic")
-      .populate("post", "images"); // To show post thumbnail if it's a like/comment
+      .populate("post", "images") // To show post thumbnail if it's a like/comment
+      .populate("story", "url type"); // To show story info if applicable
 
     // 4. Emit Socket Event to Receiver's Room
     if (req.io) {

@@ -1,46 +1,26 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose from "mongoose";
 
-const storySchema = new Schema(
+const storySchema = new mongoose.Schema(
   {
-    user: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    url: {
-      type: String, // Cloudinary URL
-      required: true,
-    },
-    publicId: {
-      type: String, // ✅ REQUIRED for deleting from Cloudinary
-      required: true,
-    },
-    type: {
-      type: String,
-      enum: ["image", "video"],
-      default: "image",
-    },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    type: { type: String, enum: ["image", "video"], required: true },
+    url: { type: String, required: true },
+    publicId: { type: String, required: true },
     viewers: [
       {
-        user: {
-          type: Schema.Types.ObjectId,
-          ref: "User",
-        },
-        viewedAt: {
-          type: Date,
-          default: Date.now,
-        },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        viewedAt: { type: Date, default: Date.now },
       },
     ],
-    // We removed the TTL index to handle cleanup manually via Cron
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     expiresAt: {
       type: Date,
-      default: () => new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+      default: () => new Date(Date.now() + 24 * 60 * 60 * 1000),
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
+
+storySchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const Story = mongoose.model("Story", storySchema);

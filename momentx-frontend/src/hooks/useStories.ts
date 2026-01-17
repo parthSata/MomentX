@@ -24,6 +24,8 @@ export interface Story {
   isViewed: boolean;
   createdAt: string;
   viewers?: StoryViewer[];
+  isLiked?: boolean;
+  likes?: string[];
 }
 
 export function useStories() {
@@ -31,9 +33,7 @@ export function useStories() {
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
 
-  // ✅ FIX: Use ref for socket to persist across renders without re-initializing
   const socketRef = useRef<Socket | null>(null);
-
   const { user } = useAuth();
 
   const fetchStories = async () => {
@@ -51,67 +51,44 @@ export function useStories() {
     fetchStories();
   }, []);
 
-  // ✅ REAL-TIME SOCKET LISTENER
+  // Socket Connection
   useEffect(() => {
     if (!user?._id) return;
-
-    // 1. Initialize Socket (Using Port 3000 as requested)
     socketRef.current = io("http://localhost:3000", {
       transports: ["websocket"],
       reconnectionAttempts: 5,
     });
-
     const socketInstance = socketRef.current;
 
-    // 2. Connect
     socketInstance.on("connect", () => {
-      // console.log("✅ Story Socket Connected:", socketInstance.id);
       socketInstance.emit("join_user_room", user._id);
     });
 
-    socketInstance.on("connect_error", (err) => {
-      console.error("❌ Story Socket Error:", err.message);
-    });
-
-    // 3. Listen for Views
     socketInstance.on(
       "story_view_updated",
       (data: { storyId: string; newViewer: any }) => {
-        // console.log("👁️ Story View Update Received:", data);
-
-        setStories((prevStories) => {
-          return prevStories.map((story) => {
+        setStories((prev) =>
+          prev.map((story) => {
             if (story._id === data.storyId) {
-              // Check duplicates safely
               const exists = story.viewers?.some(
                 (v) => v.user._id === data.newViewer.user._id
               );
-
               if (exists) return story;
-
-              // Return new story object with updated viewers
               return {
                 ...story,
                 viewers: [data.newViewer, ...(story.viewers || [])],
               };
             }
             return story;
-          });
-        });
+          })
+        );
       }
     );
 
-    // 4. Cleanup on Unmount
     return () => {
-      if (socketInstance) {
-        socketInstance.disconnect();
-      }
+      if (socketInstance) socketInstance.disconnect();
     };
   }, [user?._id]);
-
-  // Actions
-  const addStoryToState = (newStories: Story[]) =>
-    setStories((prev) => [...newStories, ...prev]);
 
   const markAsViewed = async (storyId: string) => {
     try {
@@ -124,6 +101,43 @@ export function useStories() {
     }
   };
 
+  const likeStory = async (storyId: string) => {
+    // 1. Optimistic Update (Prevent UI lag)
+    setStories((prevStories) =>
+      prevStories.map((story) => {
+        if (story._id === storyId) {
+          // IMPORTANT: Spread ...story first to keep 'user', 'url', etc.
+          return {
+            ...story,
+            isLiked: !story.isLiked,
+            // Visually update the likes array (optional but good for consistency)
+            likes: story.isLiked
+              ? (story.likes || []).filter((id) => id !== user?._id)
+              : [...(story.likes || []), user?._id || "me"],
+          };
+        }
+        return story;
+      })
+    );
+
+    try {
+      // 2. API Call
+      await api.post(`/stories/${storyId}/like`);
+    } catch (error) {
+      console.error("Failed to like story", error);
+      fetchStories(); // Revert on error
+    }
+  };
+
+  const replyStory = async (storyId: string, message: string) => {
+    try {
+      await api.post(`/stories/${storyId}/reply`, { message });
+    } catch (error) {
+      console.error("Reply error", error);
+      throw error;
+    }
+  };
+
   const deleteStory = async (storyId: string) => {
     try {
       await api.delete(`/stories/${storyId}`);
@@ -133,14 +147,40 @@ export function useStories() {
     }
   };
 
+  // ✅ ADDED: createStory function used in other parts of app
+  const createStory = async (files: File[]) => {
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file));
+
+      const { data } = await api.post("/stories", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (data.success) {
+        setStories((prev) => [...data.data, ...prev]);
+      }
+      return data;
+    } catch (error) {
+      console.error("Upload failed", error);
+      throw error;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return {
     stories,
     loading,
     isUploading,
     setIsUploading,
     fetchStories,
-    addStoryToState,
+    addStoryToState: setStories,
     markAsViewed,
     deleteStory,
+    likeStory,
+    replyStory,
+    createStory, // ✅ Fixed: Now exported
   };
 }

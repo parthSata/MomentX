@@ -3,10 +3,9 @@ import { motion } from "framer-motion"
 import { Plus, Loader2 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { MainLayout } from "@/components/navigation/MainLayout"
-import { StoriesBar } from "@/components/feed/StoriesBar"
+import { StoriesBar } from "@/components/feed/StoriesBar" // This now handles uploads
 import { PostCard } from "@/components/feed/PostCard"
 import { StoryViewer } from "@/components/feed/StoryViewer"
-import { StoryUploadDialog } from "@/components/feed/StoryUploadDialog"
 import { PostSkeleton } from "@/components/ui/skeleton-loader"
 import { api } from "@/lib/axios"
 import { useStories } from "@/hooks/useStories"
@@ -17,15 +16,16 @@ export default function HomePage() {
   const navigate = useNavigate()
   const { user: currentUser, loading: authLoading } = useAuth()
 
-  // Assuming 'stories' contains all stories sorted by Date or User
-  // IMPORTANT: Backend must populate 'user' field in stories
-  const { stories, markAsViewed, createStory, isUploading, deleteStory } = useStories()
+  // createStory is available here, but StoriesBar handles it internally now.
+  // We keep fetchStories to refresh list after upload.
+  const { stories, markAsViewed, deleteStory, replyStory, likeStory, fetchStories } = useStories()
 
   // --- State ---
   const [storyViewerOpen, setStoryViewerOpen] = useState(false)
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0)
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
+
+  // ❌ REMOVED: uploadFile, isUploadDialogOpen (StoriesBar handles this now)
+
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -33,15 +33,10 @@ export default function HomePage() {
 
   // --- Logic ---
 
-  // Filter stories to show only ONE bubble per User in the top bar (The latest one)
   const uniqueUserStories = useMemo(() => {
     const seenUsers = new Set();
     const result = [];
-
-    // Iterate through stories. Since they are usually sorted Newest -> Oldest,
-    // the first time we see a user, that's their latest story.
     for (const story of stories) {
-      // Handle case where user might be null or populated object
       const userId = story.user?._id || story.user;
       if (userId && !seenUsers.has(userId)) {
         seenUsers.add(userId);
@@ -51,26 +46,11 @@ export default function HomePage() {
     return result;
   }, [stories]);
 
-  // When clicking a bubble, find that story's index in the FULL 'stories' list
-  // so the Viewer opens at the correct spot and can scroll to previous/next.
   const handleStoryClick = (storyId: string) => {
     const index = stories.findIndex(s => s._id === storyId);
     if (index !== -1) {
       setSelectedStoryIndex(index);
       setStoryViewerOpen(true);
-    }
-  }
-
-  const handleFileSelect = (file: File) => {
-    setUploadFile(file);
-    setIsUploadDialogOpen(true);
-  }
-
-  const handleConfirmUpload = async () => {
-    if (uploadFile) {
-      await createStory([uploadFile]);
-      setIsUploadDialogOpen(false);
-      setUploadFile(null);
     }
   }
 
@@ -108,13 +88,13 @@ export default function HomePage() {
     <MainLayout>
       <div className="space-y-6 pb-20">
 
-        {/* Stories Bar - Uses Unique List */}
+        {/* Stories Bar */}
         <StoriesBar
           stories={uniqueUserStories}
-          onStoryClick={handleStoryClick} // Passes ID up
-          onFileSelect={handleFileSelect}
-          isUploading={isUploading}
+          onStoryClick={handleStoryClick}
           currentUser={currentUser}
+          // ✅ FIX: When upload finishes in StoriesBar, refresh the list
+          onUploadSuccess={() => fetchStories()}
         />
 
         {/* Posts Feed */}
@@ -159,7 +139,7 @@ export default function HomePage() {
         <Plus className="w-7 h-7" />
       </motion.button>
 
-      {/* Story Viewer - Uses FULL List */}
+      {/* Story Viewer */}
       {!authLoading && (
         <StoryViewer
           isOpen={storyViewerOpen}
@@ -169,17 +149,11 @@ export default function HomePage() {
           onViewStory={markAsViewed}
           onDeleteStory={deleteStory}
           currentUserId={currentUser?._id}
+          onReplyStory={replyStory}
+          onLikeStory={likeStory}
         />
       )}
 
-      {/* Upload Dialog */}
-      <StoryUploadDialog
-        isOpen={isUploadDialogOpen}
-        onClose={() => setIsUploadDialogOpen(false)}
-        file={uploadFile}
-        onConfirm={handleConfirmUpload}
-        isUploading={isUploading}
-      />
     </MainLayout>
   )
 }
