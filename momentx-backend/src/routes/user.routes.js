@@ -15,6 +15,7 @@ import {
   toggleFollowUser,
   getUserFollowers,
   getUserFollowing,
+  getUserById,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -107,10 +108,7 @@ router.route("/following/:id").get(verifyJWT, getUserFollowing);
 router.get(
   "/search",
   verifyJWT,
-  [
-    query("username").trim().optional(), // Optional validation
-    validate,
-  ],
+  [query("username").trim().optional(), validate],
   searchUser
 );
 
@@ -132,5 +130,7 @@ router
     ],
     updateProfile
   );
+
+router.route("/:id").get(verifyJWT, getUserById);
 
 export default router;

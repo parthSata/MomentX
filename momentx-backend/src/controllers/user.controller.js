@@ -177,25 +177,30 @@ const refreshToken = asyncHandler(async (req, res) => {
 });
 
 const searchUser = asyncHandler(async (req, res) => {
-  const { username } = req.query;
+  const { query } = req.query; // Changed from 'username' to 'query' for generic usage
   const currentUserId = req.user._id;
 
-  let users;
-
-  if (username && username.trim() !== "") {
-    users = await User.find({
-      username: { $regex: username, $options: "i" },
-      _id: { $ne: currentUserId },
-    }).select("-password -refreshToken");
-  } else {
-    users = await User.find({ _id: { $ne: currentUserId } }).select(
-      "-password -refreshToken"
-    );
+  if (!query || query.trim() === "") {
+    return res.status(200).json(new ApiResponse(200, [], "No query provided"));
   }
+
+  const users = await User.find({
+    $and: [
+      { _id: { $ne: currentUserId } }, // Exclude self
+      {
+        $or: [
+          { username: { $regex: query, $options: "i" } },
+          { name: { $regex: query, $options: "i" } },
+        ],
+      },
+    ],
+  })
+    .select("name username profilePic isVerified")
+    .limit(10); // Limit results for performance
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Users fetched successfully", users));
+    .json(new ApiResponse(200, users, "Users fetched successfully"));
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
@@ -300,7 +305,8 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 const getAllUsers = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id;
   const users = await User.find({ _id: { $ne: currentUserId } })
-    .select("_id username profilePic isOnline")
+    .select("_id username profilePic isOnline name")
+    .limit(20)
     .lean();
 
   const formattedUsers = users.map((user) => ({
@@ -560,6 +566,24 @@ const getUserFollowing = asyncHandler(async (req, res) => {
     );
 });
 
+const getUserById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const user = await User.findById(id).select(
+    "name username profilePic isOnline"
+  );
+
+  if (!user) {
+    return res.status(404).json(new ApiResponse(404, null, "User not found"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "User details fetched"));
+});
+
+
+
 export {
   registerUser,
   loginUser,
@@ -575,4 +599,5 @@ export {
   toggleFollowUser,
   getUserFollowers,
   getUserFollowing,
+  getUserById,
 };

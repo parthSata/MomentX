@@ -263,6 +263,56 @@ const deletePost = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { postId }, "Post deleted successfully"));
 });
 
+const searchHashtags = asyncHandler(async (req, res) => {
+  const { query } = req.query;
+
+  if (!query || query.trim() === "") {
+    return res.status(200).json(new ApiResponse(200, [], "No query provided"));
+  }
+
+  // Remove '#' if user typed it
+  const cleanQuery = query.replace("#", "").toLowerCase();
+
+  // 1. Find all posts that *might* contain the tag in the caption
+  const posts = await Post.find({
+    caption: { $regex: `#`, $options: "i" }, // Optimization: Only look at posts with at least one hashtag
+  }).select("caption");
+
+  // 2. Process in Memory (Extract, Filter, Count)
+  const tagCounts = {};
+
+  posts.forEach((post) => {
+    if (!post.caption) return;
+
+    // Regex to extract hashtags: #word
+    const matches = post.caption.match(/#[a-z0-9_]+/gi);
+
+    if (matches) {
+      matches.forEach((tag) => {
+        const tagName = tag.replace("#", "").toLowerCase();
+
+        // Only include if it matches the user's search query
+        if (tagName.includes(cleanQuery)) {
+          tagCounts[tagName] = (tagCounts[tagName] || 0) + 1;
+        }
+      });
+    }
+  });
+
+  // 3. Convert to Array and Sort
+  const results = Object.keys(tagCounts).map((tag) => ({
+    tag: tag,
+    count: tagCounts[tag],
+  }));
+
+  // Sort by popularity (count desc)
+  results.sort((a, b) => b.count - a.count);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, results, "Hashtag results fetched"));
+});
+
 export {
   createPost,
   getHomeFeed,
@@ -272,4 +322,5 @@ export {
   getUserPosts,
   getUserSavedPosts,
   getUserTaggedPosts,
+  searchHashtags,
 };

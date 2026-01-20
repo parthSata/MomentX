@@ -10,6 +10,7 @@ import {
   getUserPosts,
   getUserSavedPosts, // ✅ Import
   getUserTaggedPosts, // ✅ Import
+  searchHashtags,
 } from "../controllers/post.controller.js";
 import {
   addComment,
@@ -35,6 +36,8 @@ router.route("/user-posts/:userId").get(getUserPosts);
 router.route("/saved-posts/:userId").get(getUserSavedPosts);
 // 3. Tagged Tab (User is tagged in)
 router.route("/tagged-posts/:userId").get(getUserTaggedPosts);
+// 2. ✅ SEARCH ROUTE (MUST BE BEFORE /:id)
+router.route("/search/tags").get(searchHashtags);
 
 // --- Interactions ---
 router.route("/:postId/like").post(togglePostLike);
