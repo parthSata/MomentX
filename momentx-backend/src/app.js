@@ -32,40 +32,79 @@ const io = new Server(server, {
   pingTimeout: 60000,
 });
 
-// 2. Handle Socket Connections
 io.on("connection", (socket) => {
-  
+  // ────────────────────────────────────────────────
+  // 1. User joins their personal room (for private calls / online status)
+  // ────────────────────────────────────────────────
   socket.on("join_user_room", async (userId) => {
     try {
       socket.join(userId);
-      socket.userId = userId; // Store ID for disconnect logic
-
-      console.log(`User connected: ${userId}`);
-      
-      // Always mark online immediately on join
+      socket.userId = userId;
+      // Mark online
       await User.findByIdAndUpdate(userId, { isOnline: true });
       socket.broadcast.emit("user_online", userId);
+
+      // ─── Call handlers (unchanged) ───
+      socket.on("callUser", ({ userToCall, signalData, from, name }) => {
+        io.to(userToCall).emit("callUser", { signal: signalData, from, name });
+      });
+
+      socket.on("answerCall", (data) => {
+        io.to(data.to).emit("callAccepted", data.signal);
+      });
+
+      socket.on("endCall", ({ to }) => {
+        io.to(to).emit("callEnded");
+      });
     } catch (e) {
-      console.error("Join Error:", e);
+      console.error("Join user room error:", e);
     }
   });
 
+  // ────────────────────────────────────────────────
+  // 2. NEW: Join a specific chat room when opening a conversation
+  //    Client should emit this when ChatPage mounts
+  // ────────────────────────────────────────────────
+  socket.on("join_chat", (chatId) => {
+    if (!chatId) return;
+
+    socket.join(chatId);
+  });
+
+  // ────────────────────────────────────────────────
+  // 3. Typing indicators — broadcast to the chat room only (not to self)
+  // ────────────────────────────────────────────────
+  socket.on("typing", (data) => {
+    if (!data.chatId || !data.senderId) return;
+
+    // Send to everyone in the chat room EXCEPT the sender
+    socket.to(data.chatId).emit("typing", {
+      chatId: data.chatId,
+      senderId: data.senderId,
+    });
+  });
+
+  socket.on("stopTyping", (data) => {
+    if (!data.chatId || !data.senderId) return;
+    socket.to(data.chatId).emit("stopTyping", {
+      chatId: data.chatId,
+      senderId: data.senderId,
+    });
+  });
+
+  // ────────────────────────────────────────────────
+  // Disconnect logic (unchanged — good job with multi-tab handling)
+  // ────────────────────────────────────────────────
   socket.on("disconnect", async () => {
-    // Check if we know who this socket belonged to
     if (socket.userId) {
-      // ✅ CRITICAL FIX: Check if user has OTHER active sockets
-      // This fetches all socket instances currently in the room 'socket.userId'
       const matchingSockets = await io.in(socket.userId).fetchSockets();
-      
-      // If the array is empty, it means NO sockets are left for this user
       const isTrulyDisconnected = matchingSockets.length === 0;
 
       if (isTrulyDisconnected) {
-        console.log(`User ${socket.userId} is fully offline (0 connections)`);
         await User.findByIdAndUpdate(socket.userId, { isOnline: false });
         socket.broadcast.emit("user_offline", socket.userId);
       } else {
-        console.log(`User ${socket.userId} disconnected one socket, but is still Online.`);
+        console.log(`User ${socket.userId} still has ${matchingSockets.length} connections`);
       }
     }
   });
@@ -118,9 +157,17 @@ app.use("/api/v1/chats", chatRouter);
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err);
   if (err instanceof ApiError) {
-    return res.status(err.statusCode).json({ success: err.success, message: err.message });
+    return res
+      .status(err.statusCode)
+      .json({ success: err.success, message: err.message });
   }
-  res.status(500).json({ success: false, message: "Internal Server Error", error: err.message });
+  res
+    .status(500)
+    .json({
+      success: false,
+      message: "Internal Server Error",
+      error: err.message,
+    });
 });
 
 export { app, server };

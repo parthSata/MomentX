@@ -11,6 +11,40 @@ import { useChat, type ChatUser } from "@/hooks/useChat";
 import { useAuth } from "@/context/AuthContext";
 import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 import { api } from "@/lib/axios";
+import Peer from "simple-peer"; // The library we installed
+import { CallScreen } from "@/components/chat/CallScreen";
+
+const MessageText = ({ text, isMe }: { text: string; isMe: boolean }) => {
+  const [expanded, setExpanded] = useState(false);
+  const WORD_LIMIT = 40; // Limit words before showing "Show more"
+
+  // Split text into words safely
+  const words = text ? text.split(/\s+/) : [];
+
+  // If text is short, just show it
+  if (words.length <= WORD_LIMIT) {
+    return <p className="px-1 text-sm sm:text-base wrap-break-word whitespace-pre-wrap leading-relaxed">{text}</p>;
+  }
+
+  return (
+    <div className="px-1 text-sm sm:text-base wrap-break-word whitespace-pre-wrap leading-relaxed">
+      {/* Show full text if expanded, otherwise truncated */}
+      {expanded ? text : words.slice(0, WORD_LIMIT).join(" ") + "..."}
+
+      {/* Toggle Button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent message selection when clicking this
+          setExpanded(!expanded);
+        }}
+        className={`block text-xs font-bold mt-1 hover:underline focus:outline-none ${isMe ? "text-white/90" : "text-primary/90"
+          }`}
+      >
+        {expanded ? "Show less" : "Show more"}
+      </button>
+    </div>
+  );
+};
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -38,17 +72,25 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [callType, setCallType] = useState<"voice" | "video">("voice");
+  const [incomingCall, setIncomingCall] = useState<any>(null);
+  const connectionRef = useRef<Peer.Instance | null>(null);
+
   const [chatUser, setChatUser] = useState<ChatUser>(
     state?.user || { _id: "", name: "User", username: "user", profilePic: "", isOnline: false }
   );
 
   useEffect(() => { fetchMessages(); }, [chatId]);
 
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping, selectedMedia]);
 
- useEffect(() => {
+  useEffect(() => {
     const fetchUserStatus = async () => {
       if (!chatUser._id) return;
       try {
@@ -67,43 +109,177 @@ export default function ChatPage() {
     fetchUserStatus();
   }, [chatId, chatUser._id]);
 
-  // ✅ 2. Socket Listeners for Real-time Updates
+  useEffect(() => {
+    if (!socketRef.current) return;
+    socketRef.current.on("callUser", (data: any) => {
+      setIncomingCall({ isReceiving: true, from: data.from, signal: data.signal, name: data.name });
+      setIsCallActive(true); // Open UI
+    });
+
+    socketRef.current.on("callAccepted", (signal: any) => {
+      connectionRef.current?.signal(signal);
+    });
+
+    socketRef.current.on("callEnded", () => {
+      leaveCall();
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!socketRef.current) return;
+
+
+    // Optional: you can emit join_chat here if not already done in useChat
+    if (chatId) {
+      socketRef.current.emit("join_chat", chatId);
+    }
+  }, [socketRef.current]);
+
   useEffect(() => {
     if (!socketRef.current) return;
     const socket = socketRef.current;
 
+    // Chat Listeners
     const handleOnline = (userId: string) => {
-      if (userId === chatUser._id) {
-        setChatUser((prev) => ({ ...prev, isOnline: true }));
-      }
+      if (userId === chatUser._id) setChatUser((prev) => ({ ...prev, isOnline: true }));
+    };
+    const handleOffline = (userId: string) => {
+      if (userId === chatUser._id) setChatUser((prev) => ({ ...prev, isOnline: false }));
     };
 
-    const handleOffline = (userId: string) => {
-      if (userId === chatUser._id) {
-        setChatUser((prev) => ({ ...prev, isOnline: false }));
-      }
-    };
 
     const handleTyping = (data: any) => {
-      if (data.chatId === chatId && data.senderId !== currentUser?._id) setIsTyping(true);
-    };
-    
-    const handleStopTyping = (data: any) => {
-      if (data.chatId === chatId && data.senderId !== currentUser?._id) setIsTyping(false);
+      if (data.chatId === chatId && data.senderId !== currentUser?._id) {
+        setIsTyping(true);
+      }
     };
 
+    const handleStopTyping = (data: any) => {
+      if (data.chatId === chatId && data.senderId !== currentUser?._id) {
+        setIsTyping(false);
+      }
+    };
+
+    socket.emit("stopTyping", {
+      chatId,
+      senderId: currentUser?._id,
+    });
+
+    // Also clear any pending timeout so we don't send duplicate later
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+
+    // Attach
+    socket.on("typing", handleTyping);
+    socket.on("stopTyping", handleStopTyping);
+
+    // Call Listeners
+    const handleCallUser = (data: any) => {
+      setIncomingCall({ isReceiving: true, from: data.from, signal: data.signal, name: data.name });
+      setIsCallActive(true);
+    };
+    const handleCallAccepted = (signal: any) => {
+      setCallAccepted(true);
+      connectionRef.current?.signal(signal);
+    };
+    const handleCallEnded = () => {
+      leaveCall();
+    };
+
+    // Attach Listeners
     socket.on("user_online", handleOnline);
     socket.on("user_offline", handleOffline);
     socket.on("typing", handleTyping);
     socket.on("stopTyping", handleStopTyping);
+    socket.on("callUser", handleCallUser);
+    socket.on("callAccepted", handleCallAccepted);
+    socket.on("callEnded", handleCallEnded);
 
+    // Cleanup
     return () => {
       socket.off("user_online", handleOnline);
       socket.off("user_offline", handleOffline);
       socket.off("typing", handleTyping);
       socket.off("stopTyping", handleStopTyping);
+      socket.off("callUser", handleCallUser);
+      socket.off("callAccepted", handleCallAccepted);
+      socket.off("callEnded", handleCallEnded);
     };
   }, [chatId, currentUser?._id, socketRef, chatUser._id]);
+
+  // --- Call Functions ---
+  const [callAccepted, setCallAccepted] = useState(false);
+
+
+
+  const initiateCall = (type: "voice" | "video") => {
+    if (!currentUser) return;
+    setCallType(type);
+    setIsCallActive(true);
+
+    navigator.mediaDevices.getUserMedia({ video: type === "video", audio: true }).then((currentStream) => {
+      setStream(currentStream);
+      const peer = new Peer({ initiator: true, trickle: false, stream: currentStream });
+
+      peer.on("signal", (data) => {
+        socketRef.current?.emit("callUser", {
+          userToCall: chatUser._id,
+          signalData: data,
+          from: currentUser._id,
+          name: currentUser.name
+        });
+      });
+
+      peer.on("stream", (currentRemoteStream) => {
+        setRemoteStream(currentRemoteStream);
+      });
+
+      connectionRef.current = peer;
+    });
+  };
+
+  const answerCall = () => {
+    if (!incomingCall) return;
+    setCallAccepted(true);
+
+    // Determine video preference based on incoming call logic (or default to video if unsure)
+    // For now enabling both, but you can pass callType in the socket event to be precise
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((currentStream) => {
+      setStream(currentStream);
+      const peer = new Peer({ initiator: false, trickle: false, stream: currentStream });
+
+      peer.on("signal", (data) => {
+        socketRef.current?.emit("answerCall", { signal: data, to: incomingCall.from });
+      });
+
+      peer.on("stream", (currentRemoteStream) => {
+        setRemoteStream(currentRemoteStream);
+      });
+
+      peer.signal(incomingCall.signal);
+      connectionRef.current = peer;
+    });
+  };
+
+  const leaveCall = () => {
+    setCallAccepted(false);
+    setIsCallActive(false);
+    setIncomingCall(null);
+
+    connectionRef.current?.destroy();
+
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setRemoteStream(null);
+
+    // Notify other user
+    if (chatUser._id) socketRef.current?.emit("endCall", { to: chatUser._id });
+  };
+
 
   const handleDeleteSelected = async () => {
     if (selectedMessageIds.length === 0) return;
@@ -118,24 +294,58 @@ export default function ChatPage() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputText(e.target.value);
-    if (socketRef.current) {
-      socketRef.current.emit("typing", { chatId, senderId: currentUser?._id });
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    const value = e.target.value;
+    setInputText(value);
+
+    const socket = socketRef.current;
+    if (!socket || !chatId || !currentUser?._id) {
+      console.warn("[TYPING EMIT BLOCKED] missing socket/chat/user", {
+        hasSocket: !!socket,
+        chatId,
+        userId: currentUser?._id
+      });
+      return;
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+
+    // Clear timeout...
+
+    if (value.trim()) {
+      socket.emit("typing", { chatId, senderId: currentUser._id });
+      // Stop showing after 3 seconds of no more typing
       typingTimeoutRef.current = setTimeout(() => {
-        socketRef.current?.emit("stopTyping", { chatId, senderId: currentUser?._id });
-      }, 2000);
+        console.log("[AUTO STOP TYPING] after 3s inactivity");
+        socket.emit("stopTyping", { chatId, senderId: currentUser._id });
+        typingTimeoutRef.current = null;
+      }, 3000);
+    } else {
+      socket.emit("stopTyping", { chatId, senderId: currentUser._id });
     }
   };
 
   const handleSend = () => {
-    if (!inputText.trim()) return;
-    if (chatUser._id) {
-      sendMessage(chatUser._id, inputText, "text");
-      setInputText("");
-      setShowEmojiPicker(false);
-      socketRef.current?.emit("stopTyping", { chatId, senderId: currentUser?._id });
+    if (!inputText.trim() || !chatUser._id) return;
+
+    sendMessage(chatUser._id, inputText, "text");
+
+    setInputText("");
+    setShowEmojiPicker(false);
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
     }
+
+    // Cleanup typing
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    socketRef.current?.emit("stopTyping", { chatId, senderId: currentUser?._id });
   };
 
   // HANDLE SELECTION TOGGLE
@@ -188,8 +398,27 @@ export default function ChatPage() {
     setInputText((prev) => prev + emojiData.emoji);
   };
 
+
+
   return (
     <div className="h-screen flex flex-col bg-background relative overflow-hidden">
+
+      {/* ✅ CALL SCREEN */}
+      <CallScreen
+        isOpen={isCallActive}
+        onClose={() => setIsCallActive(false)} // Just minimizes/hides the modal, DOES NOT end call
+        callType={callType}
+        user={{
+          name: chatUser.name || "User",
+          avatar: chatUser.profilePic,
+          username: chatUser.username
+        }}
+        localStream={stream}
+        remoteStream={remoteStream}
+        endCall={leaveCall}
+        isIncoming={!!incomingCall && !callAccepted}
+        answerCall={answerCall}
+      />
 
       {/* FULL SCREEN IMAGE VIEWER */}
       <AnimatePresence>
@@ -283,17 +512,14 @@ export default function ChatPage() {
               <AvatarRing src={chatUser.profilePic} isOnline={chatUser.isOnline} size="sm" />
               <div>
                 <h4 className="font-semibold text-sm sm:text-base">{chatUser.name || chatUser.username}</h4>
-
-                {/* ✅ WHATSAPP STYLE STATUS */}
                 <p className={`text-xs font-medium transition-colors duration-300 ${chatUser.isOnline ? "text-green-500 animate-pulse" : "text-muted-foreground"}`}>
                   {chatUser.isOnline ? "Online" : "Offline"}
                 </p>
-
               </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
-              <button className="p-2 glass rounded-full"><Phone className="w-5 h-5" /></button>
-              <button className="p-2 glass rounded-full"><Video className="w-5 h-5" /></button>
+              <button onClick={() => initiateCall("voice")} className="p-2 glass rounded-full"><Phone className="w-5 h-5" /></button>
+              <button onClick={() => initiateCall("video")} className="p-2 glass rounded-full"><Video className="w-5 h-5" /></button>
               <div className="relative">
                 <button onClick={() => setShowMenu(!showMenu)} className="p-2 glass rounded-full"><MoreVertical className="w-5 h-5" /></button>
                 {showMenu && (
@@ -314,62 +540,28 @@ export default function ChatPage() {
           {messages.map((msg, index) => {
             const isMe = msg.sender?._id === currentUser?._id;
             const isSelected = selectedMessageIds.includes(msg._id!);
-
             return (
               <motion.div
                 key={msg._id || index}
                 layout
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                // ✅ FIX 4: Used correct function name 'toggleMessageSelection'
                 onClick={() => isSelectionMode && toggleMessageSelection(msg._id!)}
                 className={`flex items-center gap-3 ${isMe ? "justify-end" : "justify-start"} ${isSelectionMode ? "cursor-pointer hover:opacity-90" : ""}`}
               >
-
-                {/* SELECTION CHECKBOX */}
-                {isSelectionMode && (
-                  // ✅ FIX 5: Changed flex-shrink-0 to shrink-0
-                  <div className={`${isMe ? "order-1" : "order-1"} shrink-0`}>
-                    {isSelected ? (
-                      <CheckCircle2 className="w-5 h-5 text-primary fill-primary/20" />
-                    ) : (
-                      <Circle className="w-5 h-5 text-muted-foreground/50" />
-                    )}
-                  </div>
-                )}
+                {isSelectionMode && (<div className={`${isMe ? "order-1" : "order-1"} shrink-0`}>{isSelected ? (<CheckCircle2 className="w-5 h-5 text-primary fill-primary/20" />) : (<Circle className="w-5 h-5 text-muted-foreground/50" />)}</div>)}
 
                 <div className={`max-w-[85%] sm:max-w-[75%] md:max-w-[60%] ${isMe ? "order-2" : "order-2"}`}>
-                  <div className={`p-2 rounded-2xl overflow-hidden ${isMe ? "bg-gradient-primary text-white rounded-br-none" : "glass rounded-bl-none"} ${msg.isOptimistic ? "opacity-70" : "opacity-100"} ${isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}>
-
-                    {msg.image ? (
-                      <div
-                        className="relative w-full max-w-55 sm:max-w-85 aspect-square rounded-lg overflow-hidden cursor-pointer group bg-black/20"
-                        onClick={() => !isSelectionMode && setFullScreenImage(msg.image || "")}
-                      >
-                        <img src={msg.image} alt="Sent" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                      </div>
-                    ) : msg.video ? (
-                      <div
-                        className="relative w-full max-w-55 sm:max-w-85 aspect-video rounded-lg overflow-hidden bg-black cursor-pointer group"
-                        onClick={() => !isSelectionMode && setFullScreenVideo(msg.video!)}
-                      >
-                        <video src={msg.video} className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full group-hover:bg-white/30 transition-colors">
-                            <Play className="w-5 h-5 sm:w-6 sm:h-6 text-white fill-white" />
-                          </div>
-                        </div>
-                      </div>
-                    ) : msg.audio ? (
-                      <div className="flex items-center gap-2 sm:gap-3 p-1 sm:p-2 min-w-50 sm:min-w-65">
-                        <div className="p-2 bg-white/20 rounded-full shrink-0"><Music className="w-4 h-4 sm:w-5 sm:h-5" /></div>
-                        <audio src={msg.audio} controls className={`w-full h-8 max-w-45 sm:max-w-55 ${isSelectionMode ? "pointer-events-none" : ""}`} />
-                      </div>
-                    ) : (
-                      <p className="px-2 py-1 text-sm sm:text-base wrap-break-word whitespace-pre-wrap leading-relaxed">{msg.text}</p>
-                    )}
-                  </div>
+                  {/* ✅ COLORED BUBBLE LOGIC HERE */}
+                  <div className={`p-3 rounded-2xl overflow-hidden relative ${isMe
+                    ? "bg-linear-to-r from-blue-600 to-indigo-500 text-white rounded-br-none"
+                    : "bg-white/10 backdrop-blur-md border border-white/5 text-white rounded-bl-none"
+                    } ${msg.isOptimistic ? "opacity-70" : "opacity-100"} ${isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`
+                  }>
+                    {msg.image ? (<div className="relative w-full max-w-55 sm:max-w-85 aspect-square rounded-lg overflow-hidden cursor-pointer group bg-black/20" onClick={() => !isSelectionMode && setFullScreenImage(msg.image || "")}><img src={msg.image} alt="Sent" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" /><div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" /></div>) : msg.video ? (<div className="relative w-full max-w-55 sm:max-w-85 aspect-video rounded-lg overflow-hidden bg-black cursor-pointer group" onClick={() => !isSelectionMode && setFullScreenVideo(msg.video!)}><video src={msg.video} className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity" /><div className="absolute inset-0 flex items-center justify-center"><div className="bg-white/20 backdrop-blur-sm p-3 rounded-full group-hover:bg-white/30 transition-colors"><Play className="w-5 h-5 sm:w-6 sm:h-6 text-white fill-white" /></div></div></div>) : msg.audio ? (<div className="flex items-center gap-2 sm:gap-3 p-1 sm:p-2 min-w-50 sm:min-w-65"><div className="p-2 bg-white/20 rounded-full shrink-0"><Music className="w-4 h-4 sm:w-5 sm:h-5" /></div><audio src={msg.audio} controls className={`w-full h-8 max-w-45 sm:max-w-55 ${isSelectionMode ? "pointer-events-none" : ""}`} /></div>) : (
+                      // ✅ UPDATED: Use MessageText for truncation
+                      <MessageText text={msg.text || ""} isMe={isMe} />
+                    )}                  </div>
                   <p className={`text-[10px] text-muted-foreground mt-1 ${isMe ? "text-right" : "text-left"}`}>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
               </motion.div>
