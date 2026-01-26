@@ -318,7 +318,6 @@ export default function ChatPage() {
       socket.emit("typing", { chatId, senderId: currentUser._id });
       // Stop showing after 3 seconds of no more typing
       typingTimeoutRef.current = setTimeout(() => {
-        console.log("[AUTO STOP TYPING] after 3s inactivity");
         socket.emit("stopTyping", { chatId, senderId: currentUser._id });
         typingTimeoutRef.current = null;
       }, 3000);

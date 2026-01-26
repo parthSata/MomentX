@@ -220,7 +220,11 @@
     }
 }
 
-/* Base Variables */
+.bg-gradient {
+    /* 👇 CHANGE THIS LINE */
+    @apply bg-linear-to-r from-pink-500 to-violet-500;
+}
+
 @layer base {
     :root {
         --background: 240 20% 5%;
@@ -294,9 +298,7 @@
         --sidebar-border: 240 5% 85%;
         --sidebar-ring: 244 100% 55%;
     }
-}
 
-@layer base {
     * {
         border-color: hsl(var(--border));
     }
@@ -312,7 +314,6 @@
     .glass {
         background: var(--glass-bg);
         backdrop-filter: blur(24px);
-        /* Replaced @apply for safety */
         border: 1px solid var(--glass-border);
     }
 

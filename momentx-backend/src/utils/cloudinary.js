@@ -11,13 +11,15 @@ cloudinary.config({
 });
 
 
-const uploadInCloudinary = async (localFilePath) => {
+const uploadInCloudinary = async (localFilePath, resourceType = "auto") => {
   try {
     if (!localFilePath) return null;
 
     // Upload file
     const uploadResult = await cloudinary.uploader.upload(localFilePath, {
-      resource_type: "auto",
+      resource_type: resourceType, // "video" or "image" or "auto"
+      // Optional: Generate a thumbnail automatically for videos
+      eager: resourceType === "video" ? [{ width: 300, height: 300, crop: "pad", format: "jpg" }] : undefined,
     });
 
     // Delete local file after successful upload
@@ -35,16 +37,12 @@ const uploadInCloudinary = async (localFilePath) => {
   }
 };
 
-// ✅ NEW: Function to delete from Cloudinary
 const deleteFromCloudinary = async (publicId, resourceType = "image") => {
   try {
     if (!publicId) return null;
-
-    // Cloudinary destroy method
     const result = await cloudinary.uploader.destroy(publicId, {
       resource_type: resourceType,
     });
-
     return result;
   } catch (error) {
     console.error("❌ Cloudinary Delete Failed:", error);

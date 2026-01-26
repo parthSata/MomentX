@@ -135,7 +135,6 @@ export const deleteMessages = async (req, res) => {
         .json({ success: false, message: "Invalid request data" });
     }
 
-    console.log("SERVER: Deleting messages:", messageIds); // Debug Log
 
     // 1. Delete Messages
     const result = await Message.deleteMany({
@@ -146,7 +145,6 @@ export const deleteMessages = async (req, res) => {
     // Note: Check your Message Model. If the field is named "chat", use "chat: chatId".
     // If it is "chatId", use "chatId: chatId".
 
-    console.log("SERVER: Deleted count:", result.deletedCount); // Debug Log
 
     // 2. Update Latest Message (Optional but recommended)
     const latestMessage = await Message.findOne({ chatId: chatId }).sort({

@@ -79,8 +79,6 @@ export function useChat(chatId?: string) {
 
     // ✅ FIX: Handler to join room on EVERY connection/reconnection
     const onConnect = () => {
-      console.log("✅ Socket Connected with ID:", socket.id);
-      console.log("🔗 Joining User Room:", user._id);
       socket.emit("join_user_room", user._id);
     };
 
@@ -89,8 +87,6 @@ export function useChat(chatId?: string) {
     };
 
     const handleNewMessage = (newMsg: Message) => {
-      console.log("📩 New Message Received:", newMsg);
-
       // If we are currently in this chat, add to messages list
       if (chatId && newMsg.chatId === chatId) {
         setMessages((prev) => [...prev, newMsg]);

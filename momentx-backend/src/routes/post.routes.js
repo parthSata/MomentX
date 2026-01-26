@@ -8,8 +8,8 @@ import {
   toggleSavePost,
   deletePost,
   getUserPosts,
-  getUserSavedPosts, // ✅ Import
-  getUserTaggedPosts, // ✅ Import
+  getUserSavedPosts,
+  getUserTaggedPosts,
   searchHashtags,
 } from "../controllers/post.controller.js";
 import {
@@ -45,7 +45,14 @@ router.route("/:postId/save").post(toggleSavePost);
 router.route("/:postId/delete").delete(deletePost);
 
 // --- Comments ---
+
+// 1. ✅ THIS IS THE FIX: Added route to match frontend call "/comments/:postId"
+router.route("/comments/:postId").get(getPostComments).post(addComment);
+
+// 2. Existing route (Keep for backward compatibility if needed)
 router.route("/:postId/comments").get(getPostComments).post(addComment);
+
+// 3. Comment Actions (Like / Delete)
 router.route("/comments/:commentId/like").post(toggleCommentLike);
 router.route("/comments/:commentId/delete").delete(deleteComment);
 

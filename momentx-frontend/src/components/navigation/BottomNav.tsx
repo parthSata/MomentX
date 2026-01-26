@@ -50,7 +50,7 @@ export function BottomNav() {
                 whileTap={{ scale: 0.9 }}
                 className={cn(
                   "p-2 rounded-xl transition-colors",
-                  isActive && "bg-gradient-to-r from-neon-indigo/20 via-neon-violet/20 to-neon-pink/20"
+                  isActive && "bg-linear-to-r from-neon-indigo/20 via-neon-violet/20 to-neon-pink/20"
                 )}
               >
                 <Icon
@@ -63,7 +63,7 @@ export function BottomNav() {
               {isActive && (
                 <motion.div
                   layoutId="bottomNavIndicator"
-                  className="absolute -bottom-0 w-1 h-1 rounded-full bg-primary"
+                  className="absolute bottom-0 w-1 h-1 rounded-full bg-primary"
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 />
               )}

@@ -62,7 +62,6 @@ export function useNotifications() {
     socket.emit("join_user_room", user._id);
 
     socket.on("new_notification", (newNotif: Notification) => {
-      console.log("🔔 New Notification:", newNotif);
       setNotifications((prev) => [newNotif, ...prev]);
       setUnreadCount((prev) => prev + 1);
     });
