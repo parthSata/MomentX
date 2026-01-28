@@ -16,6 +16,7 @@ import {
   getUserFollowers,
   getUserFollowing,
   getUserById,
+  getUserByUsername
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -104,6 +105,7 @@ router.get("/all", verifyJWT, getAllUsers);
 router.route("/follow/:id").post(verifyJWT, toggleFollowUser);
 router.route("/followers/:id").get(verifyJWT, getUserFollowers);
 router.route("/following/:id").get(verifyJWT, getUserFollowing);
+router.route("/u/:username").get(verifyJWT, getUserByUsername);
 
 router.get(
   "/search",

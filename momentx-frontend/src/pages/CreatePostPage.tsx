@@ -1,15 +1,14 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Image, Video, Camera, MapPin, Hash,
-  ChevronRight, Upload, Loader2, X
-} from "lucide-react";
+  ArrowLeft, Image, Camera, MapPin, Hash,
+  ChevronRight, Upload, Loader2, X, Film, RefreshCcw} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { api } from "@/lib/axios"; // Import Axios
+import { api } from "@/lib/axios";
 
 const filters = [
   { name: "Original", class: "" },
@@ -22,12 +21,23 @@ const filters = [
 
 export default function CreatePostPage() {
   const navigate = useNavigate();
+
+  // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [step, setStep] = useState<"select" | "edit" | "details">("select");
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Steps: select -> camera -> edit -> details
+  const [step, setStep] = useState<"select" | "camera" | "edit" | "details">("select");
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null); // ✅ Store actual file
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
+  // Camera State
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [stream, setStream] = useState<MediaStream | null>(null);
+
+  // Post Details State
   const [selectedFilter, setSelectedFilter] = useState("");
   const [caption, setCaption] = useState("");
   const [location, setLocation] = useState("");
@@ -37,10 +47,85 @@ export default function CreatePostPage() {
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [showTagInput, setShowTagInput] = useState(false);
 
+  // --- CAMERA LOGIC ---
+
+  const startCamera = async () => {
+    setStep("camera");
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facingMode }
+      });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (err) {
+      console.error("Camera Error:", err);
+      toast.error("Could not access camera. Please allow permissions.");
+      setStep("select");
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+  };
+
+  // Switch between Front/Back camera
+  const toggleCamera = () => {
+    stopCamera();
+    setFacingMode(prev => prev === "user" ? "environment" : "user");
+  };
+
+  // Restart camera when facing mode changes
+  useEffect(() => {
+    if (step === "camera") {
+      startCamera();
+    }
+    return () => stopCamera(); // Cleanup on unmount
+  }, [facingMode]);
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      // Set canvas size to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // Draw image
+      const context = canvas.getContext("2d");
+      if (context) {
+        // Flip horizontally if using front camera for "mirror" effect
+        if (facingMode === "user") {
+          context.translate(canvas.width, 0);
+          context.scale(-1, 1);
+        }
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convert to File/Blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+            setImageFile(file);
+            setSelectedImage(URL.createObjectURL(blob));
+            stopCamera();
+            setStep("edit");
+          }
+        }, "image/jpeg");
+      }
+    }
+  };
+
+  // --- FILE UPLOAD LOGIC ---
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImageFile(file); // ✅ Save file for upload
+      setImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setSelectedImage(event.target?.result as string);
@@ -92,47 +177,50 @@ export default function CreatePostPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 z-40 glass-strong border-b border-border"
-      >
-        <div className="max-w-4xl mx-auto p-4 flex items-center justify-between">
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => {
-              if (step === "select") navigate(-1);
-              else if (step === "edit") setStep("select");
-              else setStep("edit");
-            }}
-            className="p-2 glass rounded-full"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </motion.button>
 
-          <h1 className="text-lg md:text-xl font-display font-bold">
-            {step === "select" ? "New Post" : step === "edit" ? "Edit Photo" : "Share Post"}
-          </h1>
-
-          {step !== "select" ? (
-            <Button
-              variant="gradient"
-              size="sm"
+      {/* HEADER (Hidden in Camera Mode) */}
+      {step !== "camera" && (
+        <motion.div
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="sticky top-0 z-40 glass-strong border-b border-border"
+        >
+          <div className="max-w-4xl mx-auto p-4 flex items-center justify-between">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
               onClick={() => {
-                if (step === "edit") setStep("details");
-                else handlePost();
+                if (step === "select") navigate(-1);
+                else if (step === "edit") setStep("select");
+                else setStep("edit");
               }}
-              disabled={isPosting}
-              className="min-w-20" // ✅ Fixed class
+              className="p-2 glass rounded-full"
             >
-              {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : step === "edit" ? "Next" : "Share"}
-            </Button>
-          ) : (
-            <div className="w-20" />
-          )}
-        </div>
-      </motion.div>
+              <ArrowLeft className="w-5 h-5" />
+            </motion.button>
+
+            <h1 className="text-lg md:text-xl font-display font-bold">
+              {step === "select" ? "New Post" : step === "edit" ? "Edit Photo" : "Share Post"}
+            </h1>
+
+            {step !== "select" ? (
+              <Button
+                variant="gradient"
+                size="sm"
+                onClick={() => {
+                  if (step === "edit") setStep("details");
+                  else handlePost();
+                }}
+                disabled={isPosting}
+                className="min-w-20"
+              >
+                {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : step === "edit" ? "Next" : "Share"}
+              </Button>
+            ) : (
+              <div className="w-20" />
+            )}
+          </div>
+        </motion.div>
+      )}
 
       <div className="max-w-4xl mx-auto">
         <AnimatePresence mode="wait">
@@ -146,23 +234,27 @@ export default function CreatePostPage() {
               exit={{ opacity: 0, x: 20 }}
               className="p-4 md:p-6 lg:p-8"
             >
-              {/* Options */}
               <div className="grid grid-cols-3 gap-3 md:gap-4 mb-8">
-                <button onClick={() => fileInputRef.current?.click()} className="p-6 glass-strong rounded-2xl flex flex-col items-center gap-2">
+                <button onClick={() => fileInputRef.current?.click()} className="p-6 glass-strong rounded-2xl flex flex-col items-center gap-2 hover:bg-muted/20 transition-colors">
                   <Image className="w-8 h-8 text-primary" />
                   <span className="text-sm font-medium">Gallery</span>
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} className="p-6 glass-strong rounded-2xl flex flex-col items-center gap-2">
+
+                {/* ✅ START CAMERA BUTTON */}
+                <button onClick={startCamera} className="p-6 glass-strong rounded-2xl flex flex-col items-center gap-2 hover:bg-muted/20 transition-colors">
                   <Camera className="w-8 h-8 text-primary" />
                   <span className="text-sm font-medium">Camera</span>
                 </button>
-                <button onClick={() => toast.info("Coming soon!")} className="p-6 glass-strong rounded-2xl flex flex-col items-center gap-2 opacity-50">
-                  <Video className="w-8 h-8 text-primary" />
-                  <span className="text-sm font-medium">Video</span>
+
+                <button
+                  onClick={() => navigate("/create-reel")}
+                  className="p-6 glass-strong rounded-2xl flex flex-col items-center gap-2 hover:bg-muted/20 transition-colors"
+                >
+                  <Film className="w-8 h-8 text-primary" />
+                  <span className="text-sm font-medium">Reel</span>
                 </button>
               </div>
 
-              {/* Drop Zone */}
               <div
                 onClick={() => fileInputRef.current?.click()}
                 className="p-12 border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-primary/5 transition-all"
@@ -181,7 +273,61 @@ export default function CreatePostPage() {
             </motion.div>
           )}
 
-          {/* Step 2: Edit */}
+          {/* ✅ Step: CAMERA OVERLAY */}
+          {step === "camera" && (
+            <motion.div
+              key="camera"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black z-50 flex flex-col"
+            >
+              {/* Camera View */}
+              <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`w-full h-full object-cover ${facingMode === "user" ? "scale-x-[-1]" : ""}`} // Mirror front cam
+                />
+
+                {/* Close Button */}
+                <button
+                  onClick={() => { stopCamera(); setStep("select"); }}
+                  className="absolute top-6 left-6 p-2 bg-black/40 rounded-full text-white backdrop-blur-md"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                {/* Camera Controls */}
+                <div className="absolute bottom-10 left-0 right-0 flex items-center justify-between px-12">
+                  <div className="w-10" /> {/* Spacer */}
+
+                  {/* Shutter Button */}
+                  <button
+                    onClick={capturePhoto}
+                    className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center hover:scale-95 transition-transform"
+                  >
+                    <div className="w-16 h-16 bg-white rounded-full" />
+                  </button>
+
+                  {/* Flip Camera */}
+                  <button
+                    onClick={toggleCamera}
+                    className="p-3 bg-black/40 rounded-full text-white backdrop-blur-md"
+                  >
+                    <RefreshCcw className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Hidden Canvas for Capture */}
+              <canvas ref={canvasRef} className="hidden" />
+            </motion.div>
+          )}
+
+          {/* Step 2: Edit (Filter) */}
           {step === "edit" && selectedImage && (
             <motion.div
               key="edit"
@@ -234,7 +380,7 @@ export default function CreatePostPage() {
                       value={caption}
                       onChange={(e) => setCaption(e.target.value)}
                       placeholder="Write a caption..."
-                      className="min-h-32 glass-strong resize-none" // ✅ Fixed class
+                      className="min-h-32 glass-strong resize-none"
                     />
                   </div>
 
@@ -242,7 +388,7 @@ export default function CreatePostPage() {
                   <div className="space-y-2">
                     <button onClick={() => setShowLocationInput(!showLocationInput)} className="w-full flex items-center justify-between p-4 glass rounded-xl">
                       <div className="flex items-center gap-2"><MapPin className="w-5 h-5" /> <span>Add Location</span></div>
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className={`w-4 h-4 transition-transform ${showLocationInput ? 'rotate-90' : ''}`} />
                     </button>
                     {showLocationInput && (
                       <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="New York, USA" />
@@ -253,7 +399,7 @@ export default function CreatePostPage() {
                   <div className="space-y-2">
                     <button onClick={() => setShowTagInput(!showTagInput)} className="w-full flex items-center justify-between p-4 glass rounded-xl">
                       <div className="flex items-center gap-2"><Hash className="w-5 h-5" /> <span>Add Tags</span></div>
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className={`w-4 h-4 transition-transform ${showTagInput ? 'rotate-90' : ''}`} />
                     </button>
                     {showTagInput && (
                       <div>

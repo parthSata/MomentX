@@ -1,8 +1,6 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-    ArrowLeft, Video, Hash, X, Loader2
-} from "lucide-react";
+import { ArrowLeft, Video, Hash, X, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,7 +67,7 @@ export default function CreateReelPage() {
             });
 
             toast.success("Reel shared successfully!");
-            navigate("/reels");
+            navigate("/");
         } catch (error: any) {
             console.error("Post Error:", error);
             toast.error("Failed to share reel", {
@@ -134,7 +132,7 @@ export default function CreateReelPage() {
                         >
                             <div
                                 onClick={() => fileInputRef.current?.click()}
-                                // ✅ Fixed aspect ratio class
+                                // ✅ FIX: Updated to aspect-9/16
                                 className="w-full max-w-xs aspect-9/16 border-2 border-dashed border-white/20 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-white/5 transition-all"
                             >
                                 <div className="p-4 bg-white/10 rounded-full">
@@ -167,7 +165,7 @@ export default function CreateReelPage() {
                         >
                             {/* Preview */}
                             <div className="flex gap-4">
-                                {/* ✅ Fixed aspect ratio class */}
+                                {/* ✅ FIX: Updated to aspect-9/16 */}
                                 <div className="w-24 aspect-9/16 bg-gray-900 rounded-lg overflow-hidden relative">
                                     <video src={selectedVideo} className="w-full h-full object-cover" muted autoPlay loop />
                                 </div>

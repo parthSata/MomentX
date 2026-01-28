@@ -64,10 +64,13 @@ export default function ReelsPage() {
 
   return (
     <div className="h-screen w-full bg-black flex overflow-hidden relative">
+
+      {/* ✅ Normal Sidebar (No hover expand) */}
       <div className="hidden lg:block w-64 border-r border-white/10 bg-black z-50">
         <Sidebar />
       </div>
 
+      {/* Main Content */}
       <div className="flex-1 relative h-full w-full">
         {reels.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-white gap-4">

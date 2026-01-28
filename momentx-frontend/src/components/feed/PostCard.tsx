@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo } from "react"
 import { motion } from "framer-motion"
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2 } from "lucide-react"
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Post } from "@/types"
 import { AvatarRing } from "@/components/ui/avatar-ring"
@@ -13,7 +13,7 @@ interface PostCardProps {
 }
 
 export function PostCard({ post }: PostCardProps) {
-  // ✅ FIX: Safe User Retrieval
+  // Safe User Retrieval
   const currentUser = useMemo(() => {
     try {
       const stored = localStorage.getItem("momentx_user");
@@ -101,6 +101,15 @@ export function PostCard({ post }: PostCardProps) {
     return num.toString()
   }
 
+  // Helper to format date nicely
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric"
+    }).toUpperCase();
+  }
+
   return (
     <>
       <motion.article
@@ -119,16 +128,20 @@ export function PostCard({ post }: PostCardProps) {
             />
             <div>
               <div className="flex items-center gap-1">
-                <span className="font-semibold">{post.user.name}</span>
+                <span className="font-semibold text-sm">{post.user.name}</span>
                 {post.user.isVerified && (
                   <svg className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
                   </svg>
                 )}
               </div>
-              <span className="text-xs text-muted-foreground">
-                {new Date(post.createdAt).toLocaleDateString()}
-              </span>
+              
+              {/* ✅ CHANGE 1: Show Location here instead of Date */}
+              {post.location && (
+                <p className="text-xs text-muted-foreground flex items-center gap-0.5">
+                   <MapPin className="w-3 h-3" /> {post.location}
+                </p>
+              )}
             </div>
           </div>
 
@@ -235,6 +248,11 @@ export function PostCard({ post }: PostCardProps) {
               )
             )}
           </div>
+
+          {/* ✅ CHANGE 2: Date moved here (Above Add Comment) */}
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-2">
+            {formatDate(post.createdAt)}
+          </p>
 
           <button
             onClick={() => setIsModalOpen(true)}

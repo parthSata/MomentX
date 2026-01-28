@@ -582,6 +582,41 @@ const getUserById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "User details fetched"));
 });
 
+const getUserByUsername = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  const currentUserId = req.user?._id;
+
+  // 1. Find User
+  const user = await User.findOne({ username }).select("-password -refresh_token");
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // 2. Get Aggregated Stats
+  const postsCount = await Post.countDocuments({ user: user._id });
+  const isFollowing = user.followers.includes(currentUserId);
+
+  // 3. Construct Response
+  const userProfile = {
+    _id: user._id,
+    name: user.name,
+    username: user.username,
+    bio: user.bio,
+    website: user.website,
+    profilePic: user.profilePic,
+    isVerified: user.isVerified,
+    followersCount: user.followers.length,
+    followingCount: user.following.length,
+    postsCount,
+    isFollowing, // Helpful for the UI button
+  };
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, userProfile, "User profile fetched successfully"));
+});
+
 
 
 export {
@@ -600,4 +635,5 @@ export {
   getUserFollowers,
   getUserFollowing,
   getUserById,
+  getUserByUsername,
 };

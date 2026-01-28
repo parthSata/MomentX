@@ -4,27 +4,27 @@ import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Volume2, VolumeX,
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { cn } from "@/lib/utils";
 import { ReelCommentsSheet } from "./ReelCommentsSheet";
-import { api } from "@/lib/axios"; // Import API
+import { api } from "@/lib/axios";
 
 export interface Reel {
     _id: string;
     user: {
         _id: string;
         username: string;
-        name: string;
-        profilePic: string;
-        avatar: string;
+        avatar: string; // mapped from profilePic
         isVerified: boolean;
+        name: string;
+        profilePic: string; // keep profilePic for compatibility
     };
     videoUrl: string;
     caption: string;
-    likes: string[];
+    likes: string[] | number; // Handle both array of IDs or count number
     commentsCount: number;
     sharesCount: number;
     music?: string;
     location?: string;
-    isLiked?: boolean; // Added for initial state
-    isSaved?: boolean; // Added for initial state
+    isLiked?: boolean;
+    isSaved?: boolean;
 }
 
 interface ReelCardProps {
@@ -32,9 +32,7 @@ interface ReelCardProps {
     isActive: boolean;
     muted: boolean;
     onToggleMute: () => void;
-    // We handle interactions internally for real-time updates, but you can keep these if needed for parent updates
-    onLike?: () => void;
-    onSave?: () => void;
+    // Removed external handlers to enforce internal logic
 }
 
 export function ReelCard({
@@ -49,13 +47,15 @@ export function ReelCard({
     const [showComments, setShowComments] = useState(false);
     const [showHeart, setShowHeart] = useState(false);
 
-    // ✅ REAL-TIME STATE
+    // ✅ Initialize State with Reel Data
+    // Determine initial like count: if it's an array, length; if number, use it.
+    const initialLikeCount = Array.isArray(reel.likes) ? reel.likes.length : (reel.likes || 0);
+
     const [isLiked, setIsLiked] = useState(reel.isLiked || false);
-    const [likeCount, setLikeCount] = useState(reel.likes.length);
-    const [commentCount, setCommentCount] = useState(reel.commentsCount);
+    const [likeCount, setLikeCount] = useState(initialLikeCount);
+    const [commentCount, setCommentCount] = useState(reel.commentsCount || 0);
     const [isSaved, setIsSaved] = useState(reel.isSaved || false);
 
-    // Auto Play/Pause
     useEffect(() => {
         if (videoRef.current) {
             if (isActive) {
@@ -67,19 +67,17 @@ export function ReelCard({
         }
     }, [isActive]);
 
-    // ✅ Handle Like Internally for Speed
+    // ✅ Handle Like
     const handleLike = async () => {
         const prevLiked = isLiked;
-        // Optimistic Update
         setIsLiked(!prevLiked);
         setLikeCount(prev => prevLiked ? prev - 1 : prev + 1);
 
         try {
-            await api.post(`/posts/${reel._id}/like`);
+            await api.post(`/posts/${reel._id}/like`); // Matches backend route
         } catch (error) {
-            // Revert if error
             setIsLiked(prevLiked);
-            setLikeCount(prev => prevLiked ? prev : prev - 1); // Revert count roughly
+            setLikeCount(prev => prevLiked ? prev : prev - 1);
         }
     };
 
@@ -89,25 +87,24 @@ export function ReelCard({
         if (!isLiked) handleLike();
     };
 
+    // ✅ Handle Save
     const handleSave = async () => {
         setIsSaved(!isSaved);
         try {
             await api.post(`/posts/${reel._id}/save`);
         } catch (error) {
-            setIsSaved(!isSaved); // Revert
+            setIsSaved(!isSaved);
         }
     };
 
     return (
         <div className="h-full w-full flex items-center justify-center bg-black relative">
 
-            {/* Blurred Background */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
                 <video src={reel.videoUrl} className="w-full h-full object-cover blur-3xl scale-110" muted />
                 <div className="absolute inset-0 bg-black/40" />
             </div>
 
-            {/* Main Container */}
             <div className="relative h-full w-full max-w-105 mx-auto bg-black md:rounded-xl overflow-hidden shadow-2xl" onDoubleClick={handleDoubleTap}>
                 <video ref={videoRef} src={reel.videoUrl} className="absolute inset-0 w-full h-full object-cover" loop muted={muted} playsInline onClick={onToggleMute} />
                 <div className="absolute inset-0 bg-linear-to-b from-black/30 via-transparent to-black/70 pointer-events-none" />
@@ -124,16 +121,12 @@ export function ReelCard({
                     )}
                 </AnimatePresence>
 
-                {/* Right Actions */}
                 <div className="absolute right-3 bottom-24 md:bottom-20 flex flex-col items-center gap-4 z-20">
-
-                    {/* LIKE */}
                     <button onClick={(e) => { e.stopPropagation(); handleLike(); }} className="flex flex-col items-center gap-1 active:scale-90 transition-transform">
                         <Heart className={cn("w-7 h-7 transition-colors", isLiked ? "text-red-500 fill-red-500" : "text-white")} />
                         <span className="text-white text-xs font-semibold">{likeCount}</span>
                     </button>
 
-                    {/* COMMENT */}
                     <button onClick={(e) => { e.stopPropagation(); setShowComments(true); }} className="flex flex-col items-center gap-1 active:scale-90 transition-transform">
                         <MessageCircle className="w-7 h-7 text-white" />
                         <span className="text-white text-xs font-semibold">{commentCount}</span>
@@ -150,15 +143,14 @@ export function ReelCard({
 
                     <button className="active:scale-90 transition-transform"><MoreHorizontal className="w-7 h-7 text-white" /></button>
 
-                    {/* <div className="w-9 h-9 mt-1 rounded-lg border border-white/20 overflow-hidden bg-black/50">
+                    <div className="w-9 h-9 mt-1 rounded-lg border border-white/20 overflow-hidden bg-black/50">
                         <motion.img animate={isActive ? { rotate: 360 } : {}} transition={{ duration: 5, repeat: Infinity, ease: "linear" }} src={reel.user.profilePic} className="w-full h-full object-cover" />
-                    </div> */}
+                    </div>
                 </div>
 
-                {/* Bottom Info */}
                 <div className="absolute bottom-20 md:bottom-4 left-3 right-16 z-20 pointer-events-auto text-left">
                     <div className="flex items-center gap-2 mb-2">
-                        <AvatarRing src={reel.user.profilePic} size="sm" className="" />
+                        <AvatarRing src={reel.user.profilePic} size="sm" />
                         <span className="text-white font-bold text-sm shadow-black drop-shadow-md">{reel.user.name}</span>
                         {reel.user.isVerified && <BadgeCheck className="w-4 h-4 text-blue-400 fill-blue-400" />}
                         <button onClick={() => setIsFollowing(!isFollowing)} className={cn("px-3 py-1 text-xs font-semibold rounded-lg border transition-all ml-1", isFollowing ? "bg-transparent border-white/50 text-white" : "bg-transparent border-white text-white hover:bg-white/10")}>
@@ -189,13 +181,13 @@ export function ReelCard({
                     </div>
                 </div>
 
-                {/* Comments Sheet */}
+                {/* ✅ Pass Callback to Increment Counter */}
                 <ReelCommentsSheet
                     isOpen={showComments}
                     onClose={() => setShowComments(false)}
                     postId={reel._id}
                     commentCount={commentCount.toString()}
-                    onCommentAdded={() => setCommentCount(prev => prev + 1)} // ✅ Updates Local State Instantly
+                    onCommentAdded={() => setCommentCount(prev => prev + 1)}
                 />
 
             </div>

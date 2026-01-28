@@ -21,6 +21,7 @@ import FollowersPage from "@/pages/FollowersPage";
 // ✅ IMPORT THE NEW PAGE
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import CreateReelPage from "@/pages/CreateReelPage";
+import UserProfilePage from "@/pages/UserProfilePage";
 
 // Admin route protection
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -98,12 +99,31 @@ export function AnimatedRoutes() {
           }
         />
 
+        {/* ✅ ADDED THIS MISSING ROUTE */}
+        <Route
+          path="/create-reel"
+          element={
+            <PageTransition>
+              <CreateReelPage />
+            </PageTransition>
+          }
+        />
+
         {/* ✅ THIS IS THE MISSING ROUTE FIX */}
         <Route
           path="/reset-password"
           element={
             <PageTransition>
               <ResetPasswordPage />
+            </PageTransition>
+          }
+        />
+
+        <Route
+          path="/u/:username"
+          element={
+            <PageTransition>
+              <UserProfilePage />
             </PageTransition>
           }
         />

@@ -18,6 +18,8 @@ export interface Post {
   isSaved: boolean;
   createdAt: string;
   hashtags: string[];
+  videoUrl: string; // Optional video URL
+  commentsCount : number;
 }
 
 export interface Comment {

@@ -31,7 +31,7 @@ export function Header({ onMenuClick, showSearch = true }: HeaderProps) {
               whileHover={{ rotate: 180 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-neon-indigo via-neon-violet to-neon-pink rounded-xl animate-gradient" />
+              <div className="absolute inset-0 bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink rounded-xl animate-gradient" />
               <div className="absolute inset-0.5 bg-background rounded-[10px] flex items-center justify-center">
                 <span className="text-lg font-bold gradient-text">M</span>
               </div>

@@ -1,31 +1,32 @@
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import { Link } from "react-router-dom"
-import { Settings, Share2, Grid3X3, Bookmark, Tag, Sparkles, Loader2 } from "lucide-react"
-import { MainLayout } from "@/components/navigation/MainLayout"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import { EditProfileDialog } from "@/components/profile/EditProfileDialog"
-import { PostViewDialog } from "@/components/feed/PostViewDialog"
-import { useAuth } from "@/context/AuthContext"
-import { api } from "@/lib/axios"
-import type { Post } from "@/types"
-import { toast } from "sonner" // ✅ 1. Import toast
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import { Settings, Share2, Grid3X3, Bookmark, Tag, Sparkles, Loader2, Film } from "lucide-react";
+import { MainLayout } from "@/components/navigation/MainLayout";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
+import { PostViewDialog } from "@/components/feed/PostViewDialog";
+import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/axios";
+import type { Post } from "@/types";
+import { toast } from "sonner";
 
-type TabType = "posts" | "saved" | "tagged"
+// ✅ Added 'reels' to TabType
+type TabType = "posts" | "reels" | "saved" | "tagged";
 
 export default function ProfilePage() {
-  const { user: authUser, refreshUser } = useAuth()
-  const [activeTab, setActiveTab] = useState<TabType>("posts")
-  const [isEditOpen, setIsEditOpen] = useState(false)
+  const { user: authUser, refreshUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>("posts");
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   // Post View State
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isPostViewOpen, setIsPostViewOpen] = useState(false);
 
   // Data State
-  const [posts, setPosts] = useState<Post[]>([])
-  const [loadingPosts, setLoadingPosts] = useState(true)
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
 
   const [profileData, setProfileData] = useState({
     _id: "",
@@ -38,20 +39,22 @@ export default function ProfilePage() {
     followers: [] as string[],
     following: [] as string[],
     postsCount: 0
-  })
+  });
 
   const formatNumber = (num: number) => {
-    if (!num) return "0"
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M"
-    if (num >= 1000) return (num / 1000).toFixed(1) + "K"
-    return num.toString()
-  }
+    if (!num) return "0";
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+    if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+    return num.toString();
+  };
 
+  // ✅ Added Reels Tab Definition
   const tabs = [
     { id: "posts", icon: Grid3X3, label: "Posts" },
+    { id: "reels", icon: Film, label: "Reels" },
     { id: "saved", icon: Bookmark, label: "Saved" },
     { id: "tagged", icon: Tag, label: "Tagged" },
-  ]
+  ];
 
   const fetchProfileInfo = async () => {
     if (!authUser) return;
@@ -74,7 +77,7 @@ export default function ProfilePage() {
     } catch (e) {
       console.error("❌ Failed to fetch info", e);
     }
-  }
+  };
 
   const fetchTabContent = async () => {
     if (!authUser?._id) return;
@@ -86,11 +89,20 @@ export default function ProfilePage() {
       if (activeTab === "posts") endpoint = `/posts/user-posts/${authUser._id}`;
       else if (activeTab === "saved") endpoint = `/posts/saved-posts/${authUser._id}`;
       else if (activeTab === "tagged") endpoint = `/posts/tagged-posts/${authUser._id}`;
+      else if (activeTab === "reels") endpoint = `/posts/user-posts/${authUser._id}`;
 
       const { data } = await api.get(endpoint);
-      const fetchedPosts = data.data || data.message || [];
+      const fetchedData = data.data || data.message || [];
 
-      setPosts(Array.isArray(fetchedPosts) ? fetchedPosts : []);
+      let finalPosts = Array.isArray(fetchedData) ? fetchedData : [];
+
+      if (activeTab === "reels") {
+        finalPosts = finalPosts.filter((p: any) => p.videoUrl);
+      } else if (activeTab === "posts") {
+        finalPosts = finalPosts.filter((p: any) => !p.videoUrl); // Only Photos
+      }
+
+      setPosts(finalPosts);
 
     } catch (error) {
       console.error(`❌ Failed to fetch ${activeTab}`, error);
@@ -117,22 +129,14 @@ export default function ProfilePage() {
     setIsPostViewOpen(true);
   };
 
-  // ✅ 2. Handle Share Function
   const handleShareProfile = () => {
     if (!profileData.username) return;
-
-    // 1. Get the current domain (e.g., http://localhost:5173 or https://myapp.com)
     const origin = window.location.origin;
-
-    // 2. Construct the URL. 
-    // CHANGE "/u/" below to match your actual route (e.g., "/profile/" or just "/")
     const shareUrl = `${origin}/u/${profileData.username}`;
 
     navigator.clipboard.writeText(shareUrl)
       .then(() => {
-        toast.success("Profile link copied!", {
-          description: `Link: ${shareUrl}`
-        });
+        toast.success("Profile link copied!", { description: `Link: ${shareUrl}` });
       })
       .catch(() => {
         toast.error("Failed to copy link");
@@ -144,6 +148,7 @@ export default function ProfilePage() {
   return (
     <MainLayout>
       <div className="space-y-6">
+
         {/* --- Header Section --- */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -174,18 +179,9 @@ export default function ProfilePage() {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="gradient" size="sm" onClick={() => setIsEditOpen(true)}>
-                    Edit Profile
-                  </Button>
-
-                  {/* ✅ 3. Attach onClick Handler */}
-                  <Button variant="glass" size="icon" onClick={handleShareProfile}>
-                    <Share2 className="w-4 h-4" />
-                  </Button>
-
-                  <Button variant="ghost" size="icon">
-                    <Settings className="w-4 h-4" />
-                  </Button>
+                  <Button variant="gradient" size="sm" onClick={() => setIsEditOpen(true)}>Edit Profile</Button>
+                  <Button variant="glass" size="icon" onClick={handleShareProfile}><Share2 className="w-4 h-4" /></Button>
+                  <Button variant="ghost" size="icon"><Settings className="w-4 h-4" /></Button>
                 </div>
               </div>
 
@@ -265,9 +261,10 @@ export default function ProfilePage() {
                 <div className="p-4 rounded-full bg-secondary/50 mb-4">
                   {activeTab === 'saved' ? <Bookmark className="w-8 h-8" /> :
                     activeTab === 'tagged' ? <Tag className="w-8 h-8" /> :
-                      <Grid3X3 className="w-8 h-8" />}
+                      activeTab === 'reels' ? <Film className="w-8 h-8" /> :
+                        <Grid3X3 className="w-8 h-8" />}
                 </div>
-                <p>No {activeTab} posts yet.</p>
+                <p>No {activeTab} yet.</p>
               </div>
             ) : (
               posts.map((post, index) => (
@@ -278,13 +275,34 @@ export default function ProfilePage() {
                   transition={{ delay: index * 0.05 }}
                   whileHover={{ scale: 1.02 }}
                   onClick={() => openPostView(post)}
-                  className="aspect-square relative group overflow-hidden cursor-pointer bg-secondary/30"
+                  className={cn(
+                    "relative group overflow-hidden cursor-pointer bg-secondary/30",
+                    // ✅ Vertical Aspect Ratio for Reels, Square for others
+                    activeTab === 'reels' ? "aspect-9/16" : "aspect-square"
+                  )}
                 >
-                  <img
-                    src={post.images?.[0] || "/placeholder-image.jpg"}
-                    alt={post.caption || "Post"}
-                    className="w-full h-full object-cover"
-                  />
+                  {/* ✅ Conditional Rendering: Video for Reels, Image for Posts */}
+                  {activeTab === 'reels' || (post as any).videoUrl ? (
+                    <video
+                      src={(post as any).videoUrl}
+                      className="w-full h-full object-cover pointer-events-none"
+                      muted
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={post.images?.[0] || "/placeholder-image.jpg"}
+                      alt={post.caption || "Post"}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+
+                  {/* Overlay Icon for Reels tab */}
+                  {activeTab === 'reels' && (
+                    <div className="absolute top-2 right-2 text-white drop-shadow-md">
+                      <Film className="w-4 h-4 fill-white/20" />
+                    </div>
+                  )}
                 </motion.div>
               ))
             )}

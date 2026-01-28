@@ -18,6 +18,7 @@ import authRoutes from "./routes/auth.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import chatRouter from "./routes/chat.routes.js";
 import reelRouter from "./routes/reel.routes.js"; // ✅ Import reel routes
+import exploreRouter from "./routes/explore.routes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -154,6 +155,7 @@ app.use("/api/v1/stories", storyRoutes);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/chats", chatRouter);
 app.use("/api/v1/reels", reelRouter); // ✅ Reel routes
+app.use("/api/v1/explore", exploreRouter);
 
 // Error Handling
 app.use((err, req, res, next) => {

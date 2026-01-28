@@ -1,4 +1,5 @@
 import { Post } from "../models/post.model.js";
+import { Reel } from "../models/reel.model.js"; // ✅ Ensure this path is correct
 import { User } from "../models/user.model.js";
 import { Comment } from "../models/comment.model.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -6,9 +7,9 @@ import ApiResponse from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadInCloudinary } from "../utils/cloudinary.js";
 import mongoose from "mongoose";
-import { sendNotification } from "../utils/Notification.js"; // ✅ Import Notification Helper
+import { sendNotification } from "../utils/Notification.js";
 
-// --- HELPER: Format Posts ---
+// --- HELPER: Format Posts & Reels ---
 const formatPosts = async (posts, currentUserId) => {
   const currentUser = await User.findById(currentUserId).select("savedPosts");
   const savedPostIds = currentUser?.savedPosts.map((id) => id.toString()) || [];
@@ -16,22 +17,37 @@ const formatPosts = async (posts, currentUserId) => {
   return await Promise.all(
     posts.map(async (post) => {
       const postObj = post.toObject ? post.toObject() : post;
-      const commentCount = await Comment.countDocuments({ post: postObj._id });
+      
+      // Count comments (Check both 'post' and 'reel' fields)
+      const commentCount = await Comment.countDocuments({ 
+          $or: [{ post: postObj._id }, { reel: postObj._id }] 
+      });
 
       return {
         ...postObj,
+        _id: postObj._id,
+        // ✅ FIX USER MAPPING
         user: {
-          ...postObj.user,
-          profilePic: postObj.user?.profilePic || "",
-          avatar: postObj.user?.profilePic || "",
+          _id: postObj.user?._id || postObj.user,
+          username: postObj.user?.username || "Unknown",
+          name: postObj.user?.name || "Unknown", // Added Name
+          profilePic: postObj.user?.profilePic || "", 
+          avatar: postObj.user?.profilePic || "", 
+          isVerified: postObj.user?.isVerified || false,
         },
-        image: postObj.images?.[0] || "",
+        // ✅ Handle Reel Fields
+        videoUrl: postObj.videoUrl || "",
+        thumbnailUrl: postObj.thumbnailUrl || "",
+        // If it's a reel without 'images', use thumbnail as the first image
+        images: postObj.images?.length > 0 ? postObj.images : (postObj.thumbnailUrl ? [postObj.thumbnailUrl] : []),
+        
         isLiked: postObj.likes.some(
           (id) => id.toString() === currentUserId.toString()
         ),
         isSaved: savedPostIds.includes(postObj._id.toString()),
         likes: postObj.likes.length,
-        comments: commentCount,
+        commentsCount: commentCount, 
+        comments: commentCount, 
       };
     })
   );
@@ -57,8 +73,7 @@ const createPost = asyncHandler(async (req, res) => {
   let parsedTags = [];
   if (taggedUsers) {
     try {
-      parsedTags =
-        typeof taggedUsers === "string" ? JSON.parse(taggedUsers) : taggedUsers;
+      parsedTags = typeof taggedUsers === "string" ? JSON.parse(taggedUsers) : taggedUsers;
     } catch (e) {
       console.warn("Could not parse taggedUsers", e);
     }
@@ -76,29 +91,27 @@ const createPost = asyncHandler(async (req, res) => {
 
   await User.findByIdAndUpdate(userId, { $inc: { posts: 1 } });
 
-  // Optional: Send notification to tagged users
   if (parsedTags.length > 0) {
     parsedTags.forEach((taggedUserId) => {
       sendNotification({
         req,
         receiverId: taggedUserId,
-        type: "mention", // You might need to add 'mention' to your enum if you want this
+        type: "mention",
         postId: post._id,
       });
     });
   }
 
-  return res
-    .status(201)
-    .json(new ApiResponse(201, post, "Post created successfully"));
+  return res.status(201).json(new ApiResponse(201, post, "Post created successfully"));
 });
 
 // --- 2. GET FEED ---
 const getHomeFeed = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 5 } = req.query;
+  const { page = 1, limit = 10 } = req.query; // Increased limit
   const skip = (page - 1) * limit;
   const currentUserId = req.user._id;
 
+  // You might want to mix Reels into the feed here later
   const posts = await Post.find()
     .sort({ createdAt: -1 })
     .skip(parseInt(skip))
@@ -121,7 +134,7 @@ const getHomeFeed = asyncHandler(async (req, res) => {
   );
 });
 
-// --- 3. GET USER POSTS ---
+// --- 3. GET USER POSTS & REELS (Profile) ---
 const getUserPosts = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const currentUserId = req.user._id;
@@ -130,15 +143,25 @@ const getUserPosts = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid User ID format");
   }
 
+  // 1. Fetch Posts with User details
   const posts = await Post.find({ user: userId })
-    .populate("user", "username profilePic")
+    .populate("user", "username name profilePic isVerified") // ✅ Populate Post User
+    .sort({ createdAt: -1 });
+  
+  // 2. Fetch Reels with User details
+  // ✅ FIX: Added .populate() here so Reel user data is not null/buffer
+  const reels = await Reel.find({ user: userId })
+    .populate("user", "username name profilePic isVerified") // ✅ Populate Reel User
     .sort({ createdAt: -1 });
 
-  const formattedPosts = await formatPosts(posts, currentUserId);
+  // 3. Combine
+  const allContent = [...posts, ...reels].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const formattedPosts = await formatPosts(allContent, currentUserId);
 
   return res
     .status(200)
-    .json(new ApiResponse(200, formattedPosts, "User posts fetched"));
+    .json(new ApiResponse(200, formattedPosts, "User posts and reels fetched"));
 });
 
 // --- 4. GET SAVED POSTS ---
@@ -152,16 +175,14 @@ const getUserSavedPosts = asyncHandler(async (req, res) => {
   const user = await User.findById(userId).populate({
     path: "savedPosts",
     options: { sort: { createdAt: -1 } },
-    populate: { path: "user", select: "username profilePic" },
+    populate: { path: "user", select: "username name profilePic isVerified" },
   });
 
   if (!user) throw new ApiError(404, "User not found");
 
   const formattedPosts = await formatPosts(user.savedPosts, currentUserId);
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, formattedPosts, "Saved posts fetched"));
+  return res.status(200).json(new ApiResponse(200, formattedPosts, "Saved posts fetched"));
 });
 
 // --- 5. GET TAGGED POSTS ---
@@ -169,61 +190,69 @@ const getUserTaggedPosts = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const currentUserId = req.user._id;
 
-  if (!mongoose.Types.ObjectId.isValid(userId))
-    throw new ApiError(400, "Invalid User ID");
-
   const posts = await Post.find({ taggedUsers: userId })
-    .populate("user", "username profilePic")
+    .populate("user", "username name profilePic isVerified")
     .sort({ createdAt: -1 });
 
   const formattedPosts = await formatPosts(posts, currentUserId);
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, formattedPosts, "Tagged posts fetched"));
+  return res.status(200).json(new ApiResponse(200, formattedPosts, "Tagged posts fetched"));
 });
 
 // --- INTERACTIONS ---
 
-// ✅ TOGGLE LIKE (Updated with Notification)
+// Toggle Like (Supports Post AND Reel)
 const togglePostLike = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const userId = req.user._id;
 
-  const post = await Post.findById(postId);
-  if (!post) throw new ApiError(404, "Post not found");
+  let item = await Post.findById(postId);
+  let type = "post";
 
-  const isLiked = post.likes.includes(userId);
-
-  if (isLiked) {
-    // Unlike logic
-    post.likes.pull(userId);
-  } else {
-    // Like logic
-    post.likes.push(userId);
-
-    // ✅ SEND NOTIFICATION
-    await sendNotification({
-      req,
-      receiverId: post.user, // Notify post owner
-      type: "like",
-      postId: post._id,
-    });
+  if (!item) {
+    item = await Reel.findById(postId);
+    type = "reel";
   }
 
-  await post.save();
+  if (!item) throw new ApiError(404, "Post/Reel not found");
+
+  const isLiked = item.likes.includes(userId);
+
+  if (isLiked) {
+    item.likes.pull(userId);
+  } else {
+    item.likes.push(userId);
+    
+    if (item.user.toString() !== userId.toString()) {
+        await sendNotification({
+          req,
+          receiverId: item.user,
+          type: "like",
+          postId: type === "post" ? item._id : undefined,
+          reelId: type === "reel" ? item._id : undefined,
+        });
+    }
+  }
+
+  await item.save();
 
   return res.status(200).json(
     new ApiResponse(200, isLiked ? "Unliked" : "Liked", {
       isLiked: !isLiked,
-      likes: post.likes.length,
+      likes: item.likes.length,
     })
   );
 });
 
+// Toggle Save (Supports Post AND Reel)
 const toggleSavePost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const userId = req.user._id;
+
+  const isPost = await Post.exists({ _id: postId });
+  const isReel = await Reel.exists({ _id: postId });
+
+  if (!isPost && !isReel) throw new ApiError(404, "Content not found");
 
   const user = await User.findById(userId);
   const isSaved = user.savedPosts.includes(postId);
@@ -236,62 +265,68 @@ const toggleSavePost = asyncHandler(async (req, res) => {
 
   await user.save({ validateBeforeSave: false });
 
-  return res
-    .status(200)
-    .json(
+  return res.status(200).json(
       new ApiResponse(200, isSaved ? "Unsaved" : "Saved", { isSaved: !isSaved })
-    );
+  );
 });
 
+// Delete Post (Can also add deleteReel here or separate controller)
 const deletePost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const userId = req.user._id;
 
-  const post = await Post.findById(postId);
-  if (!post) throw new ApiError(404, "Post not found");
+  // Try finding Post
+  let item = await Post.findById(postId);
+  let isReel = false;
 
-  if (post.user.toString() !== userId.toString()) {
-    throw new ApiError(403, "You are not authorized to delete this post");
+  // If not post, try Reel
+  if (!item) {
+      item = await Reel.findById(postId);
+      isReel = true;
   }
 
-  await Comment.deleteMany({ post: postId });
-  await Post.findByIdAndDelete(postId);
-  await User.findByIdAndUpdate(userId, { $inc: { posts: -1 } });
+  if (!item) throw new ApiError(404, "Content not found");
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, { postId }, "Post deleted successfully"));
+  if (item.user.toString() !== userId.toString()) {
+    throw new ApiError(403, "You are not authorized to delete this");
+  }
+
+  // Delete associated comments
+  await Comment.deleteMany({ 
+      $or: [{ post: postId }, { reel: postId }] 
+  });
+
+  if (isReel) {
+      await Reel.findByIdAndDelete(postId);
+      // Optional: Decrement reel count in user if you track it
+  } else {
+      await Post.findByIdAndDelete(postId);
+      await User.findByIdAndUpdate(userId, { $inc: { posts: -1 } });
+  }
+
+  return res.status(200).json(new ApiResponse(200, { postId }, "Deleted successfully"));
 });
 
 const searchHashtags = asyncHandler(async (req, res) => {
   const { query } = req.query;
+  if (!query || query.trim() === "") return res.status(200).json(new ApiResponse(200, [], "No query"));
 
-  if (!query || query.trim() === "") {
-    return res.status(200).json(new ApiResponse(200, [], "No query provided"));
-  }
-
-  // Remove '#' if user typed it
   const cleanQuery = query.replace("#", "").toLowerCase();
+  
+  // Search in Posts
+  const posts = await Post.find({ caption: { $regex: `#`, $options: "i" } }).select("caption");
+  // Search in Reels (optional, but good for consistency)
+  const reels = await Reel.find({ caption: { $regex: `#`, $options: "i" } }).select("caption");
 
-  // 1. Find all posts that *might* contain the tag in the caption
-  const posts = await Post.find({
-    caption: { $regex: `#`, $options: "i" }, // Optimization: Only look at posts with at least one hashtag
-  }).select("caption");
-
-  // 2. Process in Memory (Extract, Filter, Count)
+  const combined = [...posts, ...reels];
   const tagCounts = {};
 
-  posts.forEach((post) => {
-    if (!post.caption) return;
-
-    // Regex to extract hashtags: #word
-    const matches = post.caption.match(/#[a-z0-9_]+/gi);
-
+  combined.forEach((item) => {
+    if (!item.caption) return;
+    const matches = item.caption.match(/#[a-z0-9_]+/gi);
     if (matches) {
       matches.forEach((tag) => {
         const tagName = tag.replace("#", "").toLowerCase();
-
-        // Only include if it matches the user's search query
         if (tagName.includes(cleanQuery)) {
           tagCounts[tagName] = (tagCounts[tagName] || 0) + 1;
         }
@@ -299,28 +334,19 @@ const searchHashtags = asyncHandler(async (req, res) => {
     }
   });
 
-  // 3. Convert to Array and Sort
-  const results = Object.keys(tagCounts).map((tag) => ({
-    tag: tag,
-    count: tagCounts[tag],
-  }));
+  const results = Object.keys(tagCounts).map((tag) => ({ tag: tag, count: tagCounts[tag] })).sort((a, b) => b.count - a.count);
 
-  // Sort by popularity (count desc)
-  results.sort((a, b) => b.count - a.count);
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, results, "Hashtag results fetched"));
+  return res.status(200).json(new ApiResponse(200, results, "Hashtag results fetched"));
 });
 
 export {
   createPost,
   getHomeFeed,
-  togglePostLike,
-  toggleSavePost,
-  deletePost,
   getUserPosts,
   getUserSavedPosts,
   getUserTaggedPosts,
+  togglePostLike,
+  toggleSavePost,
+  deletePost,
   searchHashtags,
 };
