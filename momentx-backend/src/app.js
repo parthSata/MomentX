@@ -17,8 +17,9 @@ import storyRoutes from "./routes/story.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import chatRouter from "./routes/chat.routes.js";
-import reelRouter from "./routes/reel.routes.js"; // ✅ Import reel routes
+import reelRouter from "./routes/reel.routes.js"; 
 import exploreRouter from "./routes/explore.routes.js";
+import commentRouter from "./routes/comment.route.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -114,8 +115,6 @@ io.on("connection", (socket) => {
 
 initStoryCleanup();
 
-// ... (Rest of your middleware and routes remain the same) ...
-
 // Path Setup
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -151,6 +150,7 @@ app.get("/", (req, res) => res.status(200).json({ message: "API Running" }));
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/posts", postRouter);
+app.use("/api/v1/comments", commentRouter);
 app.use("/api/v1/stories", storyRoutes);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/chats", chatRouter);

@@ -4,6 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { uploadInCloudinary } from "../utils/cloudinary.js";
+import { Comment } from "../models/comment.model.js"; // ✅ Import Comment
 import fs from "fs";
 
 // ✅ Create New Reel
@@ -55,15 +56,45 @@ export const createReel = asyncHandler(async (req, res) => {
 
 // ✅ Get All Reels (Feed)
 export const getReelsFeed = asyncHandler(async (req, res) => {
-  // Pagination logic can be added here
+  const currentUserId = req.user._id;
+  const { page = 1, limit = 20 } = req.query;
+  const skip = (page - 1) * limit;
+
+  // Fetch raw reels
   const reels = await Reel.find()
     .populate("user", "username name profilePic isVerified")
     .sort({ createdAt: -1 })
-    .limit(20);
+    .skip(skip)
+    .limit(parseInt(limit));
+
+  // ✅ Format reels to include isLiked, likes count, comments count
+  const formattedReels = await Promise.all(
+    reels.map(async (reel) => {
+      const reelObj = reel.toObject();
+
+      // Count comments for this reel
+      const commentCount = await Comment.countDocuments({ reel: reelObj._id });
+
+      // Check if current user liked it
+      const isLiked = reelObj.likes.some((id) => id.toString() === currentUserId.toString());
+
+      return {
+        ...reelObj,
+        isLiked, // Boolean: keeps heart red
+        likes: reelObj.likes.length, // Number: shows count
+        commentsCount: commentCount, // Number: shows real comment count
+        sharesCount: reelObj.sharesCount || 0,
+        user: {
+            ...reelObj.user,
+            avatar: reelObj.user.profilePic // Map profilePic to avatar for consistency
+        }
+      };  
+    })
+  );
 
   return res
     .status(200)
-    .json(new ApiResponse(200, reels, "Reels feed fetched"));
+    .json(new ApiResponse(200, formattedReels, "Reels feed fetched"));
 });
 
 // ✅ Like/Unlike Reel

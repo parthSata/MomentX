@@ -2,7 +2,7 @@ import axios from "axios";
 
 // 1. Create the instance
 export const api = axios.create({
-  baseURL: "http://localhost:3000/api/v1", // Adjust if needed
+  baseURL: "http://localhost:3000/api/v1", // Make sure this matches your backend
   withCredentials: true, // 👈 CRITICAL: Sends cookies automatically
   headers: {
     "Content-Type": "application/json",
@@ -31,14 +31,18 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Check if error is 401 and we haven't already retried this specific request
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      // If the error comes from the login page itself, reject immediately (don't loop)
-      if (originalRequest.url.includes("/login")) {
+    // 🛑 1. Ignore errors from Login or Refresh endpoints (Prevent Infinite Loop)
+    if (
+        error.response?.status === 401 && 
+        (originalRequest.url.includes("login") || originalRequest.url.includes("refresh-token"))
+    ) {
         return Promise.reject(error);
-      }
+    }
 
-      // If already refreshing, add this request to the queue
+    // 🛑 2. Handle 401 (Unauthorized)
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      
+      // A. If refreshing is already happening, Queue this request
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
@@ -51,35 +55,39 @@ api.interceptors.response.use(
           });
       }
 
+      // B. Start Refreshing
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
-        // Attempt to refresh the token
-        // The cookie is sent automatically by 'withCredentials: true'
+        // Attempt to refresh (Cookie is sent automatically)
         await api.post("/users/refresh-token");
 
-        // If successful, retry all queued requests
+        // Process queue (retry all waiting requests)
         processQueue(null);
 
-        // Retry the original failed request
+        // Retry the original failing request
         return api(originalRequest);
+
       } catch (refreshError) {
-        // If refresh fails, the session is truly dead
+        console.error("❌ [Axios] Refresh Failed. Session expired.");
+        
+        // Fail all queued requests
         processQueue(refreshError, null);
 
-        // Clear local storage and let the UI know
+        // Cleanup local storage
         localStorage.removeItem("momentx_user");
 
-        // Optional: Redirect to login
-        // window.location.href = "/login";
-
+        // Redirect to login (Full page reload to clear state)
+        window.location.href = "/login";
+        
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
     }
 
+    // Return other errors as is
     return Promise.reject(error);
   }
 );

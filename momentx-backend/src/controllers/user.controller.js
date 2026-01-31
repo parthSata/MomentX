@@ -11,9 +11,7 @@ import { sendNotification } from "../utils/Notification.js";
 
 const cookieOptions = {
   httpOnly: true,
-  // only use 'secure: true' in production (HTTPS), otherwise false for localhost
   secure: process.env.NODE_ENV === "production",
-  // 'Lax' allows the cookie to be sent on localhost navigation
   sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Days in milliseconds
 };
@@ -141,30 +139,49 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 
 const refreshToken = asyncHandler(async (req, res) => {
-  // Use cookies OR body for flexibility
+  // 1. Safe Cookie Read (Prevent Crash)
   const incomingRefreshToken =
-    req.cookies.refreshToken || req.body.refreshToken;
+    req.cookies?.refreshToken || req.body?.refreshToken;
 
-  if (!incomingRefreshToken) throw new ApiError(401, "Unauthorized request");
+  if (!incomingRefreshToken) {
+    throw new ApiError(401, "Unauthorized request: No refresh token provided");
+  }
 
   try {
+    // 2. Verify the Token
     const decoded = jwt.verify(
       incomingRefreshToken,
       process.env.REFRESH_TOKEN_SECRET
     );
+
+    // 3. Find User
     const user = await User.findById(decoded._id);
-
     if (!user) throw new ApiError(401, "Invalid refresh token");
-    if (incomingRefreshToken !== user?.refreshToken)
+
+    // 4. Security Check
+    // If the token sent doesn't match the DB, it might be reused/stolen.
+    if (incomingRefreshToken !== user?.refreshToken) {
       throw new ApiError(401, "Refresh token is expired or used");
+    }
 
-    const { accessToken, refreshToken: newRefreshToken } =
-      await generateAccessAndRefereshTokens(user._id);
+    // 5. ✅ THE FIX: Generate ONLY new Access Token
+    // We do NOT generate a new Refresh Token here. We keep the existing one.
+    // This prevents the race condition where parallel requests fail.
+    const accessToken = user.generateAccessToken();
+    const newRefreshToken = incomingRefreshToken; // Reuse the valid one
 
+    // 6. Cookie Options
+    const options = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+    };
+
+    // 7. Send Response
     return res
       .status(200)
-      .cookie("accessToken", accessToken, cookieOptions)
-      .cookie("refreshToken", newRefreshToken, cookieOptions)
+      .cookie("accessToken", accessToken, { ...options, maxAge: 24 * 60 * 60 * 1000 }) // 1 Day
+      .cookie("refreshToken", newRefreshToken, { ...options, maxAge: 30 * 24 * 60 * 60 * 1000 }) // 30 Days (Refresh expiry)
       .json(
         new ApiResponse(200, "Token refreshed successfully", {
           accessToken,

@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Image, Camera, MapPin, Hash,
-  ChevronRight, Upload, Loader2, X, Film, RefreshCcw} from "lucide-react";
+  ChevronRight, Upload, Loader2, X, Film, RefreshCcw, Navigation
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,7 +28,7 @@ export default function CreatePostPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Steps: select -> camera -> edit -> details
+  // Steps
   const [step, setStep] = useState<"select" | "camera" | "edit" | "details">("select");
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -40,12 +41,82 @@ export default function CreatePostPage() {
   // Post Details State
   const [selectedFilter, setSelectedFilter] = useState("");
   const [caption, setCaption] = useState("");
+
+  // ✅ Location State
   const [location, setLocation] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [showTagInput, setShowTagInput] = useState(false);
+
+  // --- LOCATION LOGIC ---
+
+  // 1. Fetch Suggestions when typing
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (location.length > 2 && showLocationInput) {
+        try {
+          // Using OpenStreetMap (Nominatim) for free suggestions
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${location}&limit=5`);
+          const data = await res.json();
+          setLocationSuggestions(data);
+          setShowLocationSuggestions(true);
+        } catch (error) {
+          console.error("Location search failed", error);
+        }
+      } else {
+        setLocationSuggestions([]);
+        setShowLocationSuggestions(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [location, showLocationInput]);
+
+  // 2. Get Current Device Location
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setIsFetchingLocation(true);
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      try {
+        const { latitude, longitude } = position.coords;
+        // Reverse Geocoding
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const data = await res.json();
+
+        // Construct a nice display name (City, Country)
+        const city = data.address.city || data.address.town || data.address.village;
+        const country = data.address.country;
+        const displayName = city ? `${city}, ${country}` : data.display_name;
+
+        setLocation(displayName);
+        setShowLocationSuggestions(false); // Hide suggestions after auto-fill
+        toast.success("Location updated");
+      } catch (error) {
+        toast.error("Failed to fetch location details");
+      } finally {
+        setIsFetchingLocation(false);
+      }
+    }, (error) => {
+      console.error(error);
+      toast.error("Unable to retrieve your location");
+      setIsFetchingLocation(false);
+    });
+  };
+
+  const selectLocation = (name: string) => {
+    setLocation(name);
+    setShowLocationSuggestions(false);
+  };
 
   // --- CAMERA LOGIC ---
 
@@ -73,40 +144,31 @@ export default function CreatePostPage() {
     }
   };
 
-  // Switch between Front/Back camera
   const toggleCamera = () => {
     stopCamera();
     setFacingMode(prev => prev === "user" ? "environment" : "user");
   };
 
-  // Restart camera when facing mode changes
   useEffect(() => {
     if (step === "camera") {
       startCamera();
     }
-    return () => stopCamera(); // Cleanup on unmount
+    return () => stopCamera();
   }, [facingMode]);
 
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-
-      // Set canvas size to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-
-      // Draw image
       const context = canvas.getContext("2d");
       if (context) {
-        // Flip horizontally if using front camera for "mirror" effect
         if (facingMode === "user") {
           context.translate(canvas.width, 0);
           context.scale(-1, 1);
         }
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Convert to File/Blob
         canvas.toBlob((blob) => {
           if (blob) {
             const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
@@ -153,10 +215,8 @@ export default function CreatePostPage() {
     try {
       const formData = new FormData();
       formData.append("images", imageFile);
-
       const finalCaption = `${caption} ${tags.map(t => `#${t}`).join(" ")}`;
       formData.append("caption", finalCaption);
-
       if (location) formData.append("location", location);
 
       await api.post("/posts/create", formData, {
@@ -178,7 +238,7 @@ export default function CreatePostPage() {
   return (
     <div className="min-h-screen bg-background">
 
-      {/* HEADER (Hidden in Camera Mode) */}
+      {/* HEADER */}
       {step !== "camera" && (
         <motion.div
           initial={{ y: -20, opacity: 0 }}
@@ -239,103 +299,50 @@ export default function CreatePostPage() {
                   <Image className="w-8 h-8 text-primary" />
                   <span className="text-sm font-medium">Gallery</span>
                 </button>
-
-                {/* ✅ START CAMERA BUTTON */}
                 <button onClick={startCamera} className="p-6 glass-strong rounded-2xl flex flex-col items-center gap-2 hover:bg-muted/20 transition-colors">
                   <Camera className="w-8 h-8 text-primary" />
                   <span className="text-sm font-medium">Camera</span>
                 </button>
-
-                <button
-                  onClick={() => navigate("/create-reel")}
-                  className="p-6 glass-strong rounded-2xl flex flex-col items-center gap-2 hover:bg-muted/20 transition-colors"
-                >
+                <button onClick={() => navigate("/create-reel")} className="p-6 glass-strong rounded-2xl flex flex-col items-center gap-2 hover:bg-muted/20 transition-colors">
                   <Film className="w-8 h-8 text-primary" />
                   <span className="text-sm font-medium">Reel</span>
                 </button>
               </div>
 
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="p-12 border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-primary/5 transition-all"
-              >
+              <div onClick={() => fileInputRef.current?.click()} className="p-12 border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-primary/5 transition-all">
                 <Upload className="w-12 h-12 text-muted-foreground" />
                 <p className="font-medium">Click to Upload Image</p>
               </div>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
             </motion.div>
           )}
 
-          {/* ✅ Step: CAMERA OVERLAY */}
+          {/* Step: CAMERA OVERLAY */}
           {step === "camera" && (
-            <motion.div
-              key="camera"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black z-50 flex flex-col"
-            >
-              {/* Camera View */}
+            <motion.div key="camera" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black z-50 flex flex-col">
               <div className="relative flex-1 bg-black overflow-hidden flex items-center justify-center">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`w-full h-full object-cover ${facingMode === "user" ? "scale-x-[-1]" : ""}`} // Mirror front cam
-                />
-
-                {/* Close Button */}
-                <button
-                  onClick={() => { stopCamera(); setStep("select"); }}
-                  className="absolute top-6 left-6 p-2 bg-black/40 rounded-full text-white backdrop-blur-md"
-                >
+                <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${facingMode === "user" ? "scale-x-[-1]" : ""}`} />
+                <button onClick={() => { stopCamera(); setStep("select"); }} className="absolute top-6 left-6 p-2 bg-black/40 rounded-full text-white backdrop-blur-md">
                   <X className="w-6 h-6" />
                 </button>
-
-                {/* Camera Controls */}
                 <div className="absolute bottom-10 left-0 right-0 flex items-center justify-between px-12">
-                  <div className="w-10" /> {/* Spacer */}
-
-                  {/* Shutter Button */}
-                  <button
-                    onClick={capturePhoto}
-                    className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center hover:scale-95 transition-transform"
-                  >
+                  <div className="w-10" />
+                  <button onClick={capturePhoto} className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center hover:scale-95 transition-transform">
                     <div className="w-16 h-16 bg-white rounded-full" />
                   </button>
-
-                  {/* Flip Camera */}
-                  <button
-                    onClick={toggleCamera}
-                    className="p-3 bg-black/40 rounded-full text-white backdrop-blur-md"
-                  >
+                  <button onClick={toggleCamera} className="p-3 bg-black/40 rounded-full text-white backdrop-blur-md">
                     <RefreshCcw className="w-6 h-6" />
                   </button>
                 </div>
               </div>
-
-              {/* Hidden Canvas for Capture */}
               <canvas ref={canvasRef} className="hidden" />
             </motion.div>
           )}
 
-          {/* Step 2: Edit (Filter) */}
+          {/* Step 2: Edit */}
           {step === "edit" && selectedImage && (
-            <motion.div
-              key="edit"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="p-4 md:p-6 lg:p-8"
-            >
+            <motion.div key="edit" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-4 md:p-6 lg:p-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl">
                   <img src={selectedImage} alt="Preview" className={`w-full h-full object-cover ${selectedFilter}`} />
@@ -344,11 +351,7 @@ export default function CreatePostPage() {
                   <h3 className="mb-4 font-medium">Filters</h3>
                   <div className="grid grid-cols-3 gap-3">
                     {filters.map((f) => (
-                      <button
-                        key={f.name}
-                        onClick={() => setSelectedFilter(f.class)}
-                        className={`p-2 rounded-xl border-2 ${selectedFilter === f.class ? "border-primary" : "border-transparent"}`}
-                      >
+                      <button key={f.name} onClick={() => setSelectedFilter(f.class)} className={`p-2 rounded-xl border-2 ${selectedFilter === f.class ? "border-primary" : "border-transparent"}`}>
                         <img src={selectedImage} className={`w-full h-20 object-cover rounded-lg mb-2 ${f.class}`} alt={f.name} />
                         <span className="text-xs">{f.name}</span>
                       </button>
@@ -361,13 +364,7 @@ export default function CreatePostPage() {
 
           {/* Step 3: Details */}
           {step === "details" && selectedImage && (
-            <motion.div
-              key="details"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="p-4 md:p-6 lg:p-8"
-            >
+            <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-4 md:p-6 lg:p-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="aspect-square rounded-2xl overflow-hidden shadow-xl h-64 lg:h-auto mx-auto lg:mx-0 w-64 lg:w-full">
                   <img src={selectedImage} alt="Final" className={`w-full h-full object-cover ${selectedFilter}`} />
@@ -376,22 +373,53 @@ export default function CreatePostPage() {
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Caption</label>
-                    <Textarea
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value)}
-                      placeholder="Write a caption..."
-                      className="min-h-32 glass-strong resize-none"
-                    />
+                    <Textarea value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Write a caption..." className="min-h-32 glass-strong resize-none" />
                   </div>
 
-                  {/* Location Toggle */}
-                  <div className="space-y-2">
+                  {/* ✅ Location with Suggestions & Current Location */}
+                  <div className="space-y-2 relative">
                     <button onClick={() => setShowLocationInput(!showLocationInput)} className="w-full flex items-center justify-between p-4 glass rounded-xl">
                       <div className="flex items-center gap-2"><MapPin className="w-5 h-5" /> <span>Add Location</span></div>
                       <ChevronRight className={`w-4 h-4 transition-transform ${showLocationInput ? 'rotate-90' : ''}`} />
                     </button>
+
                     {showLocationInput && (
-                      <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="New York, USA" />
+                      <div className="relative">
+                        <Input
+                          value={location}
+                          onChange={(e) => {
+                            setLocation(e.target.value);
+                            setShowLocationSuggestions(true);
+                          }}
+                          placeholder="New York, USA"
+                          className="pr-10" // Make room for icon
+                        />
+
+                        {/* Current Location Button inside Input */}
+                        <button
+                          onClick={handleGetCurrentLocation}
+                          disabled={isFetchingLocation}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors text-primary"
+                          title="Use Current Location"
+                        >
+                          {isFetchingLocation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4 fill-current" />}
+                        </button>
+
+                        {/* Suggestions Dropdown */}
+                        {showLocationSuggestions && locationSuggestions.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+                            {locationSuggestions.map((place, index) => (
+                              <button
+                                key={index}
+                                onClick={() => selectLocation(place.display_name)}
+                                className="w-full text-left px-4 py-2 text-sm hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0 truncate"
+                              >
+                                {place.display_name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 

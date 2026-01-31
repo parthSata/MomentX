@@ -53,7 +53,7 @@ export default function ActivityPage() {
               whileHover={{ scale: 1.02 }}
               className="glass-strong p-4 rounded-2xl"
             >
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${stat.color} flex items-center justify-center mb-3`}>
+              <div className={`w-10 h-10 rounded-xl bg-linear-to-r ${stat.color} flex items-center justify-center mb-3`}>
                 <stat.icon className="w-5 h-5 text-white" />
               </div>
               <h3 className="text-2xl font-bold">{stat.value}</h3>
@@ -204,7 +204,7 @@ export default function ActivityPage() {
                     initial={{ width: 0 }}
                     animate={{ width: `${item.value}%` }}
                     transition={{ duration: 0.5, delay: 0.8 + index * 0.1 }}
-                    className={`h-full bg-gradient-to-r ${item.color} rounded-full`}
+                    className={`h-full bg-linear-to-r ${item.color} rounded-full`}
                   />
                 </div>
               </div>

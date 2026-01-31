@@ -55,7 +55,8 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
     if (!post) return
     setIsCommentsLoading(true)
     try {
-      const { data } = await api.get(`/posts/${post._id}/comments`)
+      // ✅ FIX: Use new comment route
+      const { data } = await api.get(`/comments/post/${post._id}`)
       setComments(Array.isArray(data.data) ? data.data : [])
     } catch (error) {
       console.error("Failed to load comments")
@@ -96,7 +97,8 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
     }));
 
     try {
-      await api.post(`/posts/comments/${commentId}/like`);
+      // ✅ FIX: Use new comment route
+      await api.post(`/comments/${commentId}/like`);
     } catch (error) {
       toast.error("Failed to like comment");
       fetchComments();
@@ -107,12 +109,11 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
     if (!confirm("Delete this comment?")) return;
 
     try {
-      await api.delete(`/posts/comments/${commentId}/delete`);
-      // Remove comment from local state immediately
+      // ✅ FIX: Use new comment route
+      await api.delete(`/comments/${commentId}/delete`);
       setComments(prev => prev.filter(c => c._id !== commentId));
       toast.success("Comment deleted");
     } catch (error: any) {
-      // Show specific error from backend if available
       const msg = error.response?.data?.message || "Failed to delete comment";
       toast.error(msg);
     }
@@ -136,7 +137,8 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
         parentCommentId: replyingTo?.id || null
       }
 
-      const { data } = await api.post(`/posts/${post._id}/comments`, payload)
+      // ✅ FIX: Use new comment route
+      const { data } = await api.post(`/comments/post/${post._id}`, payload)
 
       if (data && data.data) {
         setComments(prev => [data.data, ...prev])
@@ -164,18 +166,12 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
   const CommentItem = ({ comment, isReply = false }: { comment: Comment, isReply?: boolean }) => {
     const isCommentLiked = currentUser?._id && comment.likes.includes(currentUser._id);
 
-    // ✅ SAFE DELETION LOGIC (String Comparison)
     const currentUserId = currentUser?._id ? String(currentUser._id) : null;
-    const commentAuthorId = String(comment.user._id || comment.user); // Handle populated object or ID string
+    const commentAuthorId = String(comment.user._id || comment.user);
     const postAuthorId = post ? String(post.user._id || post.user) : null;
 
-    // 1. Am I the author of this specific comment?
     const isMyComment = currentUserId === commentAuthorId;
-
-    // 2. Am I the author of the POST this comment is on?
     const isMyPost = currentUserId === postAuthorId;
-
-    // Show delete button if either is true
     const canDelete = isMyComment || isMyPost;
 
     return (
@@ -188,7 +184,6 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
               {comment.text}
             </p>
 
-            {/* ✅ Delete Button (Only visible if authorized) */}
             {canDelete && (
               <button
                 onClick={() => handleDeleteComment(comment._id)}
@@ -231,7 +226,6 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
 
   if (!post) return null
 
-  // Safe check for Post Delete permission
   const isPostOwner = currentUser?._id && post && String(currentUser._id) === String(post.user._id || post.user);
 
   return (

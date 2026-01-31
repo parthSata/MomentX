@@ -29,8 +29,8 @@ interface ReelCommentsSheetProps {
     onClose: () => void;
     postId: string;
     commentCount: string;
-    onCommentAdded: () => void; // ✅ Callback for parent updates
-    isEmbedded?: boolean; // ✅ Flag for desktop modal embedding
+    onCommentAdded: () => void;
+    isEmbedded?: boolean;
 }
 
 export function ReelCommentsSheet({
@@ -53,8 +53,8 @@ export function ReelCommentsSheet({
     const fetchComments = async () => {
         try {
             setLoading(true);
-            // Calls GET /api/v1/posts/:postId/comments
-            const { data } = await api.get(`/posts/${postId}/comments`);
+            // ✅ FIX: Match route /comments/post/:postId
+            const { data } = await api.get(`/comments/post/${postId}`);
 
             // Normalize response data structure
             let commentsData: Comment[] = [];
@@ -106,7 +106,8 @@ export function ReelCommentsSheet({
             setSending(true);
             const payload = { content: newComment, parentCommentId: replyingTo?.id || null };
 
-            const { data } = await api.post(`/posts/${postId}/comments`, payload);
+            // ✅ FIX: Match route /comments/post/:postId
+            const { data } = await api.post(`/comments/post/${postId}`, payload);
             const createdComment = data.data || data;
 
             // Optimistically update UI
@@ -145,14 +146,16 @@ export function ReelCommentsSheet({
                 const newLikes = isLiked ? c.likes.filter(id => id !== currentUser?._id) : [...c.likes, currentUser?._id || ""];
                 return { ...c, likes: newLikes };
             }));
-            await api.post(`/posts/comments/${commentId}/like`);
+            // ✅ FIX: Match route /comments/:commentId/like
+            await api.post(`/comments/${commentId}/like`);
         } catch (error) { console.error(error); fetchComments(); }
     };
 
     const handleDelete = async (commentId: string) => {
         try {
             setComments(prev => removeCommentFromTree(prev, commentId));
-            await api.delete(`/posts/comments/${commentId}/delete`);
+            // ✅ FIX: Match route /comments/:commentId/delete
+            await api.delete(`/comments/${commentId}/delete`);
         } catch (error) { console.error(error); fetchComments(); }
     };
 
@@ -207,18 +210,16 @@ export function ReelCommentsSheet({
                         exit={isEmbedded ? { opacity: 0 } : { y: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 200 }}
                         className={cn(
-                            // ✅ Conditional Styling: Full fill if embedded, bottom sheet if not
                             isEmbedded
                                 ? "absolute inset-0 z-0 bg-background flex flex-col"
                                 : "absolute bottom-0 left-0 right-0 z-50 bg-neutral-900 rounded-t-xl overflow-hidden flex flex-col h-[70%]"
                         )}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Header (Hide Close Button if Embedded) */}
+                        {/* Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-neutral-900 shrink-0">
                             <div className="flex flex-col">
                                 <span className="text-white font-semibold text-sm">Comments</span>
-                                {/* Total Count Logic */}
                                 <span className="text-white/50 text-xs">
                                     {comments.length > 0 ? comments.reduce((acc, curr) => acc + 1 + (curr.replies?.length || 0), 0) : commentCount} comments
                                 </span>

@@ -50,13 +50,10 @@ export default function ExplorePage() {
   const openPost = (post: any) => {
     const compatiblePost = {
       ...post,
-      // Ensure user is an object, even if Explore returns a simplified one
       user: post.user || { username: "Unknown", profilePic: "" },
-      // Ensure media fields map correctly
       videoUrl: post.videoUrl || (post.type === 'reel' ? post.image : ""),
       images: post.images?.length ? post.images : [post.image],
-      // Map simplified counts to standard fields if needed
-      likes: typeof post.likes === 'number' ? Array(post.likes).fill("id") : post.likes, // Mock array for length if number
+      likes: typeof post.likes === 'number' ? Array(post.likes).fill("id") : post.likes,
       commentsCount: post.comments
     };
 
@@ -86,7 +83,8 @@ export default function ExplorePage() {
             className="relative group"
           >
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors z-10" />
-            <div className="w-full h-14 pl-12 pr-6 glass rounded-2xl flex items-center text-muted-foreground shadow-sm hover:shadow-md hover:border-primary/50 transition-all border border-transparent">
+            {/* ✅ Fix: Removed 'glass' which might be dark-only, used 'bg-secondary/30' for adaptable bg */}
+            <div className="w-full h-14 pl-12 pr-6 bg-secondary/30 rounded-2xl flex items-center text-muted-foreground shadow-sm hover:shadow-md hover:border-primary/50 transition-all border border-border/50">
               Search users, hashtags...
             </div>
           </motion.div>
@@ -96,8 +94,9 @@ export default function ExplorePage() {
         {trendingHashtags.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
             <div className="flex items-center gap-2 px-1">
-              <TrendingUp className="w-5 h-5 text-white" />
-              <h3 className="font-bold text-lg">Trending Now</h3>
+              {/* ✅ Fix: text-white -> text-primary */}
+              <TrendingUp className="w-5 h-5 text-primary" />
+              <h3 className="font-bold text-lg text-foreground">Trending Now</h3>
             </div>
             <div className="flex flex-wrap gap-3">
               {trendingHashtags.map((hashtag, index) => (
@@ -107,10 +106,11 @@ export default function ExplorePage() {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.05 }}
                   whileHover={{ scale: 1.05 }}
-                  className="px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition-all flex items-center gap-2 text-white"
+                  // ✅ Fix: Replaced hardcoded white styles with theme vars (bg-card, text-foreground)
+                  className="px-4 py-2 rounded-full bg-card hover:bg-secondary border border-border text-sm font-medium transition-all flex items-center gap-2 text-foreground shadow-sm"
                 >
-                  <span className="text-white/60">{hashtag.tag}</span>
-                  <span className="text-xs opacity-60 bg-black/40 px-1.5 py-0.5 rounded-md">
+                  <span className="text-muted-foreground">{hashtag.tag}</span>
+                  <span className="text-xs opacity-80 bg-secondary px-1.5 py-0.5 rounded-md text-foreground">
                     {formatNumber(hashtag.posts)}
                   </span>
                 </motion.button>
@@ -122,21 +122,24 @@ export default function ExplorePage() {
         {/* 3. Suggested Profiles */}
         {users.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-            <h3 className="font-bold text-lg px-1">Discover People</h3>
+            {/* ✅ Fix: text-foreground */}
+            <h3 className="font-bold text-lg px-1 text-foreground">Discover People</h3>
             <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4 md:mx-0 md:px-0">
               {users.map((user) => (
                 <Link to={`/u/${user.username}`} key={user._id}>
                   <motion.div
                     whileHover={{ y: -5 }}
-                    className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all shrink-0 w-36 shadow-sm border border-white/5"
+                    // ✅ Fix: Replaced bg-white/5 with bg-card
+                    className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-card hover:bg-secondary/50 hover:border-primary/20 transition-all shrink-0 w-36 shadow-sm border border-border"
                   >
                     <AvatarRing src={user.avatar} alt={user.username} size="lg" className="shadow-md" />
                     <div className="text-center w-full">
-                      <p className="font-bold text-sm truncate text-white">{user.displayName || user.username}</p>
-                      <p className="text-xs text-white/50 truncate">@{user.username}</p>
+                      {/* ✅ Fix: text-white -> text-foreground */}
+                      <p className="font-bold text-sm truncate text-foreground">{user.displayName || user.username}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
                     </div>
-                    <div className="text-[10px] font-medium px-2 py-1 bg-black/40 rounded-md text-white/60">
-                      {formatNumber(user.followers)} followers
+                    <div className="text-[12px] font-medium px-2 py-1 bg-secondary rounded-md text-muted-foreground">
+                      {formatNumber(user.followers)} Followers
                     </div>
                   </motion.div>
                 </Link>
@@ -147,7 +150,7 @@ export default function ExplorePage() {
 
         {/* 4. Explore Feed Grid */}
         <div className="space-y-3">
-          <h3 className="font-bold text-lg px-1">Explore Feed</h3>
+          <h3 className="font-bold text-lg px-1 text-foreground">Explore Feed</h3>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 md:gap-4">
             {posts.map((post, index) => {
@@ -164,23 +167,23 @@ export default function ExplorePage() {
                   viewport={{ once: true }}
                   transition={{ duration: 0.3, delay: (index % 5) * 0.05 }}
                   onClick={() => openPost(post)}
-                  className="relative group rounded-xl overflow-hidden bg-secondary/10 cursor-pointer aspect-4/5 border border-white/5"
+                  // ✅ Fix: bg-secondary/10 instead of hardcoded
+                  className="relative group rounded-xl overflow-hidden bg-muted cursor-pointer aspect-4/5 border border-border/50"
                 >
                   {/* Media Content */}
                   {isReel ? (
                     <div className="w-full h-full bg-black relative">
                       <video
-                        src={videoSrc} // ✅ Use actual video URL here
-                        poster={imageSrc} // ✅ Use image as the poster (thumbnail)
+                        src={videoSrc}
+                        poster={imageSrc}
                         className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
                         muted
                         loop
                         playsInline
-                        // Optional: Force reload on hover to ensure play
                         onMouseOver={e => e.currentTarget.play()}
                         onMouseOut={e => {
                           e.currentTarget.pause();
-                          e.currentTarget.currentTime = 0; // Reset to start (thumbnail view)
+                          e.currentTarget.currentTime = 0;
                         }}
                       />
                       <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-md p-1.5 rounded-full text-white">
@@ -189,14 +192,14 @@ export default function ExplorePage() {
                     </div>
                   ) : (
                     <img
-                      src={imageSrc} // ✅ Use image for standard posts
+                      src={imageSrc}
                       alt={post.caption}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
                     />
                   )}
 
-                  {/* Hover Overlay */}
+                  {/* Hover Overlay (Always dark for text visibility) */}
                   <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
                     <div className="flex items-center gap-3 text-white">
                       <div className="flex items-center gap-1">
@@ -214,6 +217,7 @@ export default function ExplorePage() {
             })}
           </div>
         </div>
+
       </div>
 
       <PostViewDialog

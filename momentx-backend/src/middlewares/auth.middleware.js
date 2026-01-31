@@ -12,11 +12,12 @@ export const verifyJWT = asyncHandler(async (req, _, next) => {
     if (!token) {
       throw new ApiError(401, "Unauthorized request");
     }
-
-    // 🔍 DEBUG CHECK (Optional: Remove after fixing)
-    if (!process.env.ACCESS_TOKEN_SECRET) {
-      console.error("FATAL: ACCESS_TOKEN_SECRET is missing in .env");
-      throw new ApiError(500, "Server Configuration Error");
+// ✅ FIX: Ensure this matches your backend .env variable name
+    const secret = process.env.ACCESS_TOKEN_SECRET; 
+        
+    if (!secret) {
+        console.error("FATAL: ACCESS_TOKEN_SECRET is missing in .env");
+        throw new ApiError(500, "Server Configuration Error");
     }
 
     // ✅ FIX: Removed 'VITE_' prefix. It should match your .env file exactly.

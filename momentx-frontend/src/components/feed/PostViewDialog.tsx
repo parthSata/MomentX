@@ -34,7 +34,7 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState("");
     const [isLoadingComments, setIsLoadingComments] = useState(false);
-    const [fetchedUser, setFetchedUser] = useState<any>(null); // ✅ Store fetched user details
+    const [fetchedUser, setFetchedUser] = useState<any>(null);
 
     // Interaction (Optimistic)
     const [isLiked, setIsLiked] = useState(false);
@@ -75,7 +75,7 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
             setLikesCount(count);
             setReplyingTo(null);
             setNewComment("");
-            setFetchedUser(null); // Reset fetched user
+            setFetchedUser(null);
 
             // A. Media Auto-play
             if (normalizedPost?.isReel) {
@@ -93,7 +93,6 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
 
             // C. Fetch User (Fix for "Unknown")
             if (isUserUnpopulated) {
-                // ✅ FIX: Use 'as unknown as string' to bypass type overlap error
                 fetchUserDetails(post._id as unknown as string);
             }
         }
@@ -113,7 +112,8 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
     const fetchComments = async (postId: string) => {
         setIsLoadingComments(true);
         try {
-            const { data } = await api.get(`/posts/${postId}/comments`);
+            // ✅ FIX: Use new comment route
+            const { data } = await api.get(`/comments/post/${postId}`);
 
             let fetchedComments = [];
             if (Array.isArray(data.data)) {
@@ -199,7 +199,8 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                 content: newComment,
                 parentCommentId: replyingTo ? replyingTo._id : null
             };
-            const { data } = await api.post(`/posts/${normalizedPost._id}/comments`, payload);
+            // ✅ FIX: Use new comment route
+            const { data } = await api.post(`/comments/post/${normalizedPost._id}`, payload);
 
             const createdComment = data.data || data;
             setComments([createdComment, ...comments]);
@@ -224,13 +225,15 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                 return c;
             })
         );
-        try { await api.post(`/posts/comments/${commentId}/like`); }
+        // ✅ FIX: Use new comment route
+        try { await api.post(`/comments/${commentId}/like`); }
         catch (error) { if (normalizedPost) fetchComments(normalizedPost._id); }
     };
 
     const handleDeleteComment = async (commentId: string) => {
         try {
-            await api.delete(`/posts/comments/${commentId}/delete`);
+            // ✅ FIX: Use new comment route
+            await api.delete(`/comments/${commentId}/delete`);
             setComments(comments.filter(c => c._id !== commentId));
             toast.success("Comment deleted");
         } catch (error) { toast.error("Failed to delete comment"); }
