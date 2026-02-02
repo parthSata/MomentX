@@ -1,18 +1,18 @@
-import { User } from "../models/user.model.js";
-import { Post } from "../models/post.model.js";
-import { uploadInCloudinary } from "../utils/cloudinary.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
-import ApiResponse from "../utils/ApiResponse.js";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
-import { sendEmail } from "../utils/sendEmail.js";
-import { sendNotification } from "../utils/Notification.js";
+import { User } from '../models/user.model.js';
+import { Post } from '../models/post.model.js';
+import { uploadInCloudinary } from '../utils/cloudinary.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { ApiError } from '../utils/ApiError.js';
+import ApiResponse from '../utils/ApiResponse.js';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import { sendEmail } from '../utils/sendEmail.js';
+import { sendNotification } from '../utils/Notification.js';
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Days in milliseconds
 };
 
@@ -27,7 +27,7 @@ const generateAccessAndRefereshTokens = async (userId) => {
   } catch (error) {
     throw new ApiError(
       500,
-      "Something went wrong while generating refresh and access token"
+      'Something went wrong while generating refresh and access token',
     );
   }
 };
@@ -41,12 +41,12 @@ const registerUser = asyncHandler(async (req, res) => {
     !email?.trim() ||
     !password?.trim()
   ) {
-    throw new ApiError(400, "All fields are required");
+    throw new ApiError(400, 'All fields are required');
   }
 
   const existingUser = await User.findOne({ $or: [{ email }, { username }] });
   if (existingUser) {
-    throw new ApiError(400, "User already exists");
+    throw new ApiError(400, 'User already exists');
   }
 
   const userData = {
@@ -54,7 +54,7 @@ const registerUser = asyncHandler(async (req, res) => {
     username: username.trim(),
     email: email.trim(),
     password,
-    profilePic: "",
+    profilePic: '',
   };
 
   if (req.files?.profilePic?.length > 0) {
@@ -66,22 +66,22 @@ const registerUser = asyncHandler(async (req, res) => {
   await newUser.save();
 
   const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
-    newUser._id
+    newUser._id,
   );
 
   const loggedInUser = await User.findById(newUser._id).select(
-    "-password -refreshToken"
+    '-password -refreshToken',
   );
 
   return res
     .status(201)
-    .cookie("accessToken", accessToken, cookieOptions)
-    .cookie("refreshToken", refreshToken, cookieOptions)
+    .cookie('accessToken', accessToken, cookieOptions)
+    .cookie('refreshToken', refreshToken, cookieOptions)
     .json(
-      new ApiResponse(201, "User registered successfully", {
+      new ApiResponse(201, 'User registered successfully', {
         user: loggedInUser,
         accessToken,
-      })
+      }),
     );
 });
 
@@ -89,33 +89,33 @@ const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password)
-    throw new ApiError(400, "Email and password required");
+    throw new ApiError(400, 'Email and password required');
 
-  const user = await User.findOne({ email }).select("+password");
+  const user = await User.findOne({ email }).select('+password');
   if (!user || !(await user.isPasswordCorrect(password))) {
-    throw new ApiError(401, "Invalid credentials");
+    throw new ApiError(401, 'Invalid credentials');
   }
 
   const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
-    user._id
+    user._id,
   );
 
   user.isOnline = true;
   await user.save({ validateBeforeSave: false });
 
   const loggedInUser = await User.findById(user._id).select(
-    "-password -refreshToken"
+    '-password -refreshToken',
   );
 
   return res
     .status(200)
-    .cookie("accessToken", accessToken, cookieOptions)
-    .cookie("refreshToken", refreshToken, cookieOptions)
+    .cookie('accessToken', accessToken, cookieOptions)
+    .cookie('refreshToken', refreshToken, cookieOptions)
     .json(
-      new ApiResponse(200, "Login successful", {
+      new ApiResponse(200, 'Login successful', {
         user: loggedInUser,
         accessToken,
-      })
+      }),
     );
 });
 
@@ -133,63 +133,61 @@ const logoutUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .clearCookie("accessToken", cookieOptions)
-    .clearCookie("refreshToken", cookieOptions)
-    .json(new ApiResponse(200, "Logged out successfully", {}));
+    .clearCookie('accessToken', cookieOptions)
+    .clearCookie('refreshToken', cookieOptions)
+    .json(new ApiResponse(200, 'Logged out successfully', {}));
 });
 
 const refreshToken = asyncHandler(async (req, res) => {
-  // 1. Safe Cookie Read (Prevent Crash)
   const incomingRefreshToken =
     req.cookies?.refreshToken || req.body?.refreshToken;
 
   if (!incomingRefreshToken) {
-    throw new ApiError(401, "Unauthorized request: No refresh token provided");
+    throw new ApiError(401, 'Unauthorized request: No token');
   }
 
   try {
-    // 2. Verify the Token
     const decoded = jwt.verify(
       incomingRefreshToken,
-      process.env.REFRESH_TOKEN_SECRET
+      process.env.REFRESH_TOKEN_SECRET,
     );
-
-    // 3. Find User
     const user = await User.findById(decoded._id);
-    if (!user) throw new ApiError(401, "Invalid refresh token");
+    if (!user) throw new ApiError(401, 'Invalid refresh token');
 
-    // 4. Security Check
-    // If the token sent doesn't match the DB, it might be reused/stolen.
+    // Security Check: Ensure the token matches what is in the DB
     if (incomingRefreshToken !== user?.refreshToken) {
-      throw new ApiError(401, "Refresh token is expired or used");
+      throw new ApiError(401, 'Refresh token is expired or used');
     }
 
-    // 5. ✅ THE FIX: Generate ONLY new Access Token
-    // We do NOT generate a new Refresh Token here. We keep the existing one.
-    // This prevents the race condition where parallel requests fail.
+    // ✅ THE FIX: Generate NEW Access Token, but REUSE the OLD Refresh Token
+    // This stops the "race condition" where the token changes while other requests are pending.
     const accessToken = user.generateAccessToken();
-    const newRefreshToken = incomingRefreshToken; // Reuse the valid one
+    const newRefreshToken = incomingRefreshToken;
 
-    // 6. Cookie Options
     const options = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
     };
 
-    // 7. Send Response
     return res
       .status(200)
-      .cookie("accessToken", accessToken, { ...options, maxAge: 24 * 60 * 60 * 1000 }) // 1 Day
-      .cookie("refreshToken", newRefreshToken, { ...options, maxAge: 30 * 24 * 60 * 60 * 1000 }) // 30 Days (Refresh expiry)
+      .cookie('accessToken', accessToken, {
+        ...options,
+        maxAge: 24 * 60 * 60 * 1000,
+      }) // 1 Day
+      .cookie('refreshToken', newRefreshToken, {
+        ...options,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      }) // 30 Days
       .json(
-        new ApiResponse(200, "Token refreshed successfully", {
+        new ApiResponse(200, 'Access token refreshed', {
           accessToken,
           refreshToken: newRefreshToken,
-        })
+        }),
       );
   } catch (error) {
-    throw new ApiError(401, error?.message || "Invalid refresh token");
+    throw new ApiError(401, error?.message || 'Invalid refresh token');
   }
 });
 
@@ -197,8 +195,8 @@ const searchUser = asyncHandler(async (req, res) => {
   const { query } = req.query; // Changed from 'username' to 'query' for generic usage
   const currentUserId = req.user._id;
 
-  if (!query || query.trim() === "") {
-    return res.status(200).json(new ApiResponse(200, [], "No query provided"));
+  if (!query || query.trim() === '') {
+    return res.status(200).json(new ApiResponse(200, [], 'No query provided'));
   }
 
   const users = await User.find({
@@ -206,28 +204,26 @@ const searchUser = asyncHandler(async (req, res) => {
       { _id: { $ne: currentUserId } }, // Exclude self
       {
         $or: [
-          { username: { $regex: query, $options: "i" } },
-          { name: { $regex: query, $options: "i" } },
+          { username: { $regex: query, $options: 'i' } },
+          { name: { $regex: query, $options: 'i' } },
         ],
       },
     ],
   })
-    .select("name username profilePic isVerified")
+    .select('name username profilePic isVerified')
     .limit(10); // Limit results for performance
 
   return res
     .status(200)
-    .json(new ApiResponse(200, users, "Users fetched successfully"));
+    .json(new ApiResponse(200, users, 'Users fetched successfully'));
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
-  // 1. Extract Data
-  // Frontend sends 'name' (Display Name), 'username', 'bio', 'website'
   const { name, username, bio, website } = req.body;
 
   // 2. Validate mandatory fields
   if (!name?.trim() || !username?.trim()) {
-    throw new ApiError(400, "Name and Username are required");
+    throw new ApiError(400, 'Name and Username are required');
   }
 
   const userId = req.user?._id;
@@ -239,15 +235,15 @@ const updateProfile = asyncHandler(async (req, res) => {
   });
 
   if (existingUser) {
-    throw new ApiError(409, "Username already taken");
+    throw new ApiError(409, 'Username already taken');
   }
 
   // 4. Prepare Update Object
   const updateData = {
     name: name.trim(),
     username: username.toLowerCase().trim(),
-    bio: bio || "",
-    website: website || "",
+    bio: bio || '',
+    website: website || '',
   };
 
   // 5. Handle File Upload
@@ -259,7 +255,7 @@ const updateProfile = asyncHandler(async (req, res) => {
     const avatar = await uploadInCloudinary(localFilePath);
 
     if (!avatar) {
-      throw new ApiError(500, "Error uploading image");
+      throw new ApiError(500, 'Error uploading image');
     }
 
     updateData.profilePic = avatar.secure_url;
@@ -269,29 +265,29 @@ const updateProfile = asyncHandler(async (req, res) => {
   const updatedUser = await User.findByIdAndUpdate(
     userId,
     { $set: updateData },
-    { new: true, runValidators: true } // Return updated doc
-  ).select("-password -refreshToken");
+    { new: true, runValidators: true }, // Return updated doc
+  ).select('-password -refreshToken');
 
   if (!updatedUser) {
-    throw new ApiError(404, "User not found");
+    throw new ApiError(404, 'User not found');
   }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
+    .json(new ApiResponse(200, updatedUser, 'Profile updated successfully'));
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
   const user = req.user;
   if (!user) {
-    throw new ApiError(401, "User not authenticated");
+    throw new ApiError(401, 'User not authenticated');
   }
 
   const userData = await User.findById(user._id).select(
-    "-password -refreshToken"
+    '-password -refreshToken',
   );
   if (!userData) {
-    throw new ApiError(404, "User not found");
+    throw new ApiError(404, 'User not found');
   }
 
   const postsCount = await Post.countDocuments({ user: user._id });
@@ -301,9 +297,9 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     username: userData.username,
     email: userData.email,
     name: userData.name, // <--- Added
-    bio: userData.bio || "", // <--- Added
-    website: userData.website || "", // <--- Added
-    profilePic: userData.profilePic || "",
+    bio: userData.bio || '', // <--- Added
+    website: userData.website || '', // <--- Added
+    profilePic: userData.profilePic || '',
     status: userData.status,
     isOnline: userData.isOnline,
     followers: userData.followers, // <--- Added
@@ -315,14 +311,14 @@ const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(
-      new ApiResponse(200, "User fetched successfully", { user: userResponse })
+      new ApiResponse(200, 'User fetched successfully', { user: userResponse }),
     );
 });
 
 const getAllUsers = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id;
   const users = await User.find({ _id: { $ne: currentUserId } })
-    .select("_id username profilePic isOnline name")
+    .select('_id username profilePic isOnline name')
     .limit(20)
     .lean();
 
@@ -333,7 +329,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Users fetched successfully", formattedUsers));
+    .json(new ApiResponse(200, 'Users fetched successfully', formattedUsers));
 });
 
 const forgotPassword = asyncHandler(async (req, res) => {
@@ -341,7 +337,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   // 1. Validation
   if (!email) {
-    throw new ApiError(400, "Email is required");
+    throw new ApiError(400, 'Email is required');
   }
 
   // 2. CHECK: Does the account exist in MongoDB?
@@ -350,7 +346,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
   if (!user) {
     // 🚨 USER DOES NOT EXIST
     // We throw a 404 so the Frontend knows to show "Account not found"
-    throw new ApiError(404, "Account does not exist. Please Sign up.");
+    throw new ApiError(404, 'Account does not exist. Please Sign up.');
   }
 
   // 3. Generate OTP
@@ -367,13 +363,13 @@ const forgotPassword = asyncHandler(async (req, res) => {
   try {
     const isSent = await sendEmail(
       user.email,
-      "Password Reset Request",
-      message
+      'Password Reset Request',
+      message,
     );
 
     if (!isSent) {
       // If sendEmail returned false (internal logic)
-      throw new Error("Email sending failed internally");
+      throw new Error('Email sending failed internally');
     }
   } catch (error) {
     // 🚨 EMAIL SENDING FAILED
@@ -387,21 +383,21 @@ const forgotPassword = asyncHandler(async (req, res) => {
     // Throw specific error to Frontend
     throw new ApiError(
       400,
-      "Failed to send email. The address might be invalid or unreachable."
+      'Failed to send email. The address might be invalid or unreachable.',
     );
   }
 
   // 6. Success
   return res
     .status(200)
-    .json(new ApiResponse(200, "OTP sent successfully. Check your inbox.", {}));
+    .json(new ApiResponse(200, 'OTP sent successfully. Check your inbox.', {}));
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
   const { email, otp, newPassword } = req.body;
 
   if (!email || !otp || !newPassword) {
-    throw new ApiError(400, "Email, OTP, and new password are required");
+    throw new ApiError(400, 'Email, OTP, and new password are required');
   }
 
   const user = await User.findOne({
@@ -411,7 +407,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
-    throw new ApiError(400, "Invalid or expired OTP");
+    throw new ApiError(400, 'Invalid or expired OTP');
   }
 
   // Update Password
@@ -429,9 +425,9 @@ const resetPassword = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         200,
-        "Password reset successfully. You can now login.",
-        {}
-      )
+        'Password reset successfully. You can now login.',
+        {},
+      ),
     );
 });
 
@@ -441,7 +437,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
   // 2. Validate essential data
   if (!name || !username) {
-    throw new ApiError(400, "Name and Username are required");
+    throw new ApiError(400, 'Name and Username are required');
   }
 
   const userId = req.user?._id;
@@ -454,15 +450,15 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
   });
 
   if (existingUser) {
-    throw new ApiError(409, "Username already taken");
+    throw new ApiError(409, 'Username already taken');
   }
 
   // 4. Prepare Update Object
   const updateData = {
     name,
     username: username.toLowerCase(),
-    bio: bio || "",
-    website: website || "",
+    bio: bio || '',
+    website: website || '',
   };
 
   const profileLocalPath = req.file?.path;
@@ -471,7 +467,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     const avatar = await uploadInCloudinary(profileLocalPath);
 
     if (!avatar) {
-      throw new ApiError(500, "Error uploading image");
+      throw new ApiError(500, 'Error uploading image');
     }
 
     updateData.profilePic = avatar.secure_url;
@@ -483,12 +479,12 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     {
       $set: updateData,
     },
-    { new: true } // Returns the updated document
-  ).select("-password -refreshToken");
+    { new: true }, // Returns the updated document
+  ).select('-password -refreshToken');
 
   return res
     .status(200)
-    .json(new ApiResponse(200, user, "Account details updated successfully"));
+    .json(new ApiResponse(200, user, 'Account details updated successfully'));
 });
 
 const toggleFollowUser = asyncHandler(async (req, res) => {
@@ -496,14 +492,14 @@ const toggleFollowUser = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id;
 
   if (id === currentUserId.toString()) {
-    throw new ApiError(400, "You cannot follow yourself");
+    throw new ApiError(400, 'You cannot follow yourself');
   }
 
   const targetUser = await User.findById(id);
   const currentUser = await User.findById(currentUserId);
 
   if (!targetUser) {
-    throw new ApiError(404, "User not found");
+    throw new ApiError(404, 'User not found');
   }
 
   // Check if already following
@@ -517,7 +513,7 @@ const toggleFollowUser = asyncHandler(async (req, res) => {
     return res
       .status(200)
       .json(
-        new ApiResponse(200, { isFollowing: false }, "Unfollowed successfully")
+        new ApiResponse(200, { isFollowing: false }, 'Unfollowed successfully'),
       );
   } else {
     // Follow logic
@@ -528,13 +524,13 @@ const toggleFollowUser = asyncHandler(async (req, res) => {
     await sendNotification({
       req,
       receiverId: id, // The user being followed
-      type: "follow",
+      type: 'follow',
     });
 
     return res
       .status(200)
       .json(
-        new ApiResponse(200, { isFollowing: true }, "Followed successfully")
+        new ApiResponse(200, { isFollowing: true }, 'Followed successfully'),
       );
   }
 });
@@ -544,18 +540,18 @@ const getUserFollowers = asyncHandler(async (req, res) => {
   const { id } = req.params; // User ID whose followers we want to see
 
   const user = await User.findById(id).populate(
-    "followers",
-    "name username profilePic isVerified"
+    'followers',
+    'name username profilePic isVerified',
   );
 
   if (!user) {
-    throw new ApiError(404, "User not found");
+    throw new ApiError(404, 'User not found');
   }
 
   return res
     .status(200)
     .json(
-      new ApiResponse(200, user.followers, "Followers fetched successfully")
+      new ApiResponse(200, user.followers, 'Followers fetched successfully'),
     );
 });
 
@@ -564,12 +560,12 @@ const getUserFollowing = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const user = await User.findById(id).populate(
-    "following",
-    "name username profilePic isVerified"
+    'following',
+    'name username profilePic isVerified',
   );
 
   if (!user) {
-    throw new ApiError(404, "User not found");
+    throw new ApiError(404, 'User not found');
   }
 
   return res
@@ -578,8 +574,8 @@ const getUserFollowing = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         user.following,
-        "Following list fetched successfully"
-      )
+        'Following list fetched successfully',
+      ),
     );
 });
 
@@ -587,16 +583,16 @@ const getUserById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const user = await User.findById(id).select(
-    "name username profilePic isOnline"
+    'name username profilePic isOnline',
   );
 
   if (!user) {
-    return res.status(404).json(new ApiResponse(404, null, "User not found"));
+    return res.status(404).json(new ApiResponse(404, null, 'User not found'));
   }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, user, "User details fetched"));
+    .json(new ApiResponse(200, user, 'User details fetched'));
 });
 
 const getUserByUsername = asyncHandler(async (req, res) => {
@@ -604,10 +600,12 @@ const getUserByUsername = asyncHandler(async (req, res) => {
   const currentUserId = req.user?._id;
 
   // 1. Find User
-  const user = await User.findOne({ username }).select("-password -refresh_token");
+  const user = await User.findOne({ username }).select(
+    '-password -refresh_token',
+  );
 
   if (!user) {
-    throw new ApiError(404, "User not found");
+    throw new ApiError(404, 'User not found');
   }
 
   // 2. Get Aggregated Stats
@@ -631,10 +629,10 @@ const getUserByUsername = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, userProfile, "User profile fetched successfully"));
+    .json(
+      new ApiResponse(200, userProfile, 'User profile fetched successfully'),
+    );
 });
-
-
 
 export {
   registerUser,

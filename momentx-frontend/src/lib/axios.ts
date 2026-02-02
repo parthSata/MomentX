@@ -1,11 +1,11 @@
-import axios from "axios";
+import axios from 'axios';
 
 // 1. Create the instance
 export const api = axios.create({
-  baseURL: "http://localhost:3000/api/v1", // Make sure this matches your backend
+  baseURL: 'http://localhost:3000/api/v1', // Ensure port is correct
   withCredentials: true, // 👈 CRITICAL: Sends cookies automatically
   headers: {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   },
 });
 
@@ -33,15 +33,15 @@ api.interceptors.response.use(
 
     // 🛑 1. Ignore errors from Login or Refresh endpoints (Prevent Infinite Loop)
     if (
-        error.response?.status === 401 && 
-        (originalRequest.url.includes("login") || originalRequest.url.includes("refresh-token"))
+      error.response?.status === 401 &&
+      (originalRequest.url.includes('/login') ||
+        originalRequest.url.includes('/refresh-token'))
     ) {
-        return Promise.reject(error);
+      return Promise.reject(error);
     }
 
-    // 🛑 2. Handle 401 (Unauthorized)
+    // 🛑 2. Handle 401 (Unauthorized) - Access Token Expired
     if (error.response?.status === 401 && !originalRequest._retry) {
-      
       // A. If refreshing is already happening, Queue this request
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
@@ -60,27 +60,27 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Attempt to refresh (Cookie is sent automatically)
-        await api.post("/users/refresh-token");
+        await api.post('/users/refresh-token');
 
-        // Process queue (retry all waiting requests)
+        // If successful, process the queue
         processQueue(null);
 
-        // Retry the original failing request
         return api(originalRequest);
-
       } catch (refreshError) {
-        console.error("❌ [Axios] Refresh Failed. Session expired.");
-        
+        console.error('❌ [Axios] Refresh Failed. Session expired.');
+
         // Fail all queued requests
         processQueue(refreshError, null);
 
         // Cleanup local storage
-        localStorage.removeItem("momentx_user");
+        localStorage.removeItem('momentx_user');
 
-        // Redirect to login (Full page reload to clear state)
-        window.location.href = "/login";
-        
+        // 🛑 CRITICAL FIX: Only redirect if we are NOT already on the login page.
+        // This stops the infinite reload loop.
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -89,5 +89,5 @@ api.interceptors.response.use(
 
     // Return other errors as is
     return Promise.reject(error);
-  }
+  },
 );
