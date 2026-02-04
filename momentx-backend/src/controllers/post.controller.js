@@ -1,55 +1,62 @@
-import { Post } from "../models/post.model.js";
-import { Reel } from "../models/reel.model.js"; // ✅ Ensure this path is correct
-import { User } from "../models/user.model.js";
-import { Comment } from "../models/comment.model.js";
-import { ApiError } from "../utils/ApiError.js";
-import ApiResponse from "../utils/ApiResponse.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { uploadInCloudinary } from "../utils/cloudinary.js";
-import mongoose from "mongoose";
-import { sendNotification } from "../utils/Notification.js";
+import { Post } from '../models/post.model.js';
+import { Reel } from '../models/reel.model.js';
+import { User } from '../models/user.model.js';
+import { Comment } from '../models/comment.model.js';
+import { ApiError } from '../utils/ApiError.js';
+import ApiResponse from '../utils/ApiResponse.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { uploadInCloudinary } from '../utils/cloudinary.js';
+import mongoose from 'mongoose';
+import { sendNotification } from '../utils/Notification.js';
+
+// ✅ STRONG FILTER: Matches visible content (false) OR old content (undefined/null)
+// This ensures that if you haven't run a migration to set isHidden:false on all docs, they still show up.
+const VISIBLE_FILTER = {
+  $or: [{ isHidden: false }, { isHidden: { $exists: false } }],
+};
 
 // --- HELPER: Format Posts & Reels ---
 const formatPosts = async (posts, currentUserId) => {
-  const currentUser = await User.findById(currentUserId).select("savedPosts");
+  const currentUser = await User.findById(currentUserId).select('savedPosts');
   const savedPostIds = currentUser?.savedPosts.map((id) => id.toString()) || [];
 
   return await Promise.all(
     posts.map(async (post) => {
       const postObj = post.toObject ? post.toObject() : post;
-      
-      // Count comments (Check both 'post' and 'reel' fields)
-      const commentCount = await Comment.countDocuments({ 
-          $or: [{ post: postObj._id }, { reel: postObj._id }] 
+
+      const commentCount = await Comment.countDocuments({
+        $or: [{ post: postObj._id }, { reel: postObj._id }],
       });
 
       return {
         ...postObj,
         _id: postObj._id,
-        // ✅ FIX USER MAPPING
         user: {
           _id: postObj.user?._id || postObj.user,
-          username: postObj.user?.username || "Unknown",
-          name: postObj.user?.name || "Unknown", // Added Name
-          profilePic: postObj.user?.profilePic || "", 
-          avatar: postObj.user?.profilePic || "", 
+          username: postObj.user?.username || 'Unknown',
+          name: postObj.user?.name || 'Unknown',
+          profilePic: postObj.user?.profilePic || '',
+          avatar: postObj.user?.profilePic || '',
           isVerified: postObj.user?.isVerified || false,
         },
-        // ✅ Handle Reel Fields
-        videoUrl: postObj.videoUrl || "",
-        thumbnailUrl: postObj.thumbnailUrl || "",
-        // If it's a reel without 'images', use thumbnail as the first image
-        images: postObj.images?.length > 0 ? postObj.images : (postObj.thumbnailUrl ? [postObj.thumbnailUrl] : []),
-        
+        videoUrl: postObj.videoUrl || '',
+        thumbnailUrl: postObj.thumbnailUrl || '',
+        images:
+          postObj.images?.length > 0
+            ? postObj.images
+            : postObj.thumbnailUrl
+              ? [postObj.thumbnailUrl]
+              : [],
+
         isLiked: postObj.likes.some(
-          (id) => id.toString() === currentUserId.toString()
+          (id) => id.toString() === currentUserId.toString(),
         ),
         isSaved: savedPostIds.includes(postObj._id.toString()),
         likes: postObj.likes.length,
-        commentsCount: commentCount, 
-        comments: commentCount, 
+        commentsCount: commentCount,
+        comments: commentCount,
       };
-    })
+    }),
   );
 };
 
@@ -59,7 +66,7 @@ const createPost = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
   if (!req.files?.images || req.files.images.length === 0) {
-    throw new ApiError(400, "Please upload at least one image");
+    throw new ApiError(400, 'Please upload at least one image');
   }
 
   const imagesLocalPaths = req.files.images.map((file) => file.path);
@@ -73,9 +80,10 @@ const createPost = asyncHandler(async (req, res) => {
   let parsedTags = [];
   if (taggedUsers) {
     try {
-      parsedTags = typeof taggedUsers === "string" ? JSON.parse(taggedUsers) : taggedUsers;
+      parsedTags =
+        typeof taggedUsers === 'string' ? JSON.parse(taggedUsers) : taggedUsers;
     } catch (e) {
-      console.warn("Could not parse taggedUsers", e);
+      console.warn('Could not parse taggedUsers', e);
     }
   }
 
@@ -87,6 +95,7 @@ const createPost = asyncHandler(async (req, res) => {
     hashtags,
     taggedUsers: parsedTags,
     likes: [],
+    isHidden: false,
   });
 
   await User.findByIdAndUpdate(userId, { $inc: { posts: 1 } });
@@ -96,28 +105,30 @@ const createPost = asyncHandler(async (req, res) => {
       sendNotification({
         req,
         receiverId: taggedUserId,
-        type: "mention",
+        type: 'mention',
         postId: post._id,
       });
     });
   }
 
-  return res.status(201).json(new ApiResponse(201, post, "Post created successfully"));
+  return res
+    .status(201)
+    .json(new ApiResponse(201, post, 'Post created successfully'));
 });
 
 // --- 2. GET FEED ---
 const getHomeFeed = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10 } = req.query; // Increased limit
+  const { page = 1, limit = 10 } = req.query;
   const skip = (page - 1) * limit;
   const currentUserId = req.user._id;
 
-  // You might want to mix Reels into the feed here later
-  const posts = await Post.find()
+  // ✅ Apply Strong Filter to Feed
+  const posts = await Post.find(VISIBLE_FILTER)
     .sort({ createdAt: -1 })
     .skip(parseInt(skip))
     .limit(parseInt(limit))
-    .populate("user", "username name profilePic isVerified")
-    .populate("taggedUsers", "username");
+    .populate('user', 'username name profilePic isVerified')
+    .populate('taggedUsers', 'username');
 
   const formattedPosts = await formatPosts(posts, currentUserId);
 
@@ -129,39 +140,39 @@ const getHomeFeed = asyncHandler(async (req, res) => {
         currentPage: parseInt(page),
         hasMore: posts.length === parseInt(limit),
       },
-      "Feed fetched successfully"
-    )
+      'Feed fetched successfully',
+    ),
   );
 });
 
-// --- 3. GET USER POSTS & REELS (Profile) ---
+// --- 3. GET USER POSTS & REELS (Fixed for Reels) ---
 const getUserPosts = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const currentUserId = req.user._id;
 
   if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new ApiError(400, "Invalid User ID format");
+    throw new ApiError(400, 'Invalid User ID format');
   }
 
-  // 1. Fetch Posts with User details
-  const posts = await Post.find({ user: userId })
-    .populate("user", "username name profilePic isVerified") // ✅ Populate Post User
-    .sort({ createdAt: -1 });
-  
-  // 2. Fetch Reels with User details
-  // ✅ FIX: Added .populate() here so Reel user data is not null/buffer
-  const reels = await Reel.find({ user: userId })
-    .populate("user", "username name profilePic isVerified") // ✅ Populate Reel User
+  // ✅ Apply Strong Filter to Posts
+  const posts = await Post.find({ user: userId, ...VISIBLE_FILTER })
+    .populate('user', 'username name profilePic isVerified')
     .sort({ createdAt: -1 });
 
-  // 3. Combine
-  const allContent = [...posts, ...reels].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  // ✅ Apply Strong Filter to Reels (This ensures hidden reels vanish)
+  const reels = await Reel.find({ user: userId, ...VISIBLE_FILTER })
+    .populate('user', 'username name profilePic isVerified')
+    .sort({ createdAt: -1 });
+
+  const allContent = [...posts, ...reels].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
 
   const formattedPosts = await formatPosts(allContent, currentUserId);
 
   return res
     .status(200)
-    .json(new ApiResponse(200, formattedPosts, "User posts and reels fetched"));
+    .json(new ApiResponse(200, formattedPosts, 'User posts and reels fetched'));
 });
 
 // --- 4. GET SAVED POSTS ---
@@ -170,19 +181,25 @@ const getUserSavedPosts = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id;
 
   if (!mongoose.Types.ObjectId.isValid(userId))
-    throw new ApiError(400, "Invalid User ID");
+    throw new ApiError(400, 'Invalid User ID');
 
+  // ✅ Apply Strong Filter to Populate Match
   const user = await User.findById(userId).populate({
-    path: "savedPosts",
+    path: 'savedPosts',
+    match: VISIBLE_FILTER,
     options: { sort: { createdAt: -1 } },
-    populate: { path: "user", select: "username name profilePic isVerified" },
+    populate: { path: 'user', select: 'username name profilePic isVerified' },
   });
 
-  if (!user) throw new ApiError(404, "User not found");
+  if (!user) throw new ApiError(404, 'User not found');
 
-  const formattedPosts = await formatPosts(user.savedPosts, currentUserId);
+  const validSavedPosts = user.savedPosts.filter((p) => p !== null);
 
-  return res.status(200).json(new ApiResponse(200, formattedPosts, "Saved posts fetched"));
+  const formattedPosts = await formatPosts(validSavedPosts, currentUserId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, formattedPosts, 'Saved posts fetched'));
 });
 
 // --- 5. GET TAGGED POSTS ---
@@ -190,31 +207,32 @@ const getUserTaggedPosts = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const currentUserId = req.user._id;
 
-  const posts = await Post.find({ taggedUsers: userId })
-    .populate("user", "username name profilePic isVerified")
+  // ✅ Apply Strong Filter to Tagged
+  const posts = await Post.find({ taggedUsers: userId, ...VISIBLE_FILTER })
+    .populate('user', 'username name profilePic isVerified')
     .sort({ createdAt: -1 });
 
   const formattedPosts = await formatPosts(posts, currentUserId);
 
-  return res.status(200).json(new ApiResponse(200, formattedPosts, "Tagged posts fetched"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, formattedPosts, 'Tagged posts fetched'));
 });
 
-// --- INTERACTIONS ---
-
-// Toggle Like (Supports Post AND Reel)
+// --- INTERACTIONS (Unchanged) ---
 const togglePostLike = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const userId = req.user._id;
 
   let item = await Post.findById(postId);
-  let type = "post";
+  let type = 'post';
 
   if (!item) {
     item = await Reel.findById(postId);
-    type = "reel";
+    type = 'reel';
   }
 
-  if (!item) throw new ApiError(404, "Post/Reel not found");
+  if (!item) throw new ApiError(404, 'Post/Reel not found');
 
   const isLiked = item.likes.includes(userId);
 
@@ -222,29 +240,28 @@ const togglePostLike = asyncHandler(async (req, res) => {
     item.likes.pull(userId);
   } else {
     item.likes.push(userId);
-    
+
     if (item.user.toString() !== userId.toString()) {
-        await sendNotification({
-          req,
-          receiverId: item.user,
-          type: "like",
-          postId: type === "post" ? item._id : undefined,
-          reelId: type === "reel" ? item._id : undefined,
-        });
+      await sendNotification({
+        req,
+        receiverId: item.user,
+        type: 'like',
+        postId: type === 'post' ? item._id : undefined,
+        reelId: type === 'reel' ? item._id : undefined,
+      });
     }
   }
 
   await item.save();
 
   return res.status(200).json(
-    new ApiResponse(200, isLiked ? "Unliked" : "Liked", {
+    new ApiResponse(200, isLiked ? 'Unliked' : 'Liked', {
       isLiked: !isLiked,
       likes: item.likes.length,
-    })
+    }),
   );
 });
 
-// Toggle Save (Supports Post AND Reel)
 const toggleSavePost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const userId = req.user._id;
@@ -252,7 +269,7 @@ const toggleSavePost = asyncHandler(async (req, res) => {
   const isPost = await Post.exists({ _id: postId });
   const isReel = await Reel.exists({ _id: postId });
 
-  if (!isPost && !isReel) throw new ApiError(404, "Content not found");
+  if (!isPost && !isReel) throw new ApiError(404, 'Content not found');
 
   const user = await User.findById(userId);
   const isSaved = user.savedPosts.includes(postId);
@@ -265,58 +282,68 @@ const toggleSavePost = asyncHandler(async (req, res) => {
 
   await user.save({ validateBeforeSave: false });
 
-  return res.status(200).json(
-      new ApiResponse(200, isSaved ? "Unsaved" : "Saved", { isSaved: !isSaved })
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, isSaved ? 'Unsaved' : 'Saved', {
+        isSaved: !isSaved,
+      }),
+    );
 });
 
-// Delete Post (Can also add deleteReel here or separate controller)
 const deletePost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const userId = req.user._id;
 
-  // Try finding Post
   let item = await Post.findById(postId);
   let isReel = false;
 
-  // If not post, try Reel
   if (!item) {
-      item = await Reel.findById(postId);
-      isReel = true;
+    item = await Reel.findById(postId);
+    isReel = true;
   }
 
-  if (!item) throw new ApiError(404, "Content not found");
+  if (!item) throw new ApiError(404, 'Content not found');
 
   if (item.user.toString() !== userId.toString()) {
-    throw new ApiError(403, "You are not authorized to delete this");
+    throw new ApiError(403, 'You are not authorized to delete this');
   }
 
-  // Delete associated comments
-  await Comment.deleteMany({ 
-      $or: [{ post: postId }, { reel: postId }] 
+  await Comment.deleteMany({
+    $or: [{ post: postId }, { reel: postId }],
   });
 
   if (isReel) {
-      await Reel.findByIdAndDelete(postId);
-      // Optional: Decrement reel count in user if you track it
+    await Reel.findByIdAndDelete(postId);
   } else {
-      await Post.findByIdAndDelete(postId);
-      await User.findByIdAndUpdate(userId, { $inc: { posts: -1 } });
+    await Post.findByIdAndDelete(postId);
+    await User.findByIdAndUpdate(userId, { $inc: { posts: -1 } });
   }
 
-  return res.status(200).json(new ApiResponse(200, { postId }, "Deleted successfully"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { postId }, 'Deleted successfully'));
 });
 
+// --- SEARCH (Fixed for Reels) ---
 const searchHashtags = asyncHandler(async (req, res) => {
   const { query } = req.query;
-  if (!query || query.trim() === "") return res.status(200).json(new ApiResponse(200, [], "No query"));
+  if (!query || query.trim() === '')
+    return res.status(200).json(new ApiResponse(200, [], 'No query'));
 
-  const cleanQuery = query.replace("#", "").toLowerCase();
-  
-  // Search in Posts
-  const posts = await Post.find({ caption: { $regex: `#`, $options: "i" } }).select("caption");
-  // Search in Reels (optional, but good for consistency)
-  const reels = await Reel.find({ caption: { $regex: `#`, $options: "i" } }).select("caption");
+  const cleanQuery = query.replace('#', '').toLowerCase();
+
+  // ✅ Apply Strong Filter to Search (Posts)
+  const posts = await Post.find({
+    caption: { $regex: `#`, $options: 'i' },
+    ...VISIBLE_FILTER,
+  }).select('caption');
+
+  // ✅ Apply Strong Filter to Search (Reels)
+  const reels = await Reel.find({
+    caption: { $regex: `#`, $options: 'i' },
+    ...VISIBLE_FILTER,
+  }).select('caption');
 
   const combined = [...posts, ...reels];
   const tagCounts = {};
@@ -326,7 +353,7 @@ const searchHashtags = asyncHandler(async (req, res) => {
     const matches = item.caption.match(/#[a-z0-9_]+/gi);
     if (matches) {
       matches.forEach((tag) => {
-        const tagName = tag.replace("#", "").toLowerCase();
+        const tagName = tag.replace('#', '').toLowerCase();
         if (tagName.includes(cleanQuery)) {
           tagCounts[tagName] = (tagCounts[tagName] || 0) + 1;
         }
@@ -334,9 +361,13 @@ const searchHashtags = asyncHandler(async (req, res) => {
     }
   });
 
-  const results = Object.keys(tagCounts).map((tag) => ({ tag: tag, count: tagCounts[tag] })).sort((a, b) => b.count - a.count);
+  const results = Object.keys(tagCounts)
+    .map((tag) => ({ tag: tag, count: tagCounts[tag] }))
+    .sort((a, b) => b.count - a.count);
 
-  return res.status(200).json(new ApiResponse(200, results, "Hashtag results fetched"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, results, 'Hashtag results fetched'));
 });
 
 export {

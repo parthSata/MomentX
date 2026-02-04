@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 
 // 1. Create the instance
 export const api = axios.create({
-  baseURL: 'http://localhost:3000/api/v1', // Ensure port is correct
+  baseURL: 'http://localhost:3000/api/v1',
   withCredentials: true, // 👈 CRITICAL: Sends cookies automatically
   headers: {
     'Content-Type': 'application/json',
@@ -25,24 +26,60 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
+api.interceptors.request.use((config) => {
+  // 👉 If this is an ADMIN request, attach admin token
+  if (config.url?.startsWith('/admin')) {
+    const adminToken = localStorage.getItem('adminToken');
+
+    if (adminToken) {
+      config.headers.Authorization = `Bearer ${adminToken}`;
+    }
+  }
+
+  return config;
+});
+
 // 3. The Interceptor
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const { status, data } = error.response || {};
 
-    // 🛑 1. Ignore errors from Login or Refresh endpoints (Prevent Infinite Loop)
+    // 🛑 1. HANDLE BANNED USERS (403 Forbidden)
+    if (status === 403 && data?.message?.includes('suspended')) {
+      toast.error('⛔ Account Suspended', {
+        description: 'Your access has been revoked. Please contact support.',
+        duration: 5000,
+      });
+
+      localStorage.removeItem('momentx_user');
+      localStorage.removeItem('adminToken');
+      sessionStorage.clear();
+
+      if (
+        window.location.pathname !== '/login' &&
+        window.location.pathname !== '/admin/login'
+      ) {
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
+      }
+
+      return Promise.reject(error);
+    }
+
+    // 🛑 2. Ignore errors from Login/Refresh (Prevent Loop)
     if (
-      error.response?.status === 401 &&
+      status === 401 &&
       (originalRequest.url.includes('/login') ||
         originalRequest.url.includes('/refresh-token'))
     ) {
       return Promise.reject(error);
     }
 
-    // 🛑 2. Handle 401 (Unauthorized) - Access Token Expired
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      // A. If refreshing is already happening, Queue this request
+    // 🛑 3. Handle 401 (Session Expired) -> Try Refresh
+    if (status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
@@ -55,30 +92,27 @@ api.interceptors.response.use(
           });
       }
 
-      // B. Start Refreshing
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
         await api.post('/users/refresh-token');
-
-        // If successful, process the queue
         processQueue(null);
-
         return api(originalRequest);
       } catch (refreshError) {
-        console.error('❌ [Axios] Refresh Failed. Session expired.');
+        // ✅ ADDED TOAST HERE
+        toast.error('Session Expired', {
+          description: 'Suspended user. Contact MomentX Support.',
+          duration: 3000,
+        });
 
-        // Fail all queued requests
         processQueue(refreshError, null);
-
-        // Cleanup local storage
         localStorage.removeItem('momentx_user');
 
-        // 🛑 CRITICAL FIX: Only redirect if we are NOT already on the login page.
-        // This stops the infinite reload loop.
         if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1000); // Small delay to show toast
         }
 
         return Promise.reject(refreshError);
@@ -87,7 +121,6 @@ api.interceptors.response.use(
       }
     }
 
-    // Return other errors as is
     return Promise.reject(error);
   },
 );

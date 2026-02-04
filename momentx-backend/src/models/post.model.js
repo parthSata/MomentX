@@ -1,16 +1,16 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const postSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
 
     caption: {
       type: String,
-      default: "",
+      default: '',
     },
 
     images: [
@@ -21,18 +21,22 @@ const postSchema = new mongoose.Schema(
       type: String, // Optional video URL
     },
 
-    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
     hashtags: [{ type: String }],
-    taggedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    taggedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
     location: {
       type: String,
-      default: "",
+      default: '',
+    },
+    isHidden: {
+      type: Boolean,
+      default: false,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // ✅ Named export to match the controller import { Post }
-export const Post = mongoose.model("Post", postSchema);
+export const Post = mongoose.model('Post', postSchema);
