@@ -166,7 +166,22 @@ const getAnalytics = asyncHandler(async (req, res) => {
 /* ===================== 4. USER MANAGEMENT ===================== */
 
 const getAllUsersAdmin = asyncHandler(async (req, res) => {
+  const { search = '' } = req.query;
+
+  // 1. Build Search Pipeline
+  const matchStage = {};
+
+  if (search.trim()) {
+    const searchRegex = { $regex: search, $options: 'i' };
+    matchStage.$or = [
+      { name: searchRegex },
+      { username: searchRegex },
+      { email: searchRegex },
+    ];
+  }
+
   const users = await User.aggregate([
+    { $match: matchStage }, // ✅ Filter users first
     {
       $lookup: {
         from: 'posts',
@@ -185,6 +200,7 @@ const getAllUsersAdmin = asyncHandler(async (req, res) => {
         isActive: { $ifNull: ['$isActive', true] },
         postsCount: { $size: '$userPosts' },
         followersCount: { $size: { $ifNull: ['$followers', []] } },
+        createdAt: 1, // ✅ Ensure createdAt is sent for "7 Days" filter
       },
     },
     { $sort: { createdAt: -1 } },
@@ -279,43 +295,58 @@ const sendUserWarning = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, 'Warning sent successfully'));
 });
 
-/* ===================== 6. CONTENT MANAGEMENT (POSTS & REELS) ===================== */
-
 const getAllContentAdmin = asyncHandler(async (req, res) => {
-  const { type = 'posts', page = 1, limit = 10 } = req.query;
+  const { type = 'posts', page = 1, limit = 10, search = '' } = req.query;
   const skip = (page - 1) * limit;
 
   let content = [];
   let total = 0;
 
+  // 1. Find Users matching search (if searching by username)
+  let userIds = [];
+  if (search.trim()) {
+    const matchingUsers = await User.find({
+      username: { $regex: search, $options: 'i' },
+    }).select('_id');
+    userIds = matchingUsers.map((u) => u._id);
+  }
+
+  // 2. Build Filter
+  const filter = {};
+  if (search.trim()) {
+    filter.$or = [
+      { caption: { $regex: search, $options: 'i' } }, // Search Caption
+      { user: { $in: userIds } }, // Search Author Username
+    ];
+  }
+
   if (type === 'reels') {
-    total = await Reel.countDocuments();
-    content = await Reel.find()
+    total = await Reel.countDocuments(filter);
+    content = await Reel.find(filter)
       .populate('user', 'username name profilePic isVerified')
       .sort({ createdAt: -1 })
       .skip(parseInt(skip))
       .limit(parseInt(limit));
   } else {
-    total = await Post.countDocuments();
-    content = await Post.find()
+    total = await Post.countDocuments(filter);
+    content = await Post.find(filter)
       .populate('user', 'username name profilePic isVerified')
       .sort({ createdAt: -1 })
       .skip(parseInt(skip))
       .limit(parseInt(limit));
   }
 
-  // ✅ FIX: Map status dynamically based on isHidden
   const formatted = content.map((item) => ({
     _id: item._id,
     type: type === 'reels' ? 'reel' : 'post',
     caption: item.caption,
     image: item.images?.[0] || item.thumbnailUrl || '',
+    videoUrl: item.videoUrl || '',
     createdAt: item.createdAt,
     user: item.user,
     likes: item.likes.length,
     comments: 0,
     shares: 0,
-    // 👇 Ensure backend sends correct state for UI
     isHidden: item.isHidden || false,
     status: item.isHidden ? 'hidden' : 'published',
   }));
@@ -348,7 +379,7 @@ const deleteContentAdmin = asyncHandler(async (req, res) => {
 
 const toggleHideContent = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { type } = req.query; // 'post' or 'reel'
+  const { type } = req.query; // Expecting 'post' or 'reel'
 
   let content;
   if (type === 'reel') {
@@ -359,8 +390,10 @@ const toggleHideContent = asyncHandler(async (req, res) => {
 
   if (!content) throw new ApiError(404, 'Content not found');
 
-  // Toggle the hidden status
+  // Toggle
   content.isHidden = !content.isHidden;
+
+  // ✅ Save with validation skipped to prevent unrelated validation errors
   await content.save({ validateBeforeSave: false });
 
   return res
@@ -372,6 +405,85 @@ const toggleHideContent = asyncHandler(async (req, res) => {
         `Content ${content.isHidden ? 'hidden' : 'visible'}`,
       ),
     );
+});
+
+const getAllReportsAdmin = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, status = 'pending' } = req.query;
+  const skip = (page - 1) * limit;
+
+  // 1. Fetch Reports
+  const reports = await Report.find({ status })
+    .sort({ createdAt: -1 })
+    .skip(parseInt(skip))
+    .limit(parseInt(limit))
+    .populate('reportedBy', 'username name profilePic'); // Populate Reporter
+
+  // 2. Manually populate the 'target' based on targetType
+  // (Since Mongoose 'refPath' wasn't set up in the schema provided, we do this manually)
+  const formattedReports = await Promise.all(
+    reports.map(async (report) => {
+      let targetContent = null;
+
+      if (report.targetType === 'post') {
+        targetContent = await Post.findById(report.targetId).select(
+          'caption images thumbnailUrl isHidden',
+        );
+      } else if (report.targetType === 'user') {
+        targetContent = await User.findById(report.targetId).select(
+          'username name email profilePic isActive',
+        );
+      } else if (report.targetType === 'reel') {
+        // If you handle reels
+        targetContent = await Reel.findById(report.targetId).select(
+          'caption videoUrl thumbnailUrl isHidden',
+        );
+      }
+
+      // If content was deleted, targetContent will be null
+      return {
+        ...report.toObject(),
+        targetContent: targetContent || { _id: report.targetId, deleted: true },
+      };
+    }),
+  );
+
+  const total = await Report.countDocuments({ status });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        reports: formattedReports,
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit),
+      },
+      'Reports fetched successfully',
+    ),
+  );
+});
+
+// Update Report Status (Resolve/Dismiss)
+const updateReportStatus = asyncHandler(async (req, res) => {
+  const { reportId } = req.params;
+  const { status, adminNote } = req.body; // 'resolved' or 'rejected'
+
+  if (!['resolved', 'rejected', 'pending'].includes(status)) {
+    throw new ApiError(400, 'Invalid status');
+  }
+
+  const report = await Report.findById(reportId);
+  if (!report) throw new ApiError(404, 'Report not found');
+
+  report.status = status;
+  report.adminNote = adminNote || report.adminNote;
+  report.reviewedBy = req.user._id; // Track which admin reviewed it
+
+  await report.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, report, `Report marked as ${status}`));
 });
 
 /* ===================== EXPORTS ===================== */
@@ -388,4 +500,6 @@ export {
   getAllContentAdmin,
   deleteContentAdmin,
   toggleHideContent,
+  getAllReportsAdmin,
+  updateReportStatus,
 };

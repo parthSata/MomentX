@@ -10,7 +10,13 @@ import { api } from "@/lib/axios";
 import { toast } from "sonner";
 import { PostViewDialog } from "@/components/feed/PostViewDialog";
 
-export function PostsTab() {
+// ✅ 1. Define the Props Interface
+interface PostsTabProps {
+    searchQuery: string;
+}
+
+// ✅ 2. Accept the prop here
+export function PostsTab({ searchQuery }: PostsTabProps) {
     const [activeTab, setActiveTab] = useState<"posts" | "reels">("posts");
     const [posts, setPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -24,14 +30,21 @@ export function PostsTab() {
 
     // 1. Fetch Content
     useEffect(() => {
-        fetchContent();
-    }, [activeTab, page]);
+        // Debounce search slightly to avoid too many API calls
+        const timer = setTimeout(() => {
+            fetchContent();
+        }, 500);
+        return () => clearTimeout(timer);
+        // ✅ Add searchQuery to dependency array
+    }, [activeTab, page, searchQuery]);
 
     const fetchContent = async () => {
         setLoading(true);
         try {
-            // Add timestamp to prevent caching issues
-            const { data } = await api.get(`/admin/content?type=${activeTab}&page=${page}&t=${Date.now()}`);
+            // ✅ Pass search query to backend
+            const { data } = await api.get(
+                `/admin/content?type=${activeTab}&page=${page}&search=${searchQuery || ''}&t=${Date.now()}`
+            );
             setPosts(data.data.content);
             setTotalPages(data.data.pages);
         } catch (error) {
@@ -45,27 +58,28 @@ export function PostsTab() {
     const handleToggleHide = async (id: string, currentStatus: boolean) => {
         setProcessingId(id);
 
-        // 1. Optimistic Update (Immediate UI Change)
-        // We flip the boolean and manually update the string status for the UI badge
+        // Optimistic Update
         const newIsHidden = !currentStatus;
-        const newStatusString = newIsHidden ? 'hidden' : 'published';
 
         setPosts(prev => prev.map(p =>
-            p._id === id ? { ...p, isHidden: newIsHidden, status: newStatusString } : p
+            p._id === id ? { ...p, isHidden: newIsHidden } : p
         ));
 
         try {
             const typeParam = activeTab === "reels" ? "reel" : "post";
+            const { data } = await api.patch(`/admin/content/${id}/hide?type=${typeParam}`);
 
-            // 2. API Call
-            await api.patch(`/admin/content/${id}/hide?type=${typeParam}`);
+            // Sync with server response
+            const updatedItem = data.data;
+            setPosts(prev => prev.map(p =>
+                p._id === id ? { ...p, isHidden: updatedItem.isHidden } : p
+            ));
 
             toast.success(newIsHidden ? "Content hidden" : "Content visible");
         } catch (error) {
-            // 3. Revert on Error
-            const revertStatusString = currentStatus ? 'hidden' : 'published';
+            // Revert
             setPosts(prev => prev.map(p =>
-                p._id === id ? { ...p, isHidden: currentStatus, status: revertStatusString } : p
+                p._id === id ? { ...p, isHidden: currentStatus } : p
             ));
             toast.error("Failed to update visibility");
         } finally {
@@ -92,7 +106,11 @@ export function PostsTab() {
     };
 
     const openViewModal = (post: any) => {
-        setSelectedPost(post);
+        const postWithType = {
+            ...post,
+            type: activeTab === "reels" ? "reel" : "post"
+        };
+        setSelectedPost(postWithType);
         setIsViewOpen(true);
     };
 
@@ -157,10 +175,9 @@ export function PostsTab() {
                             </thead>
                             <tbody>
                                 {posts.length === 0 ? (
-                                    <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No content found.</td></tr>
+                                    <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No content found matching "{searchQuery}".</td></tr>
                                 ) : (
                                     posts.map((post, index) => {
-                                        // Check logic: Uses isHidden from DB
                                         const isHidden = post.isHidden === true;
 
                                         return (
@@ -171,7 +188,6 @@ export function PostsTab() {
                                                 transition={{ delay: index * 0.05 }}
                                                 className="border-b border-border/50 hover:bg-white/5 transition-colors group"
                                             >
-                                                {/* Content Preview */}
                                                 <td className="p-4 pl-6">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-white/5 relative border border-white/10 group-hover:border-primary/50 transition-colors">
@@ -192,7 +208,6 @@ export function PostsTab() {
                                                     </div>
                                                 </td>
 
-                                                {/* Author */}
                                                 <td className="p-4 hidden md:table-cell">
                                                     <div className="flex items-center gap-2">
                                                         <AvatarRing src={post.user?.profilePic} size="sm" />
@@ -203,7 +218,6 @@ export function PostsTab() {
                                                     </div>
                                                 </td>
 
-                                                {/* Stats */}
                                                 <td className="p-4 hidden sm:table-cell">
                                                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                                         <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> {post.likes}</span>
@@ -211,7 +225,6 @@ export function PostsTab() {
                                                     </div>
                                                 </td>
 
-                                                {/* Status Badge */}
                                                 <td className="p-4">
                                                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${isHidden
                                                         ? "bg-red-500/10 text-red-400 border-red-500/20"
@@ -221,7 +234,6 @@ export function PostsTab() {
                                                     </span>
                                                 </td>
 
-                                                {/* Actions */}
                                                 <td className="p-4 pr-6">
                                                     <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                                                         <motion.button
