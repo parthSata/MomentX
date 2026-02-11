@@ -22,6 +22,7 @@ import FollowersPage from "@/pages/FollowersPage";
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import CreateReelPage from "@/pages/CreateReelPage";
 import UserProfilePage from "@/pages/UserProfilePage";
+import ActivityPage from "@/pages/ActivityPage";
 
 // Admin route protection
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -105,6 +106,15 @@ export function AnimatedRoutes() {
           element={
             <PageTransition>
               <CreateReelPage />
+            </PageTransition>
+          }
+        />
+
+        <Route
+          path="/activity"
+          element={
+            <PageTransition>
+              <ActivityPage />
             </PageTransition>
           }
         />

@@ -21,6 +21,7 @@ import reelRouter from './routes/reel.routes.js';
 import exploreRouter from './routes/explore.routes.js';
 import commentRouter from './routes/comment.route.js';
 import adminRouter from './routes/admin.routes.js';
+import activityRouter from './routes/activity.routes.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -161,6 +162,7 @@ app.use('/api/v1/chats', chatRouter);
 app.use('/api/v1/reels', reelRouter); // ✅ Reel routes
 app.use('/api/v1/explore', exploreRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/activity', activityRouter);
 
 // Error Handling
 app.use((err, req, res, next) => {

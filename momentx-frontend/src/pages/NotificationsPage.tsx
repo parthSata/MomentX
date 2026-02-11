@@ -16,24 +16,17 @@ const getIcon = (type: string) => {
 };
 
 const getContentText = (type: string, notification: Notification) => {
-  // 1. Check if it's a Story Like
-  // We check if 'story' exists AND if it has an ID (meaning it was populated)
   if (type === "like" && notification.story?._id) {
     return "liked your story";
   }
-
-  // 2. Fallback for other types
   switch (type) {
-    case "like":
-      return "liked your post";
-    case "comment":
-      return "commented on your post";
-    case "follow":
-      return "started following you";
-    default:
-      return "interacted with you";
+    case "like": return "liked your post";
+    case "comment": return "commented on your post";
+    case "follow": return "started following you";
+    default: return "interacted with you";
   }
 };
+
 export default function NotificationsPage() {
   const { notifications, unreadCount, loading, markAllRead } = useNotifications();
   const [filter, setFilter] = useState<"all" | "unread">("all");
@@ -51,15 +44,22 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background pb-20 md:pb-0 text-foreground">
       <PageHeader
         title="Notifications"
         rightContent={
           <div className="flex items-center gap-2">
-            <motion.button onClick={markAllRead} className="p-2 glass rounded-full">
-              <Check className="w-5 h-5" />
+            <motion.button
+              onClick={markAllRead}
+              className="p-2 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+            >
+              <Check className="w-5 h-5 text-foreground" />
             </motion.button>
-            <motion.button className="p-2 glass rounded-full"><Settings className="w-5 h-5" /></motion.button>
+            <motion.button
+              className="p-2 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+            >
+              <Settings className="w-5 h-5 text-foreground" />
+            </motion.button>
           </div>
         }
       />
@@ -71,10 +71,23 @@ export default function NotificationsPage() {
             <button
               key={tab}
               onClick={() => setFilter(tab)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${filter === tab ? "bg-gradient-primary text-white" : "glass hover:bg-white/10"}`}
+              className={`px-6 py-2 rounded-full text-sm font-bold transition-all border shadow-sm ${filter === tab
+                ? "bg-linear-to-r from-pink-500 to-violet-600 text-white border-transparent"
+                : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-white/10"
+                }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              {tab === "unread" && unreadCount > 0 && <span className="ml-2 px-1.5 py-0.5 bg-white/20 rounded-full text-xs">{unreadCount}</span>}
+
+              {tab === "unread" && unreadCount > 0 && (
+                <span
+                  className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${filter === tab
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-200 dark:bg-white/20 text-gray-900 dark:text-white"
+                    }`}
+                >
+                  {unreadCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -90,19 +103,21 @@ export default function NotificationsPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ delay: index * 0.05 }}
-                  className={`flex items-center gap-3 p-3 glass rounded-2xl ${!notif.isRead ? "border-l-4 border-l-primary bg-primary/5" : ""}`}
+                  className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors ${!notif.isRead
+                    ? "border-l-4 border-l-primary bg-primary/5 border-y-transparent border-r-transparent dark:border-y-white/5 dark:border-r-white/5"
+                    : "bg-white dark:bg-white/5 border-gray-200 dark:border-white/10"
+                    }`}
                 >
                   <div className="relative">
                     <AvatarRing src={notif.sender?.profilePic} size="md" />
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background flex items-center justify-center border border-border">
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-background flex items-center justify-center border border-border shadow-sm">
                       {getIcon(notif.type)}
                     </div>
                   </div>
 
                   <div className="flex-1 min-w-0 ml-1">
-                    <p className="text-sm">
+                    <p className="text-sm text-foreground">
                       <span className="font-semibold">{notif.sender?.username}</span>
-                      {/* ✅ PASS THE FULL NOTIFICATION OBJECT */}
                       <span className="text-muted-foreground ml-1">{getContentText(notif.type, notif)}</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -112,12 +127,16 @@ export default function NotificationsPage() {
 
                   {/* Post Thumbnail */}
                   {!notif.story && notif.post?.images?.[0] && (
-                    <img src={notif.post.images[0]} alt="Post" className="w-10 h-10 rounded-lg object-cover ml-2 border border-white/10" />
+                    <img
+                      src={notif.post.images[0]}
+                      alt="Post"
+                      className="w-10 h-10 rounded-lg object-cover ml-2 border border-gray-200 dark:border-white/10"
+                    />
                   )}
 
-                  {/* Story Thumbnail (Pink Border) */}
+                  {/* Story Thumbnail */}
                   {notif.story && (
-                    <div className="relative w-10 h-10 rounded-lg overflow-hidden ml-2 border border-pink-500/30 bg-black">
+                    <div className="relative w-10 h-10 rounded-lg overflow-hidden ml-2 border border-pink-500/30 bg-gray-100 dark:bg-black">
                       {notif.story.url ? (
                         notif.story.type === 'video' ?
                           <video src={notif.story.url} className="w-full h-full object-cover" muted /> :
@@ -131,7 +150,9 @@ export default function NotificationsPage() {
                   )}
 
                   {notif.type === "follow" && (
-                    <button className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary text-xs font-semibold rounded-full transition-colors ml-2">Follow Back</button>
+                    <button className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold rounded-full transition-colors ml-2">
+                      Follow Back
+                    </button>
                   )}
                 </motion.div>
               ))

@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
-import { api } from "@/lib/axios";
-import { io, Socket } from "socket.io-client";
-import { useAuth } from "@/context/AuthContext";
+import { useState, useEffect, useRef } from 'react';
+import { api } from '@/lib/axios';
+import { io, Socket } from 'socket.io-client';
+import { useAuth } from '@/context/AuthContext';
+import { useCallback } from 'react';
 
 export interface ChatUser {
   _id: string;
@@ -39,118 +40,77 @@ export function useChat(chatId?: string) {
   const { user } = useAuth();
   const socketRef = useRef<Socket | null>(null);
 
-  // 1. Fetch Chats
-  const fetchChats = async () => {
+  const fetchChats = useCallback(async () => {
     try {
-      const { data } = await api.get("/chats");
+      const { data } = await api.get('/chats');
       setChats(data.data || []);
     } catch (error) {
-      console.error("Fetch chats error", error);
+      console.error('Fetch chats error', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // 2. Fetch Messages
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!chatId) return;
     try {
       const { data } = await api.get(`/chats/${chatId}/messages`);
       setMessages(data.data || []);
     } catch (error) {
-      console.error("Fetch messages error", error);
+      console.error('Fetch messages error', error);
     }
-  };
+  }, [chatId]);
 
   // 3. Socket Logic (THE FIX IS HERE)
   useEffect(() => {
     if (!user?._id) return;
-
-    // Initialize Socket if null
     if (!socketRef.current) {
-      socketRef.current = io("http://localhost:3000", {
-        transports: ["websocket"],
+      socketRef.current = io('http://localhost:3000', {
+        transports: ['websocket'],
         withCredentials: true,
-        autoConnect: false, // We handle connection manually
       });
     }
 
     const socket = socketRef.current;
-
-    // ✅ FIX: Handler to join room on EVERY connection/reconnection
-    const onConnect = () => {
-      socket.emit("join_user_room", user._id);
-    };
-
-    const onDisconnect = () => {
-      console.log("⚠️ Socket Disconnected");
-    };
+    const onConnect = () => socket.emit('join_user_room', user._id);
 
     const handleNewMessage = (newMsg: Message) => {
-      // If we are currently in this chat, add to messages list
+      // ✅ Only add if it's not from us (Optimistic handles ours)
+      const senderId =
+        typeof newMsg.sender === 'string' ? newMsg.sender : newMsg.sender?._id;
+      if (senderId === user._id) return;
+
       if (chatId && newMsg.chatId === chatId) {
-        setMessages((prev) => [...prev, newMsg]);
+        setMessages((prev) => {
+          if (prev.some((m) => m._id === newMsg._id)) return prev;
+          return [...prev, newMsg];
+        });
       }
-
-      // Always update the Chat List preview
-      setChats((prev) => {
-        return prev
-          .map((c) =>
-            c._id === newMsg.chatId
-              ? {
-                  ...c,
-                  lastMessage: newMsg.text || "Sent a file",
-                  lastMessageAt: newMsg.createdAt,
-                }
-              : c
-          )
-          .sort(
-            (a, b) =>
-              new Date(b.lastMessageAt).getTime() -
-              new Date(a.lastMessageAt).getTime()
-          );
-      });
+      fetchChats();
     };
 
-    // Attach Listeners
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    socket.on("newMessage", handleNewMessage);
+    socket.on('connect', onConnect);
+    socket.on('newMessage', handleNewMessage);
+    if (socket.connected) onConnect();
 
-    // Manual Connect Trigger
-    if (!socket.connected) {
-      socket.connect();
-    } else {
-      // If already connected (e.g. from previous page), we MUST still join the room
-      onConnect();
-    }
-
-    // Cleanup Listeners (Prevents duplicates)
     return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("newMessage", handleNewMessage);
-      // Note: We do NOT disconnect the socket here to keep it alive across navigation
+      socket.off('connect', onConnect);
+      socket.off('newMessage', handleNewMessage);
     };
-  }, [user?._id, chatId]);
+  }, [user?._id, chatId, fetchChats]);
 
   // 4. Send Message
   const sendMessage = async (
     receiverId: string,
     content: string,
-    type: "text" | "image" | "video" | "audio" = "text"
+    type: string = 'text',
   ) => {
     if (!user?._id) return;
+    const body: any = { [type]: content };
 
-    const body: any = {};
-    if (type === "text") body.text = content;
-    else if (type === "image") body.image = content;
-    else if (type === "video") body.video = content;
-    else if (type === "audio") body.audio = content;
-
-    // Optimistic UI Update
+    // ✅ FIX: Use full ISO string to prevent "Invalid Date"
     const tempMsg: Message = {
-      _id: Date.now().toString(),
+      _id: `temp-${Date.now()}`,
       sender: { _id: user._id },
       createdAt: new Date().toISOString(),
       isOptimistic: true,
@@ -160,12 +120,15 @@ export function useChat(chatId?: string) {
     setMessages((prev) => [...prev, tempMsg]);
 
     try {
-      await api.post(`/chats/send/${receiverId}`, body);
-      // Don't need to do anything else, socket will confirm it or it's saved.
+      const { data } = await api.post(`/chats/send/${receiverId}`, body);
+      // ✅ Update message ID from temp to real
+      setMessages((prev) =>
+        prev.map((m) => (m._id === tempMsg._id ? data.data : m)),
+      );
+      return data.data;
     } catch (error) {
-      console.error("Send error", error);
-      // Remove optimistic message if failed
       setMessages((prev) => prev.filter((m) => m._id !== tempMsg._id));
+      throw error;
     }
   };
 
@@ -179,11 +142,11 @@ export function useChat(chatId?: string) {
     setMessages((prev) => prev.filter((msg) => !messageIds.includes(msg._id)));
 
     try {
-      await api.post("/chats/delete-messages", { chatId, messageIds });
+      await api.post('/chats/delete-messages', { chatId, messageIds });
     } catch (error: any) {
-      console.error("Delete Failed:", error);
+      console.error('Delete Failed:', error);
       setMessages(originalMessages);
-      alert("Could not delete messages.");
+      alert('Could not delete messages.');
     }
   };
 

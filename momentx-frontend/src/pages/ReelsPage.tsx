@@ -63,10 +63,9 @@ export default function ReelsPage() {
   }
 
   return (
-    <div className="h-screen w-full bg-black flex overflow-hidden relative">
+    <div className="h-screen w-full bg-white dark:bg-black flex overflow-hidden relative">
 
-      {/* ✅ Normal Sidebar (No hover expand) */}
-      <div className="hidden lg:block w-64 border-r border-white/10 bg-black z-50">
+      <div className="hidden lg:block w-64 border-r border-gray-200 dark:border-white/10 bg-linear-to-r from-neon-indigo/20 via-neon-violet/20 to-neon-pink/20 z-50">
         <Sidebar />
       </div>
 
@@ -74,8 +73,13 @@ export default function ReelsPage() {
       <div className="flex-1 relative h-full w-full">
         {reels.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-white gap-4">
-            <p>No reels found.</p>
-            <button onClick={() => navigate("/reels/create")} className="px-6 py-2 bg-white text-black rounded-full font-bold">Create First Reel</button>
+            <p className="text-gray-400">No reels found.</p>
+            <button
+              onClick={() => navigate("/reels/create")}
+              className="px-6 py-2 bg-white text-black rounded-full font-bold hover:bg-gray-200 transition-colors"
+            >
+              Create First Reel
+            </button>
           </div>
         ) : (
           <div ref={containerRef} className="h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide pb-16 md:pb-0">
@@ -92,17 +96,38 @@ export default function ReelsPage() {
           </div>
         )}
 
+        {/* Navigation Buttons (Desktop) */}
         <div className="hidden lg:flex absolute right-8 top-1/2 -translate-y-1/2 flex-col gap-4 z-40">
-          <button onClick={() => scrollToReel("up")} disabled={currentIndex === 0} className={cn("w-12 h-12 rounded-full flex items-center justify-center transition-all", currentIndex === 0 ? "bg-white/5 text-white/20 cursor-not-allowed" : "bg-white/10 hover:bg-white/20 text-white backdrop-blur-md")}>
+          <button
+            onClick={() => scrollToReel("up")}
+            disabled={currentIndex === 0}
+            className={cn("w-12 h-12 rounded-full flex items-center justify-center transition-all",
+              currentIndex === 0
+                ? "bg-white/5 text-white/20 cursor-not-allowed"
+                : "bg-white/10 hover:bg-white/20 text-white backdrop-blur-md"
+            )}
+          >
             <ChevronUp className="w-6 h-6" />
           </button>
-          <button onClick={() => scrollToReel("down")} disabled={currentIndex === reels.length - 1} className={cn("w-12 h-12 rounded-full flex items-center justify-center transition-all", currentIndex === reels.length - 1 ? "bg-white/5 text-white/20 cursor-not-allowed" : "bg-white/10 hover:bg-white/20 text-white backdrop-blur-md")}>
+          <button
+            onClick={() => scrollToReel("down")}
+            disabled={currentIndex === reels.length - 1}
+            className={cn("w-12 h-12 rounded-full flex items-center justify-center transition-all",
+              currentIndex === reels.length - 1
+                ? "bg-white/5 text-white/20 cursor-not-allowed"
+                : "bg-white/10 hover:bg-white/20 text-white backdrop-blur-md"
+            )}
+          >
             <ChevronDown className="w-6 h-6" />
           </button>
         </div>
 
+        {/* Create Reel Button (Desktop) */}
         <div className="hidden lg:block absolute top-6 right-10 z-40">
-          <button onClick={() => navigate("/reels/create")} className="p-3 bg-linear-to-r from-pink-500 to-violet-500 rounded-full shadow-lg hover:shadow-pink-500/20">
+          <button
+            onClick={() => navigate("/reels/create")}
+            className="p-3 bg-linear-to-r from-pink-500 to-violet-500 rounded-full shadow-lg hover:shadow-pink-500/20 transition-shadow"
+          >
             <Plus className="w-6 h-6 text-white" />
           </button>
         </div>

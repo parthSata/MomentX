@@ -1,20 +1,20 @@
-import Chat from "../models/chat.model.js";
-import Message from "../models/message.model.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
-import ApiResponse from "../utils/ApiResponse.js";
-import { ApiError } from "../utils/ApiError.js";
-import { uploadInCloudinary } from "../utils/cloudinary.js";
+import Chat from '../models/chat.model.js';
+import Message from '../models/message.model.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import ApiResponse from '../utils/ApiResponse.js';
+import { ApiError } from '../utils/ApiError.js';
+import { uploadInCloudinary } from '../utils/cloudinary.js';
+import { getOrCreatePrivateChat } from '../utils/chatUtils.js'; // ✅ Import Helper
 
-// ... (getChats and getMessages remain the same) ...
 export const getChats = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id;
   const chats = await Chat.find({ participants: { $in: [currentUserId] } })
-    .populate("participants", "name username profilePic isOnline")
+    .populate('participants', 'name username profilePic isOnline')
     .sort({ lastMessageAt: -1 });
 
   const formattedChats = chats.map((chat) => {
     const otherParticipant = chat.participants.find(
-      (p) => p._id.toString() !== currentUserId.toString()
+      (p) => p._id.toString() !== currentUserId.toString(),
     );
     return {
       _id: chat._id,
@@ -25,35 +25,30 @@ export const getChats = asyncHandler(async (req, res) => {
   });
   return res
     .status(200)
-    .json(new ApiResponse(200, formattedChats, "Chats fetched"));
+    .json(new ApiResponse(200, formattedChats, 'Chats fetched'));
 });
 
 export const getMessages = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   const messages = await Message.find({ chatId })
-    .populate("sender", "username profilePic")
+    .populate('sender', 'username profilePic')
     .sort({ createdAt: 1 });
   return res
     .status(200)
-    .json(new ApiResponse(200, messages, "Messages fetched"));
+    .json(new ApiResponse(200, messages, 'Messages fetched'));
 });
 
 export const uploadChatMedia = asyncHandler(async (req, res) => {
-  if (!req.file) {
-    throw new ApiError(400, "No file uploaded");
-  }
+  if (!req.file) throw new ApiError(400, 'No file uploaded');
 
   const localFilePath = req.file.path;
   const cloudResponse = await uploadInCloudinary(localFilePath);
 
-  if (!cloudResponse) {
-    throw new ApiError(500, "Failed to upload to cloud");
-  }
+  if (!cloudResponse) throw new ApiError(500, 'Failed to upload to cloud');
 
-  // Determine File Type
-  let type = "image";
-  if (req.file.mimetype.startsWith("video")) type = "video";
-  else if (req.file.mimetype.startsWith("audio")) type = "audio";
+  let type = 'image';
+  if (req.file.mimetype.startsWith('video')) type = 'video';
+  else if (req.file.mimetype.startsWith('audio')) type = 'audio';
 
   return res
     .status(200)
@@ -61,69 +56,53 @@ export const uploadChatMedia = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         { url: cloudResponse.secure_url, type },
-        "Upload successful"
-      )
+        'Upload successful',
+      ),
     );
 });
 
-// ✅ UPDATED: Send Message (Handles Text & Media)
 export const sendMessage = asyncHandler(async (req, res) => {
   const { receiverId } = req.params;
-  const { text, image, video, audio } = req.body; // Accept media fields
+  const { text, image, video, audio } = req.body;
   const senderId = req.user._id;
 
   if (!text && !image && !video && !audio) {
-    throw new ApiError(400, "Message content cannot be empty");
+    throw new ApiError(400, 'Message content cannot be empty');
   }
 
-  // 1. Find/Create Chat
-  let chat = await Chat.findOne({
-    participants: { $all: [senderId, receiverId] },
-  });
+  const chat = await getOrCreatePrivateChat(senderId, receiverId);
 
-  if (!chat) {
-    chat = await Chat.create({
-      participants: [senderId, receiverId],
-      lastMessage: "Started a conversation",
-      lastMessageAt: new Date(),
-    });
-  }
-
-  // 2. Create Message
   const newMessage = await Message.create({
     chatId: chat._id,
     sender: senderId,
-    text: text || "",
-    image, // Save URL if present
+    text: text || '',
+    image,
     video,
     audio,
     seenBy: [senderId],
   });
 
-  // 3. Update Chat Preview
-  let previewText = text;
-  if (image) previewText = "📷 Image";
-  if (video) previewText = "🎥 Video";
-  if (audio) previewText = "🎵 Audio";
-
+  // Update Chat Metadata
   await Chat.findByIdAndUpdate(chat._id, {
-    lastMessage: previewText,
+    lastMessage: text || (image ? '📷 Image' : video ? '🎥 Video' : 'Media'),
     lastMessageAt: new Date(),
   });
 
-  // 4. Socket Event
+  // ✅ FIX: Broadcast to room EXCEPT the sender to prevent local duplicates
   if (req.io) {
-    req.io.to(receiverId).emit("newMessage", newMessage);
+    req.io
+      .to(chat._id.toString())
+      .except(senderId.toString())
+      .emit('newMessage', newMessage);
   }
 
-  return res.status(201).json(new ApiResponse(201, newMessage, "Message sent"));
+  return res.status(201).json(new ApiResponse(201, newMessage, 'Message sent'));
 });
-// ✅ NEW: Delete Messages
+
 export const deleteMessages = async (req, res) => {
   try {
     const { chatId, messageIds } = req.body;
 
-    // Validate Input
     if (
       !chatId ||
       !messageIds ||
@@ -132,69 +111,99 @@ export const deleteMessages = async (req, res) => {
     ) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid request data" });
+        .json({ success: false, message: 'Invalid request data' });
     }
 
+    await Message.deleteMany({ _id: { $in: messageIds }, chatId });
 
-    // 1. Delete Messages
-    const result = await Message.deleteMany({
-      _id: { $in: messageIds },
-      chatId: chatId, // Ensure you match the field name in your Schema (is it 'chatId' or 'chat'?)
-    });
-
-    // Note: Check your Message Model. If the field is named "chat", use "chat: chatId".
-    // If it is "chatId", use "chatId: chatId".
-
-
-    // 2. Update Latest Message (Optional but recommended)
-    const latestMessage = await Message.findOne({ chatId: chatId }).sort({
+    const latestMessage = await Message.findOne({ chatId }).sort({
       createdAt: -1,
     });
 
     await Chat.findByIdAndUpdate(chatId, {
       lastMessage: latestMessage
-        ? latestMessage.text || "Media"
-        : "No messages",
+        ? latestMessage.text || (latestMessage.image ? '📷 Image' : 'Media')
+        : 'No messages',
       lastMessageAt: latestMessage ? latestMessage.createdAt : new Date(),
     });
 
     return res
       .status(200)
-      .json({ success: true, message: "Messages deleted successfully" });
+      .json({ success: true, message: 'Messages deleted successfully' });
   } catch (error) {
-    console.error("Delete messages error:", error);
     return res
       .status(500)
-      .json({ success: false, message: "Internal Server Error" });
+      .json({ success: false, message: 'Internal Server Error' });
   }
 };
 
 export const createChat = asyncHandler(async (req, res) => {
-  const { userId } = req.body; // The user we want to chat with
+  const { userId } = req.body;
+  const currentUserId = req.user._id;
 
-  if (!userId) throw new ApiError(400, "UserId is required");
+  if (!userId) throw new ApiError(400, 'UserId is required');
 
-  // 1. Check if chat exists
-  let chat = await Chat.findOne({
-    isGroupChat: false,
-    participants: { $all: [req.user._id, userId] },
-  }).populate("participants", "-password");
+  const chat = await getOrCreatePrivateChat(currentUserId, userId);
 
-  if (chat) {
-    return res.status(200).json(new ApiResponse(200, chat, "Chat retrieved"));
-  }
-
-  // 2. Create new chat
-  const newChat = await Chat.create({
-    participants: [req.user._id, userId],
-    isGroupChat: false,
-    lastMessageAt: new Date(),
-  });
-
-  const fullChat = await Chat.findById(newChat._id).populate(
-    "participants",
-    "-password"
+  const fullChat = await Chat.findById(chat._id).populate(
+    'participants',
+    'name username profilePic isOnline',
   );
 
-  return res.status(201).json(new ApiResponse(201, fullChat, "Chat created"));
+  // ✅ Format the response to match getChats structure
+  const otherParticipant = fullChat.participants.find(
+    (p) => p._id.toString() !== currentUserId.toString(),
+  );
+
+  const formattedChat = {
+    _id: fullChat._id,
+    user: otherParticipant,
+    lastMessage: fullChat.lastMessage,
+    lastMessageAt: fullChat.lastMessageAt,
+    participants: fullChat.participants, // keep this for utility
+  };
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, formattedChat, 'Chat ready'));
+});
+
+export const cleanDuplicateChats = asyncHandler(async (req, res) => {
+  const chats = await Chat.find({ isGroupChat: false });
+  const seen = new Set();
+  let deleted = 0;
+
+  for (const chat of chats) {
+    const pair = chat.participants
+      .map((p) => p.toString())
+      .sort()
+      .join('-');
+    if (seen.has(pair)) {
+      await Chat.findByIdAndDelete(chat._id);
+      await Message.deleteMany({ chatId: chat._id });
+      deleted++;
+    } else {
+      seen.add(pair);
+    }
+  }
+  return res
+    .status(200)
+    .json({ message: `Deleted ${deleted} duplicate chats.` });
+});
+
+export const deleteChat = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const chat = await Chat.findById(chatId);
+  if (!chat) throw new ApiError(404, 'Chat not found');
+
+  if (!chat.participants.includes(req.user._id)) {
+    throw new ApiError(403, 'Not authorized to delete this chat');
+  }
+
+  await Chat.findByIdAndDelete(chatId);
+  await Message.deleteMany({ chatId });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, 'Chat deleted successfully'));
 });

@@ -45,18 +45,23 @@ export function StoryViewer({
 
   // Reset state on open or slide change
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && currentStory) {
       setProgress(0)
       setIsPaused(false)
       setIsViewersOpen(false)
       setMessage("")
       setIsInputFocused(false)
 
-      // Reset Like state based on story data
-      // Check if the current user's ID exists in the likes array
-      // Using 'any' cast to handle potential TS mismatch if type isn't updated yet
-      if (currentStory && (currentStory as any).likes && currentUserId) {
-        setIsLiked((currentStory as any).likes.includes(currentUserId));
+      // ✅ FIX: Robust Like Check (Handle both string IDs and Object populated users)
+      if (currentUserId && (currentStory as any).likes) {
+        const hasLiked = (currentStory as any).likes.some((like: any) => {
+          // If like is just an ID string
+          if (typeof like === 'string') return like === currentUserId;
+          // If like is an object (populated user)
+          if (typeof like === 'object' && like._id) return like._id === currentUserId;
+          return false;
+        });
+        setIsLiked(hasLiked);
       } else {
         setIsLiked(false);
       }
@@ -139,6 +144,7 @@ export function StoryViewer({
 
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Optimistic Update
     setIsLiked(!isLiked);
     if (onLikeStory && currentStory) {
       onLikeStory(currentStory._id);
