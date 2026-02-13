@@ -551,8 +551,7 @@ export default function ChatPage() {
                 <img
                   src={selectedMedia.url}
                   alt="Preview"
-                  className="max-h-[70vh] max-w-full rounded-2xl object-contain shadow-2xl border border-white/10"
-                />
+                  className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl border border-white/10" />
               )}
               {selectedMedia.type === "video" && (
                 <video
@@ -727,7 +726,8 @@ export default function ChatPage() {
                   >
                     {msg.image ? (
                       <div
-                        className="relative w-full aspect-square rounded-lg overflow-hidden cursor-pointer group bg-black/10 dark:bg-black/20"
+                        className="relative overflow-hidden cursor-pointer group bg-black/10 dark:bg-black/20 rounded-lg"
+                        style={{ maxWidth: "280px", maxHeight: "350px" }} // Explicit constraints
                         onClick={() => !isSelectionMode && setFullScreenImage(msg.image || "")}
                       >
                         <img

@@ -4,7 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import ApiResponse from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import { uploadInCloudinary } from '../utils/cloudinary.js';
-import { getOrCreatePrivateChat } from '../utils/chatUtils.js'; // ✅ Import Helper
+import { getOrCreatePrivateChat } from '../utils/chatUtils.js';
 
 export const getChats = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id;
@@ -12,17 +12,25 @@ export const getChats = asyncHandler(async (req, res) => {
     .populate('participants', 'name username profilePic isOnline')
     .sort({ lastMessageAt: -1 });
 
-  const formattedChats = chats.map((chat) => {
-    const otherParticipant = chat.participants.find(
-      (p) => p._id.toString() !== currentUserId.toString(),
-    );
-    return {
-      _id: chat._id,
-      user: otherParticipant,
-      lastMessage: chat.lastMessage,
-      lastMessageAt: chat.lastMessageAt,
-    };
-  });
+  const formattedChats = await Promise.all(
+    chats.map(async (chat) => {
+      const otherParticipant = chat.participants.find(
+        (p) => p._id.toString() !== currentUserId.toString(),
+      );
+      const unreadCount = await Message.countDocuments({
+        chatId: chat._id,
+        seenBy: { $ne: currentUserId },
+      });
+      return {
+        _id: chat._id,
+        user: otherParticipant,
+        lastMessage: chat.lastMessage,
+        lastMessageAt: chat.lastMessageAt,
+        unreadCount: unreadCount || 0,
+      };
+    }),
+  );
+
   return res
     .status(200)
     .json(new ApiResponse(200, formattedChats, 'Chats fetched'));
@@ -30,9 +38,17 @@ export const getChats = asyncHandler(async (req, res) => {
 
 export const getMessages = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
+  const currentUserId = req.user._id;
+
   const messages = await Message.find({ chatId })
     .populate('sender', 'username profilePic')
     .sort({ createdAt: 1 });
+
+  await Message.updateMany(
+    { chatId, seenBy: { $ne: currentUserId } },
+    { $addToSet: { seenBy: currentUserId } },
+  );
+
   return res
     .status(200)
     .json(new ApiResponse(200, messages, 'Messages fetched'));
@@ -40,16 +56,12 @@ export const getMessages = asyncHandler(async (req, res) => {
 
 export const uploadChatMedia = asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'No file uploaded');
-
   const localFilePath = req.file.path;
   const cloudResponse = await uploadInCloudinary(localFilePath);
-
   if (!cloudResponse) throw new ApiError(500, 'Failed to upload to cloud');
-
   let type = 'image';
   if (req.file.mimetype.startsWith('video')) type = 'video';
   else if (req.file.mimetype.startsWith('audio')) type = 'audio';
-
   return res
     .status(200)
     .json(
@@ -61,17 +73,19 @@ export const uploadChatMedia = asyncHandler(async (req, res) => {
     );
 });
 
+// ✅ FIXED: Send Message & Emit to User Rooms
 export const sendMessage = asyncHandler(async (req, res) => {
   const { receiverId } = req.params;
   const { text, image, video, audio } = req.body;
   const senderId = req.user._id;
 
-  if (!text && !image && !video && !audio) {
-    throw new ApiError(400, 'Message content cannot be empty');
-  }
+  if (!text && !image && !video && !audio)
+    throw new ApiError(400, 'Message cannot be empty');
 
+  // 1. Get Chat
   const chat = await getOrCreatePrivateChat(senderId, receiverId);
 
+  // 2. Create Message
   const newMessage = await Message.create({
     chatId: chat._id,
     sender: senderId,
@@ -82,18 +96,22 @@ export const sendMessage = asyncHandler(async (req, res) => {
     seenBy: [senderId],
   });
 
-  // Update Chat Metadata
+  // 3. Update Chat Last Message
+  const previewText =
+    text || (image ? '📷 Image' : video ? '🎥 Video' : '🎵 Audio');
   await Chat.findByIdAndUpdate(chat._id, {
-    lastMessage: text || (image ? '📷 Image' : video ? '🎥 Video' : 'Media'),
+    lastMessage: previewText,
     lastMessageAt: new Date(),
   });
 
-  // ✅ FIX: Broadcast to room EXCEPT the sender to prevent local duplicates
+  // 4. ✅ EMIT TO PARTICIPANTS (User Rooms)
+  // This ensures the receiver gets it even if they haven't joined the "chat room"
   if (req.io) {
-    req.io
-      .to(chat._id.toString())
-      .except(senderId.toString())
-      .emit('newMessage', newMessage);
+    chat.participants.forEach((participantId) => {
+      // Emit to everyone.
+      // The frontend logic (senderId check) will prevent duplicates for the sender.
+      req.io.to(participantId.toString()).emit('newMessage', newMessage);
+    });
   }
 
   return res.status(201).json(new ApiResponse(201, newMessage, 'Message sent'));
@@ -102,57 +120,39 @@ export const sendMessage = asyncHandler(async (req, res) => {
 export const deleteMessages = async (req, res) => {
   try {
     const { chatId, messageIds } = req.body;
-
-    if (
-      !chatId ||
-      !messageIds ||
-      !Array.isArray(messageIds) ||
-      messageIds.length === 0
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Invalid request data' });
-    }
+    if (!chatId || !messageIds?.length)
+      return res.status(400).json({ success: false });
 
     await Message.deleteMany({ _id: { $in: messageIds }, chatId });
 
     const latestMessage = await Message.findOne({ chatId }).sort({
       createdAt: -1,
     });
-
     await Chat.findByIdAndUpdate(chatId, {
       lastMessage: latestMessage
-        ? latestMessage.text || (latestMessage.image ? '📷 Image' : 'Media')
+        ? latestMessage.text || 'Media'
         : 'No messages',
       lastMessageAt: latestMessage ? latestMessage.createdAt : new Date(),
     });
 
-    return res
-      .status(200)
-      .json({ success: true, message: 'Messages deleted successfully' });
+    return res.status(200).json({ success: true, message: 'Deleted' });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ success: false, message: 'Internal Server Error' });
+    return res.status(500).json({ success: false, message: 'Error' });
   }
 };
 
 export const createChat = asyncHandler(async (req, res) => {
   const { userId } = req.body;
-  const currentUserId = req.user._id;
-
   if (!userId) throw new ApiError(400, 'UserId is required');
 
-  const chat = await getOrCreatePrivateChat(currentUserId, userId);
+  const chat = await getOrCreatePrivateChat(req.user._id, userId);
 
   const fullChat = await Chat.findById(chat._id).populate(
     'participants',
     'name username profilePic isOnline',
   );
-
-  // ✅ Format the response to match getChats structure
   const otherParticipant = fullChat.participants.find(
-    (p) => p._id.toString() !== currentUserId.toString(),
+    (p) => p._id.toString() !== req.user._id.toString(),
   );
 
   const formattedChat = {
@@ -160,7 +160,8 @@ export const createChat = asyncHandler(async (req, res) => {
     user: otherParticipant,
     lastMessage: fullChat.lastMessage,
     lastMessageAt: fullChat.lastMessageAt,
-    participants: fullChat.participants, // keep this for utility
+    unreadCount: 0,
+    participants: fullChat.participants,
   };
 
   return res
@@ -168,11 +169,11 @@ export const createChat = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, formattedChat, 'Chat ready'));
 });
 
+// ... (cleanDuplicateChats and deleteChat remain same)
 export const cleanDuplicateChats = asyncHandler(async (req, res) => {
   const chats = await Chat.find({ isGroupChat: false });
   const seen = new Set();
   let deleted = 0;
-
   for (const chat of chats) {
     const pair = chat.participants
       .map((p) => p.toString())
@@ -195,15 +196,9 @@ export const deleteChat = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   const chat = await Chat.findById(chatId);
   if (!chat) throw new ApiError(404, 'Chat not found');
-
-  if (!chat.participants.includes(req.user._id)) {
-    throw new ApiError(403, 'Not authorized to delete this chat');
-  }
-
+  if (!chat.participants.includes(req.user._id))
+    throw new ApiError(403, 'Not authorized');
   await Chat.findByIdAndDelete(chatId);
   await Message.deleteMany({ chatId });
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, {}, 'Chat deleted successfully'));
+  return res.status(200).json(new ApiResponse(200, {}, 'Chat deleted'));
 });

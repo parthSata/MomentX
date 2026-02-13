@@ -23,6 +23,7 @@ import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import CreateReelPage from "@/pages/CreateReelPage";
 import UserProfilePage from "@/pages/UserProfilePage";
 import ActivityPage from "@/pages/ActivityPage";
+import SettingsPage from "@/pages/SettingsPage";
 
 // Admin route protection
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -96,6 +97,15 @@ export function AnimatedRoutes() {
           element={
             <PageTransition>
               <CreateReelPage />
+            </PageTransition>
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <PageTransition>
+              <SettingsPage />
             </PageTransition>
           }
         />

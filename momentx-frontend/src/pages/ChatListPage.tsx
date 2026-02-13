@@ -8,8 +8,8 @@ import { useChat } from "@/hooks/useChat";
 import { formatDistanceToNowStrict } from "date-fns";
 import { api } from "@/lib/axios";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
-// ✅ INTERFACE
 interface SearchUser {
   _id: string;
   name: string;
@@ -19,8 +19,10 @@ interface SearchUser {
 }
 
 export default function ChatListPage() {
-  // ✅ FIX 1: Removed 'setChats' (it doesn't exist on useChat type)
-  const { chats, fetchChats, loading } = useChat();
+  const { chats, fetchChats, loading, socketRef } = useChat();
+  const { user: currentUser } = useAuth();
+
+  const [localChats, setLocalChats] = useState<any[]>(chats);
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
 
@@ -28,42 +30,83 @@ export default function ChatListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  // ✅ Context Menu State
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; chatId: string } | null>(null);
 
+  // Sync local state when chats are fetched
+  useEffect(() => {
+    setLocalChats(chats);
+  }, [chats]);
+
+  // Initial Fetch
   useEffect(() => {
     fetchChats();
   }, []);
 
-  // Close context menu on click anywhere
+  // ✅ REAL-TIME LISTENER
   useEffect(() => {
-    const handleClick = () => setContextMenu(null);
-    window.addEventListener("click", handleClick);
-    return () => window.removeEventListener("click", handleClick);
-  }, []);
+    if (!socketRef.current) return;
 
-  // Handle Search & Default List
+    const handleNewMessageList = (newMessage: any) => {
+      setLocalChats((prevChats) => {
+        const existingChatIndex = prevChats.findIndex((c: any) => c._id === newMessage.chatId);
+
+        let newChatsList = [...prevChats];
+
+        if (existingChatIndex !== -1) {
+          // 1. Update existing chat in list
+          const existingChat = prevChats[existingChatIndex];
+          const updatedChat = {
+            ...existingChat,
+            lastMessage: newMessage.text || (newMessage.image ? "📷 Image" : newMessage.video ? "🎥 Video" : "Media"),
+            lastMessageAt: new Date().toISOString(),
+            // Increment count if I am NOT the sender
+            unreadCount: (existingChat.unreadCount || 0) + (newMessage.sender?._id !== currentUser?._id ? 1 : 0)
+          };
+
+          // 2. Move to top
+          newChatsList.splice(existingChatIndex, 1);
+          newChatsList.unshift(updatedChat);
+        } else {
+          // 3. New Chat (Receiver side): Fetch new list to get full user details
+          fetchChats();
+          return prevChats;
+        }
+
+        return newChatsList;
+      });
+    };
+
+    socketRef.current.on("newMessage", handleNewMessageList);
+
+    return () => {
+      socketRef.current?.off("newMessage", handleNewMessageList);
+    };
+  }, [socketRef.current, currentUser?._id, fetchChats]);
+
+  // Helper: Clear unread count on click
+  const handleNavigateToChat = (chatId: string, user: any) => {
+    setLocalChats((prev) =>
+      prev.map(c => c._id === chatId ? { ...c, unreadCount: 0 } : c)
+    );
+    navigate(`/chat/${chatId}`, { state: { user } });
+  };
+
+  // ... (Rest of handlers: context menu, delete, search - unchanged) ...
+  const handleContextMenu = (e: React.MouseEvent, chatId: string) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, chatId }); };
+  const handleDeleteChat = async () => { if (!contextMenu) return; try { await api.delete(`/chats/${contextMenu.chatId}`); toast.success("Chat deleted"); fetchChats(); } catch (error) { toast.error("Failed to delete chat"); } };
+
+  // Search Logic
   useEffect(() => {
     if (!isNewChatOpen) return;
-
     const fetchUsers = async () => {
       setIsSearching(true);
       try {
         let endpoint = "/users/all";
-        if (searchQuery.trim().length > 0) {
-          endpoint = `/users/search?username=${searchQuery}`;
-        }
+        if (searchQuery.trim().length > 0) endpoint = `/users/search?username=${searchQuery}`;
         const { data } = await api.get(endpoint);
         setSearchResults(Array.isArray(data.message) ? data.message : []);
-      } catch (error) {
-        console.error("Failed to fetch users", error);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
+      } catch (error) { setSearchResults([]); } finally { setIsSearching(false); }
     };
-
     const delay = searchQuery.length > 0 ? 300 : 0;
     const timeoutId = setTimeout(fetchUsers, delay);
     return () => clearTimeout(timeoutId);
@@ -73,168 +116,79 @@ export default function ChatListPage() {
     try {
       const { data } = await api.post("/chats", { userId });
       const chat = data.data;
-
       const targetUser = chat.participants?.find((u: any) => u._id === userId);
-
       if (targetUser) {
         navigate(`/chat/${chat._id}`, { state: { user: targetUser } });
         setIsNewChatOpen(false);
-        await fetchChats();
+        fetchChats();
       }
-    } catch (error) {
-      console.error("Failed to start chat", error);
-      toast.error("Could not start chat");
-    }
+    } catch (error) { toast.error("Could not start chat"); }
   };
 
-  // ✅ RIGHT CLICK HANDLER
-  const handleContextMenu = (e: React.MouseEvent, chatId: string) => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, chatId });
-  };
-
-  // ✅ DELETE CHAT HANDLER
-  const handleDeleteChat = async () => {
-    if (!contextMenu) return;
-    try {
-      await api.delete(`/chats/${contextMenu.chatId}`);
-      toast.success("Chat deleted");
-
-      // ✅ FIX 1: Use fetchChats() to refresh list instead of setChats
-      fetchChats();
-    } catch (error) {
-      console.error("Failed to delete chat", error);
-      toast.error("Failed to delete chat");
-    }
-  };
-
+  // Deduplicate for display
   const chatMap = new Map<string, any>();
-
-  chats.forEach((chat) => {
+  localChats.forEach((chat: any) => {
     const otherUserId = chat.user?._id;
-    if (!otherUserId) return;
-
-    const existing = chatMap.get(otherUserId);
-
-    // Keep the one with the most recent message (or any valid one)
-    if (!existing || new Date(chat.lastMessageAt) > new Date(existing.lastMessageAt)) {
-      chatMap.set(otherUserId, chat);
+    if (otherUserId) {
+      const existing = chatMap.get(otherUserId);
+      if (!existing || new Date(chat.lastMessageAt) > new Date(existing.lastMessageAt)) {
+        chatMap.set(otherUserId, chat);
+      }
     }
   });
-
-  // ✅ Filter out Duplicates (Keep only one chat per user)
   const uniqueChats = Array.from(chatMap.values());
-
-  const filteredChats = uniqueChats.filter((c) =>
+  const filteredChats = uniqueChats.filter((c: any) =>
     c.user?.name?.toLowerCase().includes(query.toLowerCase()) ||
     c.user?.username?.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 relative text-foreground">
-
-      {/* ✅ CUSTOM CONTEXT MENU */}
       {contextMenu && (
-        <div
-          className="fixed z-50 w-48 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-100"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={handleDeleteChat}
-            className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete Chat
+        <div className="fixed z-50 w-48 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-lg shadow-xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-100" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
+          <button onClick={handleDeleteChat} className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 transition-colors cursor-pointer">
+            <Trash2 className="w-4 h-4" /> Delete Chat
           </button>
         </div>
       )}
 
-      {/* NEW CHAT MODAL */}
+      {/* New Chat Modal */}
       <AnimatePresence>
         {isNewChatOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="absolute inset-0" onClick={() => setIsNewChatOpen(false)} />
-
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[80vh]"
-            >
+            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[80vh]">
               <div className="p-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50 dark:bg-white/5">
-                <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-                  <UserPlus className="w-5 h-5 text-primary" />
-                  <span>New Message</span>
-                </h2>
-                <button
-                  onClick={() => setIsNewChatOpen(false)}
-                  className="p-2 rounded-full transition-colors hover:bg-gray-200 dark:hover:bg-white/10 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-900 dark:text-white"><UserPlus className="w-5 h-5 text-primary" /> <span>New Message</span></h2>
+                <button onClick={() => setIsNewChatOpen(false)} className="p-2 rounded-full transition-colors hover:bg-gray-200 dark:hover:bg-white/10 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"><X className="w-5 h-5" /></button>
               </div>
-
               <div className="p-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    autoFocus
-                    placeholder="Search people..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 bg-white/5 border-white/10 focus:border-primary/50"
-                  />
+                  <Input autoFocus placeholder="Search people..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 bg-white/5 border-white/10 focus:border-primary/50" />
                 </div>
               </div>
-
-              {/* User List */}
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {isSearching ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : (Array.isArray(searchResults) && searchResults.length > 0) ? (
-                  searchResults.map((user) => (
-                    <div
-                      key={user._id}
-                      onClick={() => handleStartChat(user._id)}
-                      className="flex items-center gap-3 p-3 hover:bg-white/10 rounded-xl cursor-pointer transition-colors group"
-                    >
-                      <AvatarRing src={user.profilePic} isOnline={user.isOnline} size="md" />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm text-white">
-                          {user.name || user.username}
-                        </h4>
-                        <p className="text-xs text-muted-foreground">@{user.username}</p>
-                      </div>
-                      <MessageCircle className="w-5 h-5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                {isSearching ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div> : (Array.isArray(searchResults) && searchResults.length > 0) ? searchResults.map((user) => (
+                  <div key={user._id} onClick={() => handleStartChat(user._id)} className="flex items-center gap-3 p-3 hover:bg-white/10 rounded-xl cursor-pointer transition-colors group">
+                    <AvatarRing src={user.profilePic} isOnline={user.isOnline} size="md" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm text-white">{user.name || user.username}</h4>
+                      <p className="text-xs text-muted-foreground">@{user.username}</p>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-center text-muted-foreground py-8 text-sm">
-                    {searchQuery.length > 1 ? "No users found." : "Type to search."}
-                  </p>
-                )}
+                    <MessageCircle className="w-5 h-5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                )) : <p className="text-center text-muted-foreground py-8 text-sm">{searchQuery.length > 1 ? "No users found." : "Type to search."}</p>}
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Header */}
       <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="sticky top-0 z-40 glass-strong p-4">
         <div className="flex items-center justify-between mb-4">
-          {/* ✅ FIX 2: Updated class to bg-linear-to-r per linter suggestion */}
           <h1 className="text-2xl font-display font-bold bg-linear-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">Messages</h1>
-          <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setIsNewChatOpen(true)} className="p-2 glass rounded-full hover:bg-primary/20 transition-colors">
-            <Edit className="w-5 h-5" />
-          </motion.button>
+          <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setIsNewChatOpen(true)} className="p-2 glass rounded-full hover:bg-primary/20 transition-colors"><Edit className="w-5 h-5" /></motion.button>
         </div>
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -242,15 +196,13 @@ export default function ChatListPage() {
         </div>
       </motion.div>
 
-      {/* Loading State */}
       {loading && (<div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>)}
 
-      {/* Online Users */}
       {!loading && chats.length > 0 && (
         <div className="p-4">
           <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-            {uniqueChats.filter(c => c.user?.isOnline).map((chat, index) => (
-              <motion.div key={chat._id} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.1 }} className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => navigate(`/chat/${chat._id}`, { state: { user: chat.user } })}>
+            {uniqueChats.filter(c => c.user?.isOnline).map((chat: any) => (
+              <motion.div key={chat._id} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }} className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => handleNavigateToChat(chat._id, chat.user)}>
                 <AvatarRing src={chat.user?.profilePic} isOnline size="md" />
                 <span className="text-xs truncate w-16 text-center">{chat.user?.username}</span>
               </motion.div>
@@ -259,18 +211,17 @@ export default function ChatListPage() {
         </div>
       )}
 
-      {/* Chat List */}
       <div className="px-4 space-y-2">
         {!loading && filteredChats.length === 0 && (<p className="text-center text-muted-foreground mt-10">No conversations yet.</p>)}
-        {filteredChats.map((chat, index) => (
+        {filteredChats.map((chat: any) => (
           <motion.div
             key={chat._id}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05 }}
+            transition={{ delay: 0.05 }}
             whileHover={{ x: 4 }}
-            onClick={() => navigate(`/chat/${chat._id}`, { state: { user: chat.user } })}
-            onContextMenu={(e) => handleContextMenu(e, chat._id)} // ✅ Trigger
+            onClick={() => handleNavigateToChat(chat._id, chat.user)}
+            onContextMenu={(e) => handleContextMenu(e, chat._id)}
             className="flex items-center gap-3 p-3 glass rounded-2xl cursor-pointer hover:bg-white/10 transition-all group relative"
           >
             <AvatarRing src={chat.user?.profilePic} isOnline={chat.user?.isOnline} size="md" />
@@ -279,18 +230,21 @@ export default function ChatListPage() {
                 <h4 className="font-semibold truncate">{chat.user?.name || chat.user?.username}</h4>
                 <span className="text-xs text-muted-foreground">{chat.lastMessageAt ? formatDistanceToNowStrict(new Date(chat.lastMessageAt), { addSuffix: true }) : ""}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <p className={`text-sm truncate text-muted-foreground`}>{chat.lastMessage || "Start a conversation"}</p>
+              <div className="flex items-center justify-between mt-1">
+                <p
+                  className={`text-sm truncate ${chat.unreadCount > 0
+                    ? "text-gray-900 dark:text-white font-bold" // ✅ Fixed: Black in Light, White in Dark
+                    : "text-muted-foreground"
+                    }`}
+                >
+                  {chat.lastMessage || "Start a conversation"}
+                </p>
+                {chat.unreadCount > 0 && (
+                  <span className="ml-2 bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{chat.unreadCount}</span>
+                )}
               </div>
             </div>
-
-            {/* Options Button */}
-            <motion.button
-              initial={{ opacity: 0 }}
-              whileHover={{ opacity: 1 }}
-              onClick={(e) => { e.stopPropagation(); handleContextMenu(e, chat._id); }}
-              className="p-2 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
+            <motion.button initial={{ opacity: 0 }} whileHover={{ opacity: 1 }} onClick={(e) => { e.stopPropagation(); handleContextMenu(e, chat._id); }} className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <MoreHorizontal className="w-5 h-5 text-muted-foreground hover:text-foreground" />
             </motion.button>
           </motion.div>
