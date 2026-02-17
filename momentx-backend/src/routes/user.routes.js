@@ -34,8 +34,7 @@ const validate = (req, res, next) => {
   next();
 };
 
-// --- Helper: Rate Limiter (Security) ---
-// Limits repeated requests to auth endpoints (max 10 requests per 15 mins)
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -44,9 +43,6 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// ==========================================
-// 🔓 PUBLIC ROUTES (No Token Required)
-// ==========================================
 
 router
   .route("/register")

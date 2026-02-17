@@ -73,7 +73,6 @@ export const uploadChatMedia = asyncHandler(async (req, res) => {
     );
 });
 
-// ✅ FIXED: Send Message & Emit to User Rooms
 export const sendMessage = asyncHandler(async (req, res) => {
   const { receiverId } = req.params;
   const { text, image, video, audio } = req.body;
@@ -169,7 +168,6 @@ export const createChat = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, formattedChat, 'Chat ready'));
 });
 
-// ... (cleanDuplicateChats and deleteChat remain same)
 export const cleanDuplicateChats = asyncHandler(async (req, res) => {
   const chats = await Chat.find({ isGroupChat: false });
   const seen = new Set();

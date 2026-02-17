@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, X, Hash, Loader2, ChevronRight } from "lucide-react"; // Added ChevronRight
+import { Search, X, Hash, Loader2, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { BackButton } from "@/components/navigation/BackButton";
@@ -16,7 +16,6 @@ interface SearchUser {
   isVerified: boolean;
 }
 
-// ✅ UPDATED INTERFACE
 interface SearchTag {
   tag: string;
   count: number;
@@ -28,7 +27,7 @@ export default function SearchPage() {
 
   // Data State
   const [users, setUsers] = useState<SearchUser[]>([]);
-  const [tags, setTags] = useState<SearchTag[]>([]); // ✅ Changed to tags
+  const [tags, setTags] = useState<SearchTag[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Debounce Logic
@@ -49,10 +48,11 @@ export default function SearchPage() {
     setIsLoading(true);
     try {
       if (activeTab === "accounts") {
+        // ✅ API Call: Search by username/name
         const { data } = await api.get(`/users/search?query=${query}`);
         setUsers(data.data || []);
       } else {
-        // ✅ Fetches the new list of tags
+        // API Call: Search by hashtag
         const { data } = await api.get(`/posts/search/tags?query=${query}`);
         setTags(data.data || []);
       }
@@ -132,7 +132,8 @@ export default function SearchPage() {
               users.length > 0 ? (
                 <div className="space-y-2">
                   {users.map((user, index) => (
-                    <Link to={`/profile/${user._id}`} key={user._id}>
+                    // ✅ FIX: Changed Link to use username (/u/username)
+                    <Link to={`/u/${user.username}`} key={user._id}>
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -146,6 +147,7 @@ export default function SearchPage() {
                             <p className="text-sm text-muted-foreground">{user.name}</p>
                           </div>
                         </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
                       </motion.div>
                     </Link>
                   ))}
@@ -155,12 +157,11 @@ export default function SearchPage() {
               )
             )}
 
-            {/* ✅ HASHTAG RESULTS (List View) */}
+            {/* HASHTAG RESULTS */}
             {activeTab === "tags" && (
               tags.length > 0 ? (
                 <div className="space-y-2">
                   {tags.map((item, index) => (
-                    // You can assume a route like /explore?tag=name or similar
                     <Link to={`/explore?tag=${item.tag}`} key={index}>
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
@@ -169,7 +170,6 @@ export default function SearchPage() {
                         className="flex items-center justify-between p-3 glass rounded-xl hover:bg-white/10 transition-colors cursor-pointer mb-2"
                       >
                         <div className="flex items-center gap-4">
-                          {/* Round Hash Icon */}
                           <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center bg-white/5">
                             <Hash className="w-6 h-6 text-white" />
                           </div>
