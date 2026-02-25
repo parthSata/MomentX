@@ -56,21 +56,21 @@ export default function ReelsPage() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-black flex items-center justify-center">
+      <div className="h-dvh bg-black flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full bg-white dark:bg-black flex overflow-hidden relative">
+    <div className="h-dvh w-full bg-white dark:bg-black flex overflow-hidden relative">
 
       <div className="hidden lg:block w-64 border-r border-gray-200 dark:border-white/10 bg-linear-to-r from-neon-indigo/20 via-neon-violet/20 to-neon-pink/20 z-50">
         <Sidebar />
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 relative h-full w-full">
+      <div className="flex-1 relative h-full w-full bg-black">
         {reels.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-white gap-4">
             <p className="text-gray-400">No reels found.</p>
@@ -82,9 +82,9 @@ export default function ReelsPage() {
             </button>
           </div>
         ) : (
-          <div ref={containerRef} className="h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide pb-16 md:pb-0">
+          <div ref={containerRef} className="h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide pb-18 md:pb-0">
             {reels.map((reel, index) => (
-              <div key={reel._id} className="h-full w-full snap-start snap-always">
+              <div key={reel._id} className="h-full w-full snap-start snap-always relative">
                 <ReelCard
                   reel={reel}
                   isActive={index === currentIndex}
@@ -132,7 +132,10 @@ export default function ReelsPage() {
           </button>
         </div>
 
-        <BottomNav />
+        {/* Bottom Nav overlayed securely */}
+        <div className="absolute bottom-0 w-full z-50">
+          <BottomNav />
+        </div>
       </div>
     </div>
   );

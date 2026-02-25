@@ -1,6 +1,6 @@
-import express from "express";
-import { body, validationResult, query } from "express-validator";
-import rateLimit from "express-rate-limit";
+import express from 'express';
+import { body, validationResult, query } from 'express-validator';
+import rateLimit from 'express-rate-limit';
 import {
   registerUser,
   loginUser,
@@ -16,11 +16,11 @@ import {
   getUserFollowers,
   getUserFollowing,
   getUserById,
-  getUserByUsername
-} from "../controllers/user.controller.js";
-import { upload } from "../middlewares/multer.middleware.js";
-import { verifyJWT } from "../middlewares/auth.middleware.js";
-import { ApiError } from "../utils/ApiError.js";
+  getUserByUsername,
+} from '../controllers/user.controller.js';
+import { upload } from '../middlewares/multer.middleware.js';
+import { verifyJWT } from '../middlewares/auth.middleware.js';
+import { ApiError } from '../utils/ApiError.js';
 
 const router = express.Router();
 
@@ -34,101 +34,99 @@ const validate = (req, res, next) => {
   next();
 };
 
-
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  message: "Too many attempts, please try again later.",
+  message: 'Too many attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 });
 
+router
+  .route('/register')
+  .post(upload.fields([{ name: 'profilePic', maxCount: 1 }]), registerUser);
 
 router
-  .route("/register")
-  .post(upload.fields([{ name: "profilePic", maxCount: 1 }]), registerUser);
-
-router
-  .route("/login")
+  .route('/login')
   .post(
     authLimiter,
     [
-      body("email").isEmail().withMessage("Please provide a valid email"),
-      body("password").notEmpty().withMessage("Password is required"),
+      body('email').isEmail().withMessage('Please provide a valid email'),
+      body('password').notEmpty().withMessage('Password is required'),
       validate,
     ],
-    loginUser
+    loginUser,
   );
 
 router
-  .route("/forgot-password")
+  .route('/forgot-password')
   .post(
     authLimiter,
     [
-      body("email").isEmail().withMessage("Please provide a valid email"),
+      body('email').isEmail().withMessage('Please provide a valid email'),
       validate,
     ],
-    forgotPassword
+    forgotPassword,
   );
 
 router
-  .route("/reset-password")
+  .route('/reset-password')
   .post(
     authLimiter,
     [
-      body("email").isEmail().withMessage("Email is required"),
-      body("otp")
+      body('email').isEmail().withMessage('Email is required'),
+      body('otp')
         .isLength({ min: 6, max: 6 })
-        .withMessage("Invalid OTP format"),
-      body("newPassword")
+        .withMessage('Invalid OTP format'),
+      body('newPassword')
         .isLength({ min: 6 })
-        .withMessage("Password must be at least 6 characters"),
+        .withMessage('Password must be at least 6 characters'),
       validate,
     ],
-    resetPassword
+    resetPassword,
   );
 
-router.post("/refresh-token", refreshToken);
+router.post('/refresh-token', refreshToken);
 
 // ==========================================
 // 🔒 SECURED ROUTES (Token Required)
 // ==========================================
 
-router.route("/current-user").get(verifyJWT, getCurrentUser);
-router.route("/logout").post(verifyJWT, logoutUser);
-router.get("/all", verifyJWT, getAllUsers);
+router.route('/current-user').get(verifyJWT, getCurrentUser);
+router.route('/logout').post(verifyJWT, logoutUser);
+router.get('/all', verifyJWT, getAllUsers);
 
-router.route("/follow/:id").post(verifyJWT, toggleFollowUser);
-router.route("/followers/:id").get(verifyJWT, getUserFollowers);
-router.route("/following/:id").get(verifyJWT, getUserFollowing);
-router.route("/u/:username").get(verifyJWT, getUserByUsername);
+router.route('/follow/:id').post(verifyJWT, toggleFollowUser);
+router.route('/followers/:id').get(verifyJWT, getUserFollowers);
+router.route('/following/:id').get(verifyJWT, getUserFollowing);
+router.route('/u/:username').get(verifyJWT, getUserByUsername);
 
 router.get(
-  "/search",
+  '/search',
   verifyJWT,
-  [query("username").trim().optional(), validate],
-  searchUser
+  [query('username').trim().optional(), validate],
+  searchUser,
 );
 
 router
-  .route("/update-profile")
+  .route('/update-profile')
   .put(
     verifyJWT,
-    upload.fields([{ name: "profilePic", maxCount: 1 }]),
+    upload.fields([{ name: 'profilePic', maxCount: 1 }]),
     [
-      body("username")
+      body('username')
         .optional()
         .trim()
         .isLength({ min: 3 })
-        .withMessage("Username too short"),
-      body("email").optional().isEmail(),
-      body("password").optional().isLength({ min: 6 }),
-      body("status").optional().trim(),
+        .withMessage('Username too short'),
+      body('email').optional().isEmail(),
+      body('password').optional().isLength({ min: 6 }),
+      body('status').optional().trim(),
       validate,
     ],
-    updateProfile
+    updateProfile,
   );
 
-router.route("/:id").get(verifyJWT, getUserById);
+router.route('/:id').get(verifyJWT, getUserById);
 
 export default router;

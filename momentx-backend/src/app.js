@@ -10,7 +10,7 @@ import { ApiError } from './utils/ApiError.js';
 import { initStoryCleanup } from '../cron/StoryCleanup.js';
 import { User } from './models/user.model.js';
 
-// Routes imports...
+
 import userRouter from './routes/user.routes.js';
 import postRouter from './routes/post.routes.js';
 import storyRoutes from './routes/story.routes.js';

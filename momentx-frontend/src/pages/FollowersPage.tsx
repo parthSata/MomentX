@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Search, UserPlus, UserCheck, Loader2 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom"; // ✅ Added Link here
 import { Input } from "@/components/ui/input";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { api } from "@/lib/axios";
@@ -37,7 +37,7 @@ export default function FollowersPage() {
     }
   }, [currentUser]);
 
-  // 2. ✅ FIXED FETCH DATA FUNCTION
+  // 2. Fetch Data
   const fetchData = async () => {
     if (!currentUser) return;
     setLoading(true);
@@ -46,9 +46,6 @@ export default function FollowersPage() {
       let endpoint = "";
       let rawData: any[] = [];
 
-      // ------------------------------------------------------
-      // STEP 1: Determine Endpoint & Fetch
-      // ------------------------------------------------------
       if (activeTab === "followers") {
         endpoint = `/users/followers/${currentUser._id}`;
       } else if (activeTab === "following") {
@@ -59,29 +56,20 @@ export default function FollowersPage() {
 
       const res = await api.get(endpoint);
 
-    
       if (activeTab === "followers") {
-       
         rawData = res.data.data || res.data.followers || (Array.isArray(res.data) ? res.data : []);
-
       } else if (activeTab === "following") {
-       
         rawData = res.data.data || res.data.following || (Array.isArray(res.data) ? res.data : []);
-
       } else if (activeTab === "suggestions") {
-       
         rawData = res.data.message || res.data.users || (Array.isArray(res.data) ? res.data : []);
       }
 
       let users: UserProfile[] = Array.isArray(rawData) ? rawData : [];
 
-      // Specific filtering for Suggestions
       if (activeTab === "suggestions") {
         users = users.filter((u: UserProfile) => {
           if (!u || !u._id) return false;
-          // Remove Myself
           if (u._id === currentUser._id) return false;
-          // Remove people I already follow
           if (followingIds.includes(u._id)) return false;
           return true;
         });
@@ -215,33 +203,43 @@ export default function FollowersPage() {
               {filteredData.map((user) => {
                 const isFollowing = followingIds.includes(user._id);
                 return (
-                  <div key={user._id} className="flex items-center gap-3 p-3 glass rounded-2xl">
-                    {/* ✅ FIXED TS ERROR: src={... || ""} */}
-                    <AvatarRing
-                      src={user.profilePic}
-                      size="md"
-                      alt={user.username}
-                      hasStory={false}
-                    />
+                  <div key={user._id} className="flex items-center justify-between p-3 glass rounded-2xl">
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <span className="font-semibold truncate">{user.name}</span>
-                        {user.isVerified && (
-                          <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
-                            <span className="text-white text-[8px]">✓</span>
-                          </div>
-                        )}
+                    {/* ✅ WRAPPED AVATAR AND INFO IN LINK */}
+                    <Link
+                      to={`/u/${user.username}`}
+                      className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
+                    >
+                      <AvatarRing
+                        src={user.profilePic}
+                        size="md"
+                        alt={user.username}
+                        hasStory={false}
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold truncate text-foreground">{user.name}</span>
+                          {user.isVerified && (
+                            <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
+                              <span className="text-white text-[8px]">✓</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">@{user.username}</p>
                       </div>
-                      <p className="text-sm text-muted-foreground truncate">@{user.username}</p>
-                    </div>
+                    </Link>
 
+                    {/* ✅ KEPT FOLLOW BUTTON OUTSIDE THE LINK */}
                     {currentUser?._id !== user._id && (
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => handleFollow(user._id)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${isFollowing
+                        onClick={(e) => {
+                          e.preventDefault(); // Just in case, though it's outside the Link
+                          handleFollow(user._id);
+                        }}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ml-2 shrink-0 ${isFollowing
                           ? "bg-secondary text-foreground border border-border"
                           : "bg-linear-to-r from-indigo-500 to-purple-600 text-white"
                           }`}
@@ -250,12 +248,12 @@ export default function FollowersPage() {
                           {isFollowing ? (
                             <>
                               <UserCheck className="w-4 h-4" />
-                              Following
+                              <span className="hidden sm:inline">Following</span>
                             </>
                           ) : (
                             <>
                               <UserPlus className="w-4 h-4" />
-                              Follow
+                              <span className="hidden sm:inline">Follow</span>
                             </>
                           )}
                         </span>

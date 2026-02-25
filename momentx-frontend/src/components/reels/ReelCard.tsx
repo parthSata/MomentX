@@ -5,6 +5,8 @@ import { AvatarRing } from "@/components/ui/avatar-ring";
 import { cn } from "@/lib/utils";
 import { ReelCommentsSheet } from "./ReelCommentsSheet";
 import { api } from "@/lib/axios";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 export interface Reel {
     _id: string;
@@ -40,19 +42,33 @@ export function ReelCard({
     muted,
     onToggleMute,
 }: ReelCardProps) {
+    const { user: currentUser, refreshUser } = useAuth();
+
     const videoRef = useRef<HTMLVideoElement>(null);
     const [showFullCaption, setShowFullCaption] = useState(false);
-    const [isFollowing, setIsFollowing] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [showHeart, setShowHeart] = useState(false);
 
-    // Initialize State directly from Props
     const [isLiked, setIsLiked] = useState(reel.isLiked || false);
     const [likeCount, setLikeCount] = useState(reel.likes || 0);
     const [commentCount, setCommentCount] = useState(reel.commentsCount || 0);
     const [isSaved, setIsSaved] = useState(reel.isSaved || false);
 
-    // Sync state if prop changes (Fixes "heart gone after refresh" if backend data is correct)
+    // State for following
+    const [isFollowing, setIsFollowing] = useState(false);
+
+    // ✅ FIX: Cast currentUser to any to bypass the missing 'following' type error
+    useEffect(() => {
+        const authUser = currentUser as any;
+        if (authUser && authUser.following && reel.user?._id) {
+            const isFollowed = authUser.following.some(
+                (followId: any) =>
+                    (typeof followId === 'string' ? followId : followId._id) === reel.user._id
+            );
+            setIsFollowing(isFollowed);
+        }
+    }, [currentUser, reel.user]);
+
     useEffect(() => {
         setIsLiked(reel.isLiked || false);
         setLikeCount(reel.likes || 0);
@@ -61,29 +77,31 @@ export function ReelCard({
     }, [reel]);
 
     useEffect(() => {
-        if (videoRef.current) {
+        if (videoRef.current && reel.videoUrl) {
             if (isActive) {
-                videoRef.current.play().catch(() => { });
+                const playPromise = videoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch((error) => {
+                        console.warn("Reel Autoplay failed:", error);
+                    });
+                }
             } else {
                 videoRef.current.pause();
                 videoRef.current.currentTime = 0;
             }
         }
-    }, [isActive]);
+    }, [isActive, reel.videoUrl]);
 
     const handleLike = async () => {
         const prevLiked = isLiked;
         const prevCount = likeCount;
 
-        // Optimistic Update
         setIsLiked(!prevLiked);
         setLikeCount(prev => prevLiked ? prev - 1 : prev + 1);
 
         try {
-            // ✅ FIX: Use '/posts' endpoint because togglePostLike handles both Posts & Reels
             await api.post(`/posts/${reel._id}/like`);
         } catch (error) {
-            // Revert on failure
             setIsLiked(prevLiked);
             setLikeCount(prevCount);
         }
@@ -99,36 +117,61 @@ export function ReelCard({
         const prevSaved = isSaved;
         setIsSaved(!prevSaved);
         try {
-            // ✅ FIX: Use '/posts' endpoint for saving Reels too
             await api.post(`/posts/${reel._id}/save`);
         } catch (error) {
             setIsSaved(prevSaved);
         }
     };
 
+    const handleFollowToggle = async () => {
+        if (!reel.user?._id) return;
+        const prevStatus = isFollowing;
+        setIsFollowing(!isFollowing);
+
+        try {
+            await api.post(`/users/follow/${reel.user._id}`);
+            refreshUser();
+        } catch (error) {
+            setIsFollowing(prevStatus);
+        }
+    };
+
+    const hasVideo = typeof reel.videoUrl === 'string' && reel.videoUrl.trim() !== "";
+
+    const isOwnReel = currentUser?._id === reel.user?._id;
+
     return (
         <div className="h-full w-full flex items-center justify-center bg-black relative">
 
             {/* Blurred Background */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
-                <video src={reel.videoUrl} className="w-full h-full object-cover blur-3xl scale-110" muted />
-                <div className="absolute inset-0 bg-black/40" />
-            </div>
+            {hasVideo && (
+                <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
+                    <video src={reel.videoUrl} className="w-full h-full object-cover blur-3xl scale-110" muted playsInline />
+                    <div className="absolute inset-0 bg-black/40" />
+                </div>
+            )}
 
             {/* Main Container */}
-            <div className="relative h-full w-full max-w-112.5 mx-auto bg-black md:rounded-xl overflow-hidden shadow-2xl" onDoubleClick={handleDoubleTap}>
-                <video
-                    ref={videoRef}
-                    src={reel.videoUrl}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    loop
-                    muted={muted}
-                    playsInline
-                    onClick={onToggleMute}
-                />
+            <div className="relative h-full w-full md:max-w-100 lg:max-w-112.5 mx-auto bg-black md:rounded-xl overflow-hidden shadow-2xl" onDoubleClick={handleDoubleTap}>
+
+                {hasVideo ? (
+                    <video
+                        ref={videoRef}
+                        src={reel.videoUrl || undefined}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loop
+                        muted={muted}
+                        playsInline
+                        onClick={onToggleMute}
+                    />
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-white/50">
+                        Content Unavailable
+                    </div>
+                )}
 
                 {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-linear-to-b from-black/30 via-transparent to-black/70 pointer-events-none" />
+                <div className="absolute inset-0 bg-linear-to-b from-black/30 via-transparent to-black/80 pointer-events-none" />
 
                 {/* Mute Button */}
                 <motion.button
@@ -155,7 +198,7 @@ export function ReelCard({
                 </AnimatePresence>
 
                 {/* Side Actions Bar */}
-                <div className="absolute right-3 bottom-24 md:bottom-20 flex flex-col items-center gap-4 z-20">
+                <div className="absolute right-3 bottom-20 md:bottom-20 flex flex-col items-center gap-5 z-20 pb-4">
                     <button onClick={(e) => { e.stopPropagation(); handleLike(); }} className="flex flex-col items-center gap-1 active:scale-90 transition-transform">
                         <Heart className={cn("w-7 h-7 transition-colors", isLiked ? "text-red-500 fill-red-500" : "text-white")} />
                         <span className="text-white text-xs font-semibold">{likeCount}</span>
@@ -177,45 +220,56 @@ export function ReelCard({
 
                     <button className="active:scale-90 transition-transform"><MoreHorizontal className="w-7 h-7 text-white" /></button>
 
-                    <div className="w-9 h-9 mt-1 rounded-lg border border-white/20 overflow-hidden bg-black/50">
+                    <Link to={`/u/${reel.user?.username}`} className="w-9 h-9 mt-2 rounded-lg border border-white/20 overflow-hidden bg-black/50 block">
                         <motion.img
                             animate={isActive ? { rotate: 360 } : {}}
                             transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-                            src={reel.user.avatar || reel.user.profilePic}
+                            src={reel.user?.avatar || reel.user?.profilePic || "/default-avatar.png"}
                             className="w-full h-full object-cover"
                         />
-                    </div>
+                    </Link>
                 </div>
 
                 {/* Bottom Info Section */}
-                <div className="absolute bottom-20 md:bottom-4 left-3 right-16 z-20 pointer-events-auto text-left">
-                    <div className="flex items-center gap-2 mb-2">
-                        <AvatarRing src={reel.user.avatar || reel.user.profilePic} size="sm" />
-                        <span className="text-white font-bold text-sm shadow-black drop-shadow-md">{reel.user.username}</span>
-                        {reel.user.isVerified && <BadgeCheck className="w-4 h-4 text-blue-400 fill-blue-400" />}
-                        <button onClick={() => setIsFollowing(!isFollowing)} className={cn("px-3 py-1 text-xs font-semibold rounded-lg border transition-all ml-1", isFollowing ? "bg-transparent border-white/50 text-white" : "bg-transparent border-white text-white hover:bg-white/10")}>
-                            {isFollowing ? "Following" : "Follow"}
-                        </button>
+                <div className="absolute bottom-6 md:bottom-4 left-4 right-16 z-20 pointer-events-auto text-left">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Link to={`/u/${reel.user?.username}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                            <AvatarRing src={reel.user?.avatar || reel.user?.profilePic || "/default-avatar.png"} size="sm" />
+                            <span className="text-white font-bold text-[15px] shadow-black drop-shadow-md">{reel.user?.username || "Unknown"}</span>
+                            {reel.user?.isVerified && <BadgeCheck className="w-4 h-4 text-blue-400 fill-blue-400" />}
+                        </Link>
+
+                        {!isOwnReel && (
+                            <button
+                                onClick={(e) => { e.preventDefault(); handleFollowToggle(); }}
+                                className={cn(
+                                    "px-3 py-1 text-[11px] font-bold rounded-lg border transition-all ml-2",
+                                    isFollowing ? "bg-transparent border-white/50 text-white" : "bg-transparent border-white text-white hover:bg-white/10"
+                                )}
+                            >
+                                {isFollowing ? "Following" : "Follow"}
+                            </button>
+                        )}
                     </div>
-                    <div className="mb-2">
-                        <p className="text-white text-sm leading-relaxed drop-shadow-md">
+                    <div className="mb-3">
+                        <p className="text-white text-[14px] leading-relaxed drop-shadow-md">
                             {showFullCaption ? reel.caption : (reel.caption?.slice(0, 60) || "")}
                             {(reel.caption?.length || 0) > 60 && (
-                                <button onClick={(e) => { e.stopPropagation(); setShowFullCaption(!showFullCaption); }} className="text-white/60 ml-1 hover:text-white">
+                                <button onClick={(e) => { e.stopPropagation(); setShowFullCaption(!showFullCaption); }} className="text-white/70 font-semibold ml-1 hover:text-white">
                                     {showFullCaption ? " less" : "... more"}
                                 </button>
                             )}
                         </p>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm rounded-full px-2.5 py-1">
+                        <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-md rounded-full px-3 py-1.5 border border-white/10">
                             <Music2 className="w-3.5 h-3.5 text-white" />
-                            <span className="text-white text-xs">{(reel.music || "Original Audio").slice(0, 25)}</span>
+                            <span className="text-white text-xs font-medium">{(reel.music || "Original Audio").slice(0, 25)}</span>
                         </div>
                         {reel.location && (
-                            <div className="flex items-center gap-1 bg-black/20 backdrop-blur-sm rounded-full px-2.5 py-1">
+                            <div className="flex items-center gap-1 bg-black/30 backdrop-blur-md rounded-full px-3 py-1.5 border border-white/10">
                                 <MapPin className="w-3.5 h-3.5 text-white" />
-                                <span className="text-white text-xs">{reel.location}</span>
+                                <span className="text-white text-xs font-medium">{reel.location}</span>
                             </div>
                         )}
                     </div>

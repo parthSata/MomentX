@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Grid3X3, Tag, Sparkles, Loader2, Film } from "lucide-react"; // ✅ Removed unused imports
+import { Grid3X3, Tag, Sparkles, Loader2, Film, MessageCircle } from "lucide-react";
 import { MainLayout } from "@/components/navigation/MainLayout";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,10 +11,14 @@ import type { Post } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
+// ✅ Import the new simplified image viewer
+import { ProfileImageViewDialog } from "@/components/profile/ProfileQuickViewDialog";
+
 type TabType = "posts" | "reels" | "tagged";
 
 export default function UserProfilePage() {
-    const { username } = useParams(); // Get username from URL
+    const { username } = useParams();
+    const navigate = useNavigate();
     const { user: currentUser } = useAuth();
 
     // State
@@ -24,12 +28,16 @@ export default function UserProfilePage() {
     const [activeTab, setActiveTab] = useState<TabType>("posts");
     const [loadingPosts, setLoadingPosts] = useState(false);
     const [isFollowing, setIsFollowing] = useState(false);
+    const [isStartingChat, setIsStartingChat] = useState(false);
 
     // Post View State
     const [selectedPost, setSelectedPost] = useState<Post | null>(null);
     const [isPostViewOpen, setIsPostViewOpen] = useState(false);
 
-    // Tabs (Hidden 'Saved' for public profiles usually)
+    // ✅ Image View Dialog State
+    const [isProfilePicOpen, setIsProfilePicOpen] = useState(false);
+
+    // Tabs
     const tabs = [
         { id: "posts", icon: Grid3X3, label: "Posts" },
         { id: "reels", icon: Film, label: "Reels" },
@@ -49,7 +57,6 @@ export default function UserProfilePage() {
             if (!username) return;
             setLoading(true);
             try {
-                // Call the new backend endpoint
                 const { data } = await api.get(`/users/u/${username}`);
                 setProfile(data.data);
                 setIsFollowing(data.data.isFollowing);
@@ -72,7 +79,6 @@ export default function UserProfilePage() {
 
             try {
                 let endpoint = "";
-                // Reusing existing endpoints by User ID
                 if (activeTab === "posts") endpoint = `/posts/user-posts/${profile._id}`;
                 else if (activeTab === "tagged") endpoint = `/posts/tagged-posts/${profile._id}`;
                 else if (activeTab === "reels") endpoint = `/posts/user-posts/${profile._id}`;
@@ -82,12 +88,10 @@ export default function UserProfilePage() {
 
                 let finalPosts = Array.isArray(fetchedData) ? fetchedData : [];
 
-                // Client-side filtering for Reels vs Posts
                 if (activeTab === "reels") {
                     finalPosts = finalPosts.filter((p: any) => p.videoUrl);
                 } else if (activeTab === "posts") {
-                    finalPosts = finalPosts.filter((p: any) => !p.videoUrl); // Only Photos
-
+                    finalPosts = finalPosts.filter((p: any) => !p.videoUrl);
                 }
                 setPosts(finalPosts);
             } catch (error) {
@@ -106,19 +110,35 @@ export default function UserProfilePage() {
     const handleFollow = async () => {
         if (!profile) return;
         const prevStatus = isFollowing;
-        setIsFollowing(!isFollowing); // Optimistic UI
+        setIsFollowing(!isFollowing);
 
         try {
             await api.post(`/users/follow/${profile._id}`);
-            // Update follower count locally
             setProfile((prev: any) => ({
                 ...prev,
                 followersCount: prevStatus ? prev.followersCount - 1 : prev.followersCount + 1
             }));
             toast.success(prevStatus ? "Unfollowed" : "Followed");
         } catch (error) {
-            setIsFollowing(prevStatus); // Revert
+            setIsFollowing(prevStatus);
             toast.error("Action failed");
+        }
+    };
+
+    // 4. Start Chat Handler
+    const handleMessageClick = async () => {
+        if (!profile?._id) return;
+        setIsStartingChat(true);
+
+        try {
+            const { data } = await api.post("/chats", { userId: profile._id });
+            const chat = data.data;
+            navigate(`/chat/${chat._id}`, { state: { user: profile } });
+        } catch (error) {
+            console.error("Failed to start chat:", error);
+            toast.error("Could not open chat");
+        } finally {
+            setIsStartingChat(false);
         }
     };
 
@@ -151,6 +171,14 @@ export default function UserProfilePage() {
     return (
         <MainLayout>
             <div className="space-y-6">
+
+                {/* ✅ Mount the Image Viewer Dialog */}
+                <ProfileImageViewDialog
+                    isOpen={isProfilePicOpen}
+                    onClose={() => setIsProfilePicOpen(false)}
+                    imageUrl={profile.profilePic || "/default-avatar.png"}
+                />
+
                 {/* --- Header Section --- */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -159,8 +187,11 @@ export default function UserProfilePage() {
                 >
                     <div className="flex flex-col md:flex-row items-center gap-6">
                         <div className="relative">
-                            {/* ✅ Fixed gradient class */}
-                            <div className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-linear-to-tr from-yellow-400 to-purple-600 p-1">
+                            <div
+                                className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-linear-to-tr from-yellow-400 to-purple-600 p-1 cursor-pointer transition-transform hover:scale-105"
+                                // ✅ Open Image Viewer when clicked
+                                onClick={() => setIsProfilePicOpen(true)}
+                            >
                                 <div className="w-full h-full rounded-full bg-background p-1">
                                     <img
                                         src={profile.profilePic || "/default-avatar.png"}
@@ -187,13 +218,26 @@ export default function UserProfilePage() {
                                             size="sm"
                                             variant={isFollowing ? "secondary" : "default"}
                                             onClick={handleFollow}
-                                            // ✅ Fixed min-width class
                                             className="min-w-25"
                                         >
                                             {isFollowing ? "Following" : "Follow"}
                                         </Button>
-                                        <Button variant="outline" size="sm">
-                                            Message
+
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleMessageClick}
+                                            disabled={isStartingChat}
+                                            className="min-w-24 flex items-center gap-2"
+                                        >
+                                            {isStartingChat ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <MessageCircle className="w-4 h-4" />
+                                                    Message
+                                                </>
+                                            )}
                                         </Button>
                                     </div>
                                 )}
@@ -220,7 +264,7 @@ export default function UserProfilePage() {
                                     {profile.bio}
                                 </p>
                                 {profile.website && (
-                                    <a href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`} target="_blank" className="text-sm text-blue-500 hover:underline block">
+                                    <a href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`} target="_blank" rel="noreferrer" className="text-sm text-blue-500 hover:underline block">
                                         {profile.website}
                                     </a>
                                 )}
@@ -276,7 +320,6 @@ export default function UserProfilePage() {
                                     onClick={() => openPostView(post)}
                                     className={cn(
                                         "relative group overflow-hidden cursor-pointer bg-secondary/30",
-                                        // ✅ Fixed aspect ratio class
                                         activeTab === 'reels' ? "aspect-9/16" : "aspect-square"
                                     )}
                                 >

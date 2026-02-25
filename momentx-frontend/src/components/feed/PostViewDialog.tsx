@@ -42,7 +42,7 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
     const [isSaved, setIsSaved] = useState(false);
 
     // Media State
-    const [muted, setMuted] = useState(false);
+    const [muted, setMuted] = useState(true);
     const [isPlaying, setIsPlaying] = useState(true);
     const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -52,21 +52,24 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
     const inputRef = useRef<HTMLInputElement>(null);
 
     // --- 1. Data Normalization & User Repair ---
-
     const isUserUnpopulated = post && (typeof post.user === 'string');
     const displayUser = fetchedUser || (post && typeof post.user === 'object' ? post.user : null) || { username: "Unknown", profilePic: "" };
+
+    // ✅ FIX 1: Safely extract URLs to prevent empty string ("") crashing the video player
+    const rawVideoUrl = (post as any)?.videoUrl || "";
+    const rawImageUrl = (post as any)?.image || post?.images?.[0] || (post as any)?.thumbnailUrl || "";
 
     const normalizedPost = post ? {
         ...post,
         user: displayUser,
-        mediaSrc: (post as any).videoUrl || (post as any).image || post.images?.[0] || (post as any).thumbnailUrl,
-        isReel: !!(post as any).videoUrl || (post as any).type === 'reel'
+        videoUrl: rawVideoUrl,
+        imageUrl: rawImageUrl,
+        isVideo: typeof rawVideoUrl === 'string' && rawVideoUrl.trim().length > 0
     } : null;
 
     // --- 2. Initialization & Fetching ---
     useEffect(() => {
         if (post && isOpen) {
-            // Reset States
             const likesData = post.likes as any;
             const count = typeof likesData === 'number' ? likesData : (Array.isArray(likesData) ? likesData.length : 0);
 
@@ -76,22 +79,28 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
             setReplyingTo(null);
             setNewComment("");
             setFetchedUser(null);
+            setIsPlaying(true);
 
-            // A. Media Auto-play
-            if (normalizedPost?.isReel) {
-                setIsPlaying(true);
+            // ✅ FIX 2: Safely handle Video Autoplay
+            if (normalizedPost?.isVideo) {
                 setTimeout(() => {
-                    if (videoRef.current) {
+                    // Check if videoRef exists AND has a valid source before calling play()
+                    if (videoRef.current && (videoRef.current.currentSrc || videoRef.current.src)) {
                         videoRef.current.currentTime = 0;
-                        videoRef.current.play().catch(() => setIsPlaying(false));
+                        const playPromise = videoRef.current.play();
+
+                        if (playPromise !== undefined) {
+                            playPromise.catch((error) => {
+                                console.warn("Auto-play prevented by browser:", error);
+                                setIsPlaying(false);
+                            });
+                        }
                     }
                 }, 100);
             }
 
-            // B. Fetch Comments
             fetchComments(post._id);
 
-            // C. Fetch User (Fix for "Unknown")
             if (isUserUnpopulated) {
                 fetchUserDetails(post._id as unknown as string);
             }
@@ -112,7 +121,6 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
     const fetchComments = async (postId: string) => {
         setIsLoadingComments(true);
         try {
-            // ✅ FIX: Use new comment route
             const { data } = await api.get(`/comments/post/${postId}`);
 
             let fetchedComments = [];
@@ -132,7 +140,6 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
     };
 
     // --- HANDLERS ---
-
     const handleLike = async () => {
         if (!normalizedPost) return;
         const prevLiked = isLiked;
@@ -175,11 +182,25 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
         }
     };
 
+    // ✅ FIX 3: Safe Manual Play/Pause Toggle
     const toggleVideoPlay = () => {
-        if (videoRef.current) {
-            if (isPlaying) videoRef.current.pause();
-            else videoRef.current.play();
-            setIsPlaying(!isPlaying);
+        if (videoRef.current && (videoRef.current.currentSrc || videoRef.current.src)) {
+            if (isPlaying) {
+                videoRef.current.pause();
+                setIsPlaying(false);
+            } else {
+                const playPromise = videoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        setIsPlaying(true);
+                    }).catch(error => {
+                        console.warn("Play error:", error);
+                        setIsPlaying(false);
+                    });
+                } else {
+                    setIsPlaying(true);
+                }
+            }
         }
     };
 
@@ -199,7 +220,6 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                 content: newComment,
                 parentCommentId: replyingTo ? replyingTo._id : null
             };
-            // ✅ FIX: Use new comment route
             const { data } = await api.post(`/comments/post/${normalizedPost._id}`, payload);
 
             const createdComment = data.data || data;
@@ -225,14 +245,12 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                 return c;
             })
         );
-        // ✅ FIX: Use new comment route
         try { await api.post(`/comments/${commentId}/like`); }
         catch (error) { if (normalizedPost) fetchComments(normalizedPost._id); }
     };
 
     const handleDeleteComment = async (commentId: string) => {
         try {
-            // ✅ FIX: Use new comment route
             await api.delete(`/comments/${commentId}/delete`);
             setComments(comments.filter(c => c._id !== commentId));
             toast.success("Comment deleted");
@@ -288,12 +306,14 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                         >
                             {/* --- LEFT (TOP on Mobile): MEDIA --- */}
                             <div className="w-full md:w-[55%] lg:w-[60%] h-[45vh] md:h-full bg-black flex items-center justify-center relative shrink-0 overflow-hidden">
+
                                 {/* 1. Video Player */}
-                                {normalizedPost.isReel && normalizedPost.mediaSrc ? (
+                                {normalizedPost.isVideo ? (
                                     <div className="relative w-full h-full flex items-center justify-center bg-black group" onClick={toggleVideoPlay}>
                                         <video
                                             ref={videoRef}
-                                            src={normalizedPost.mediaSrc}
+                                            // ✅ FIX 4: Use undefined to prevent React from passing src=""
+                                            src={normalizedPost.videoUrl || undefined}
                                             className="max-h-full max-w-full w-auto h-auto object-contain"
                                             loop
                                             muted={muted}
@@ -311,16 +331,12 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                                             {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
                                         </button>
                                     </div>
-
-                                    // 2. Image Viewer
-                                ) : normalizedPost.mediaSrc ? (
+                                ) : normalizedPost.imageUrl ? (
                                     <img
-                                        src={normalizedPost.mediaSrc}
+                                        src={normalizedPost.imageUrl}
                                         alt="Post"
                                         className="max-h-full max-w-full w-auto h-auto object-contain"
                                     />
-
-                                    // 3. Fallback
                                 ) : (
                                     <div className="text-muted-foreground flex flex-col items-center gap-2">
                                         <AlertCircle className="w-10 h-10 opacity-50" />
@@ -391,7 +407,6 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                                         <div className="text-center text-muted-foreground text-sm py-10">No comments yet.</div>
                                     ) : comments.map(comment => {
                                         const isCommentLiked = comment.likes?.includes(currentUser?._id || '');
-                                        // Safe comment user access
                                         const cUser = comment.user || { username: "Unknown", profilePic: "" };
                                         const canDelete = currentUser?._id === cUser._id || currentUser?._id === normalizedPost.user._id;
                                         return (

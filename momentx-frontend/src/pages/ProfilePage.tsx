@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
 import { PostViewDialog } from "@/components/feed/PostViewDialog";
+// ✅ Import the Profile Image View Dialog
+import { ProfileImageViewDialog } from "@/components/profile/ProfileQuickViewDialog";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/axios";
 import type { Post } from "@/types";
 import { toast } from "sonner";
 
-// ✅ Added 'reels' to TabType
 type TabType = "posts" | "reels" | "saved" | "tagged";
 
 export default function ProfilePage() {
@@ -23,6 +24,9 @@ export default function ProfilePage() {
   // Post View State
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isPostViewOpen, setIsPostViewOpen] = useState(false);
+
+  // ✅ Profile Image View State
+  const [isProfilePicOpen, setIsProfilePicOpen] = useState(false);
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([]);
@@ -48,7 +52,6 @@ export default function ProfilePage() {
     return num.toString();
   };
 
-  // ✅ Added Reels Tab Definition
   const tabs = [
     { id: "posts", icon: Grid3X3, label: "Posts" },
     { id: "reels", icon: Film, label: "Reels" },
@@ -149,6 +152,13 @@ export default function ProfilePage() {
     <MainLayout>
       <div className="space-y-6">
 
+        {/* ✅ Mount the Image Viewer Dialog */}
+        <ProfileImageViewDialog
+          isOpen={isProfilePicOpen}
+          onClose={() => setIsProfilePicOpen(false)}
+          imageUrl={profileData.profilePic || "/default-avatar.png"}
+        />
+
         {/* --- Header Section --- */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -157,7 +167,11 @@ export default function ProfilePage() {
         >
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="relative">
-              <div className="w-32 h-32 rounded-full bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink p-1 animate-gradient">
+              <div
+                className="w-32 h-32 rounded-full bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink p-1 animate-gradient cursor-pointer transition-transform hover:scale-105"
+                // ✅ Added onClick to open the profile picture dialog
+                onClick={() => setIsProfilePicOpen(true)}
+              >
                 <div className="w-full h-full rounded-full bg-background p-1">
                   <img
                     src={profileData.profilePic || "/default-avatar.png"}
@@ -170,7 +184,7 @@ export default function ProfilePage() {
 
             <div className="flex-1 text-center md:text-left space-y-4">
               <div className="flex flex-col md:flex-row items-center gap-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 justify-center md:justify-start">
                   <h1 className="text-2xl font-display font-bold">{profileData.username}</h1>
                   {profileData.isVerified && (
                     <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
@@ -178,7 +192,7 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 justify-center md:justify-start">
                   <Button variant="gradient" size="sm" onClick={() => setIsEditOpen(true)}>Edit Profile</Button>
                   <Button variant="glass" size="icon" onClick={handleShareProfile}><Share2 className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="icon"><Settings className="w-4 h-4" /></Button>
@@ -202,9 +216,9 @@ export default function ProfilePage() {
 
               <div className="space-y-1">
                 <p className="font-semibold">{profileData.name}</p>
-                <p className="text-sm text-muted-foreground whitespace-pre-line">{profileData.bio}</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-line max-w-md mx-auto md:mx-0">{profileData.bio}</p>
                 {profileData.website && (
-                  <a href={profileData.website.startsWith('http') ? profileData.website : `https://${profileData.website}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                  <a href={profileData.website.startsWith('http') ? profileData.website : `https://${profileData.website}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline block">
                     {profileData.website}
                   </a>
                 )}
@@ -277,11 +291,9 @@ export default function ProfilePage() {
                   onClick={() => openPostView(post)}
                   className={cn(
                     "relative group overflow-hidden cursor-pointer bg-secondary/30",
-                    // ✅ Vertical Aspect Ratio for Reels, Square for others
                     activeTab === 'reels' ? "aspect-9/16" : "aspect-square"
                   )}
                 >
-                  {/* ✅ Conditional Rendering: Video for Reels, Image for Posts */}
                   {activeTab === 'reels' || (post as any).videoUrl ? (
                     <video
                       src={(post as any).videoUrl}
