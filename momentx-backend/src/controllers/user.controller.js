@@ -634,6 +634,29 @@ const getUserByUsername = asyncHandler(async (req, res) => {
     );
 });
 
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    throw new ApiError(400, 'Both current and new passwords are required');
+  }
+
+  const user = await User.findById(req.user._id).select('+password');
+
+  const isPasswordCorrect = await user.isPasswordCorrect(currentPassword);
+
+  if (!isPasswordCorrect) {
+    throw new ApiError(400, 'Invalid current password');
+  }
+
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, 'Password changed successfully'));
+});
+
 export {
   registerUser,
   loginUser,
@@ -643,6 +666,7 @@ export {
   refreshToken,
   updateProfile,
   getAllUsers,
+  changeCurrentPassword,
   forgotPassword,
   resetPassword,
   updateAccountDetails,

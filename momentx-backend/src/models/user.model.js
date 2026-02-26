@@ -45,7 +45,6 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: undefined,
     },
-    // ✅ ADD THIS FIELD
     isActive: {
       type: Boolean,
       default: true,

@@ -17,6 +17,7 @@ import {
   getUserFollowing,
   getUserById,
   getUserByUsername,
+  changeCurrentPassword,
 } from '../controllers/user.controller.js';
 import { upload } from '../middlewares/multer.middleware.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
@@ -87,6 +88,7 @@ router
   );
 
 router.post('/refresh-token', refreshToken);
+router.route('/change-password').post(verifyJWT, changeCurrentPassword);
 
 // ==========================================
 // 🔒 SECURED ROUTES (Token Required)

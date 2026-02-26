@@ -1,12 +1,13 @@
-import { useState, useRef, useMemo } from "react"
-import { motion } from "framer-motion"
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, MapPin } from "lucide-react"
+import { useState, useRef, useMemo, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, MapPin, Play, Volume2, VolumeX } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Post } from "@/types"
 import { AvatarRing } from "@/components/ui/avatar-ring"
 import { toast } from "sonner"
 import { PostModal } from "./PostModal"
 import { api } from "@/lib/axios"
+import { Link } from "react-router-dom"
 
 interface PostCardProps {
   post: Post
@@ -30,20 +31,61 @@ export function PostCard({ post }: PostCardProps) {
   const [showHeart, setShowHeart] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showFullCaption, setShowFullCaption] = useState(false)
+
   const lastTapRef = useRef(0)
 
-  // Double tap to like
-  const handleDoubleTap = () => {
-    const now = Date.now()
-    if (now - lastTapRef.current < 300) {
+  // --- Video States ---
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isMuted, setIsMuted] = useState(true) // Must default to true for mobile autoplay
+  const hasVideo = !!(post as any).videoUrl;
+
+  // Auto-play Video when scrolled into view
+  useEffect(() => {
+    if (!hasVideo || !videoRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          videoRef.current?.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        } else {
+          videoRef.current?.pause();
+          setIsPlaying(false);
+        }
+      },
+      { threshold: 0.6 } // Play when 60% of video is visible
+    );
+
+    observer.observe(videoRef.current);
+    return () => observer.disconnect();
+  }, [hasVideo]);
+
+  // ✅ FIX: Removed unused 'e' parameter
+  const handleMediaInteract = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300; // 300ms window for double tap
+
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      // It's a Double Tap!
       if (!isLiked) {
-        handleLike()
-        setShowHeart(true)
-        setTimeout(() => setShowHeart(false), 800)
+        handleLike();
+      }
+      setShowHeart(true);
+      setTimeout(() => setShowHeart(false), 800);
+    } else {
+      // It's a Single Tap!
+      if (hasVideo && videoRef.current) {
+        if (isPlaying) {
+          videoRef.current.pause();
+          setIsPlaying(false);
+        } else {
+          videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        }
       }
     }
-    lastTapRef.current = now
-  }
+    lastTapRef.current = now;
+  };
 
   // Like API
   const handleLike = async () => {
@@ -101,7 +143,6 @@ export function PostCard({ post }: PostCardProps) {
     return num.toString()
   }
 
-  // Helper to format date nicely
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "long",
@@ -115,13 +156,13 @@ export function PostCard({ post }: PostCardProps) {
       <motion.article
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-2xl overflow-hidden mb-6 relative"
+        className="glass rounded-2xl overflow-hidden mb-6 relative border border-border/50"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
+          <Link to={`/u/${post.user.username}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <AvatarRing
-              src={post.user.profilePic || ""}
+              src={post.user.profilePic || "/default-avatar.png"}
               alt={post.user.username}
               size="sm"
               hasStory={false}
@@ -135,15 +176,14 @@ export function PostCard({ post }: PostCardProps) {
                   </svg>
                 )}
               </div>
-              
-              {/* ✅ CHANGE 1: Show Location here instead of Date */}
+
               {post.location && (
                 <p className="text-xs text-muted-foreground flex items-center gap-0.5">
-                   <MapPin className="w-3 h-3" /> {post.location}
+                  <MapPin className="w-3 h-3" /> {post.location}
                 </p>
               )}
             </div>
-          </div>
+          </Link>
 
           {/* Post Settings */}
           <div className="relative">
@@ -155,7 +195,6 @@ export function PostCard({ post }: PostCardProps) {
             </button>
             {showSettings && (
               <div className="absolute right-0 mt-2 w-40 bg-popover rounded-xl shadow-lg border border-border overflow-hidden z-20">
-                {/* Only show delete if user owns the post */}
                 {post.user._id === currentUser._id ? (
                   <button
                     onClick={handleDeletePost}
@@ -171,27 +210,55 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         </div>
 
-        {/* Image */}
+        {/* ✅ FIX: Applied canonical tailwind classes sm:aspect-4/5 and md:max-h-150 */}
         <div
-          className="relative aspect-square cursor-pointer bg-muted/20"
-          onClick={handleDoubleTap}
+          className="relative w-full aspect-square sm:aspect-4/5 max-h-[75vh] md:max-h-150 bg-black cursor-pointer group flex items-center justify-center overflow-hidden"
+          onClick={handleMediaInteract}
         >
-          <img
-            src={post.images[0]}
-            alt={post.caption}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-          {showHeart && (
-            <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <Heart className="w-24 h-24 text-red-500 fill-red-500 animate-heart-pop drop-shadow-lg" />
-            </motion.div>
+          {hasVideo ? (
+            <>
+              <video
+                ref={videoRef}
+                src={(post as any).videoUrl}
+                // 'object-contain' ensures video is never cut off on weird aspect ratios
+                className="w-full h-full object-contain"
+                loop
+                muted={isMuted}
+                playsInline
+              />
+              {!isPlaying && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+                  <Play className="w-16 h-16 text-white/80 fill-white/80" />
+                </div>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}
+                className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10"
+              >
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+            </>
+          ) : (
+            <img
+              src={post.images?.[0] || (post as any).thumbnailUrl || "/placeholder-image.jpg"}
+              alt={post.caption || "Post content"}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
           )}
+
+          <AnimatePresence>
+            {showHeart && (
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+              >
+                <Heart className="w-24 h-24 text-red-500 fill-red-500 animate-heart-pop drop-shadow-[0_0_40px_rgba(239,68,68,0.8)]" />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Actions */}
@@ -214,7 +281,7 @@ export function PostCard({ post }: PostCardProps) {
                 onClick={() => setIsModalOpen(true)}
                 className="hover:text-muted-foreground transition-colors"
               >
-                <MessageCircle className="w-6 h-6" />
+                <MessageCircle className="w-6 h-6 -rotate-90" />
               </button>
               <button className="hover:text-muted-foreground transition-colors">
                 <Send className="w-6 h-6" />
@@ -236,27 +303,41 @@ export function PostCard({ post }: PostCardProps) {
 
           <p className="font-semibold text-sm">{formatNumber(likes)} likes</p>
 
-          <div className="text-sm">
-            <span className="font-semibold mr-2">{post.user.username}</span>
-            {post.caption.split(" ").map((word, i) =>
-              word.startsWith("#") ? (
-                <span key={i} className="text-primary font-medium hover:underline cursor-pointer">
-                  {word}{" "}
-                </span>
-              ) : (
-                word + " "
-              )
-            )}
-          </div>
+          {/* Caption with "... more" truncation */}
+          {post.caption && (
+            <div className="text-sm">
+              <Link to={`/u/${post.user.username}`} className="font-semibold mr-2 hover:underline">
+                {post.user.username}
+              </Link>
 
-          {/* ✅ CHANGE 2: Date moved here (Above Add Comment) */}
+              <span className="text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                {(!showFullCaption && post.caption.length > 80)
+                  ? post.caption.slice(0, 80).split(" ").map((word, i) =>
+                    word.startsWith("#") ? <span key={i} className="text-primary font-medium">{word} </span> : word + " "
+                  )
+                  : post.caption.split(" ").map((word, i) =>
+                    word.startsWith("#") ? <span key={i} className="text-primary font-medium">{word} </span> : word + " "
+                  )}
+              </span>
+
+              {post.caption.length > 80 && !showFullCaption && (
+                <button
+                  onClick={() => setShowFullCaption(true)}
+                  className="text-muted-foreground font-semibold ml-1 hover:text-foreground"
+                >
+                  ... more
+                </button>
+              )}
+            </div>
+          )}
+
           <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-2">
             {formatDate(post.createdAt)}
           </p>
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-1"
           >
             {post.comments > 0 ? `View all ${post.comments} comments` : "Add a comment..."}
           </button>

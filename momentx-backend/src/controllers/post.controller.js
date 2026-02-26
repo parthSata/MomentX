@@ -122,15 +122,27 @@ const getHomeFeed = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
   const currentUserId = req.user._id;
 
-  // ✅ Apply Strong Filter to Feed
+  // 1. Fetch Posts
   const posts = await Post.find(VISIBLE_FILTER)
-    .sort({ createdAt: -1 })
-    .skip(parseInt(skip))
-    .limit(parseInt(limit))
     .populate('user', 'username name profilePic isVerified')
-    .populate('taggedUsers', 'username');
+    .populate('taggedUsers', 'username')
+    .lean();
 
-  const formattedPosts = await formatPosts(posts, currentUserId);
+  // 2. Fetch Reels
+  const reels = await Reel.find(VISIBLE_FILTER)
+    .populate('user', 'username name profilePic isVerified')
+    .lean();
+
+  // 3. Combine and Sort Chronologically (Newest first)
+  const allContent = [...posts, ...reels].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
+
+  // 4. Apply Pagination (Skip and Limit on the combined array)
+  const paginatedContent = allContent.slice(skip, skip + parseInt(limit));
+
+  // 5. Format the resulting page
+  const formattedPosts = await formatPosts(paginatedContent, currentUserId);
 
   return res.status(200).json(
     new ApiResponse(
@@ -138,7 +150,7 @@ const getHomeFeed = asyncHandler(async (req, res) => {
       {
         posts: formattedPosts,
         currentPage: parseInt(page),
-        hasMore: posts.length === parseInt(limit),
+        hasMore: skip + parseInt(limit) < allContent.length,
       },
       'Feed fetched successfully',
     ),
@@ -282,13 +294,11 @@ const toggleSavePost = asyncHandler(async (req, res) => {
 
   await user.save({ validateBeforeSave: false });
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, isSaved ? 'Unsaved' : 'Saved', {
-        isSaved: !isSaved,
-      }),
-    );
+  return res.status(200).json(
+    new ApiResponse(200, isSaved ? 'Unsaved' : 'Saved', {
+      isSaved: !isSaved,
+    }),
+  );
 });
 
 const deletePost = asyncHandler(async (req, res) => {
