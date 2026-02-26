@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { Settings, Share2, Grid3X3, Bookmark, Tag, Sparkles, Loader2, Film } from "lucide-react";
+import { Link, useParams, useNavigate } from "react-router-dom"; // ✅ Added useParams & useNavigate
+import { Settings, Share2, Grid3X3, Bookmark, Tag, Sparkles, Loader2, Film, MessageCircle, UserPlus, UserCheck } from "lucide-react";
 import { MainLayout } from "@/components/navigation/MainLayout";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EditProfileDialog } from "@/components/profile/EditProfileDialog";
 import { PostViewDialog } from "@/components/feed/PostViewDialog";
-// ✅ Import the Profile Image View Dialog
-import { ProfileImageViewDialog } from "@/components/profile/ProfileQuickViewDialog";
+import { ProfileImageViewDialog } from "@/components/profile/ProfileQuickViewDialog"; // ✅ Fixed import path
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/axios";
 import type { Post } from "@/types";
@@ -17,6 +16,8 @@ import { toast } from "sonner";
 type TabType = "posts" | "reels" | "saved" | "tagged";
 
 export default function ProfilePage() {
+  const { username } = useParams(); // ✅ Get username from URL if it exists
+  const navigate = useNavigate();
   const { user: authUser, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("posts");
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -25,12 +26,17 @@ export default function ProfilePage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isPostViewOpen, setIsPostViewOpen] = useState(false);
 
-  // ✅ Profile Image View State
+  // Profile Image View State
   const [isProfilePicOpen, setIsProfilePicOpen] = useState(false);
+
+  // Interaction State (For viewing other users)
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isStartingChat, setIsStartingChat] = useState(false);
 
   // Data State
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const [profileData, setProfileData] = useState({
     _id: "",
@@ -45,6 +51,9 @@ export default function ProfilePage() {
     postsCount: 0
   });
 
+  // Check if we are viewing our own profile
+  const isOwnProfile = !username || (authUser && authUser.username === username);
+
   const formatNumber = (num: number) => {
     if (!num) return "0";
     if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
@@ -52,18 +61,25 @@ export default function ProfilePage() {
     return num.toString();
   };
 
-  const tabs = [
+  // ✅ Conditionally render tabs (Hide "Saved" for other users)
+  const tabs = isOwnProfile ? [
     { id: "posts", icon: Grid3X3, label: "Posts" },
     { id: "reels", icon: Film, label: "Reels" },
     { id: "saved", icon: Bookmark, label: "Saved" },
     { id: "tagged", icon: Tag, label: "Tagged" },
+  ] : [
+    { id: "posts", icon: Grid3X3, label: "Posts" },
+    { id: "reels", icon: Film, label: "Reels" },
+    { id: "tagged", icon: Tag, label: "Tagged" },
   ];
 
   const fetchProfileInfo = async () => {
-    if (!authUser) return;
+    setProfileLoading(true);
     try {
-      const userRes = await api.get("/users/current-user");
-      const user = userRes.data?.message?.user || userRes.data?.data?.user || userRes.data?.data;
+      const endpoint = isOwnProfile ? "/users/current-user" : `/users/u/${username}`;
+      const { data } = await api.get(endpoint);
+
+      const user = data?.message?.user || data?.data?.user || data?.data;
 
       setProfileData({
         _id: user._id,
@@ -77,22 +93,36 @@ export default function ProfilePage() {
         following: user.following || [],
         postsCount: user.postsCount || 0
       });
+
+      // If viewing someone else, check if we follow them
+      if (!isOwnProfile && authUser) {
+        setIsFollowing(user.followers?.includes(authUser._id) || user.isFollowing);
+      }
     } catch (e) {
       console.error("❌ Failed to fetch info", e);
+      toast.error("User not found");
+      navigate("/");
+    } finally {
+      setProfileLoading(false);
     }
   };
 
   const fetchTabContent = async () => {
-    if (!authUser?._id) return;
+    if (!profileData._id) return;
     setLoadingPosts(true);
     setPosts([]);
 
     try {
       let endpoint = "";
-      if (activeTab === "posts") endpoint = `/posts/user-posts/${authUser._id}`;
-      else if (activeTab === "saved") endpoint = `/posts/saved-posts/${authUser._id}`;
-      else if (activeTab === "tagged") endpoint = `/posts/tagged-posts/${authUser._id}`;
-      else if (activeTab === "reels") endpoint = `/posts/user-posts/${authUser._id}`;
+      if (activeTab === "posts") endpoint = `/posts/user-posts/${profileData._id}`;
+      else if (activeTab === "saved" && isOwnProfile) endpoint = `/posts/saved-posts/${profileData._id}`;
+      else if (activeTab === "tagged") endpoint = `/posts/tagged-posts/${profileData._id}`;
+      else if (activeTab === "reels") endpoint = `/posts/user-posts/${profileData._id}`;
+
+      if (!endpoint) {
+        setLoadingPosts(false);
+        return;
+      }
 
       const { data } = await api.get(endpoint);
       const fetchedData = data.data || data.message || [];
@@ -106,7 +136,6 @@ export default function ProfilePage() {
       }
 
       setPosts(finalPosts);
-
     } catch (error) {
       console.error(`❌ Failed to fetch ${activeTab}`, error);
     } finally {
@@ -115,16 +144,55 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    fetchProfileInfo();
-  }, [authUser]);
+    if (authUser) {
+      fetchProfileInfo();
+      // Reset tab to posts if navigating from own profile (which has saved) to someone else's
+      if (!isOwnProfile && activeTab === 'saved') setActiveTab('posts');
+    }
+  }, [authUser, username]);
 
   useEffect(() => {
     fetchTabContent();
-  }, [activeTab, authUser]);
+  }, [activeTab, profileData._id]);
 
   const handleProfileUpdate = async () => {
     await refreshUser();
     await fetchProfileInfo();
+  };
+
+  const handleFollowToggle = async () => {
+    if (!profileData._id) return;
+    const prevStatus = isFollowing;
+    setIsFollowing(!isFollowing);
+
+    try {
+      await api.post(`/users/follow/${profileData._id}`);
+      setProfileData(prev => ({
+        ...prev,
+        followers: prevStatus
+          ? prev.followers.filter(id => id !== authUser?._id)
+          : [...prev.followers, authUser?._id || ""]
+      }));
+      await refreshUser();
+    } catch (error) {
+      setIsFollowing(prevStatus);
+      toast.error("Action failed");
+    }
+  };
+
+  const handleMessageClick = async () => {
+    if (!profileData?._id) return;
+    setIsStartingChat(true);
+
+    try {
+      const { data } = await api.post("/chats", { userId: profileData._id });
+      const chat = data.data;
+      navigate(`/chat/${chat._id}`, { state: { user: profileData } });
+    } catch (error) {
+      toast.error("Could not open chat");
+    } finally {
+      setIsStartingChat(false);
+    }
   };
 
   const openPostView = (post: Post) => {
@@ -138,21 +206,24 @@ export default function ProfilePage() {
     const shareUrl = `${origin}/u/${profileData.username}`;
 
     navigator.clipboard.writeText(shareUrl)
-      .then(() => {
-        toast.success("Profile link copied!", { description: `Link: ${shareUrl}` });
-      })
-      .catch(() => {
-        toast.error("Failed to copy link");
-      });
+      .then(() => toast.success("Profile link copied!"))
+      .catch(() => toast.error("Failed to copy link"));
   };
 
-  if (!authUser) return null;
+  if (!authUser || profileLoading) {
+    return (
+      <MainLayout>
+        <div className="h-screen flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    )
+  }
 
   return (
     <MainLayout>
       <div className="space-y-6">
 
-        {/* ✅ Mount the Image Viewer Dialog */}
         <ProfileImageViewDialog
           isOpen={isProfilePicOpen}
           onClose={() => setIsProfilePicOpen(false)}
@@ -169,7 +240,6 @@ export default function ProfilePage() {
             <div className="relative">
               <div
                 className="w-32 h-32 rounded-full bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink p-1 animate-gradient cursor-pointer transition-transform hover:scale-105"
-                // ✅ Added onClick to open the profile picture dialog
                 onClick={() => setIsProfilePicOpen(true)}
               >
                 <div className="w-full h-full rounded-full bg-background p-1">
@@ -192,10 +262,37 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
+
+                {/* ✅ CONDITIONAL ACTION BUTTONS */}
                 <div className="flex gap-2 justify-center md:justify-start">
-                  <Button variant="gradient" size="sm" onClick={() => setIsEditOpen(true)}>Edit Profile</Button>
-                  <Button variant="glass" size="icon" onClick={handleShareProfile}><Share2 className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="icon"><Settings className="w-4 h-4" /></Button>
+                  {isOwnProfile ? (
+                    <>
+                      <Button variant="gradient" size="sm" onClick={() => setIsEditOpen(true)}>Edit Profile</Button>
+                      <Button variant="glass" size="icon" onClick={handleShareProfile}><Share2 className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}><Settings className="w-4 h-4" /></Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant={isFollowing ? "secondary" : "default"}
+                        onClick={handleFollowToggle}
+                        className="min-w-28"
+                      >
+                        {isFollowing ? <><UserCheck className="w-4 h-4 mr-2" /> Following</> : <><UserPlus className="w-4 h-4 mr-2" /> Follow</>}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleMessageClick}
+                        disabled={isStartingChat}
+                        className="min-w-28"
+                      >
+                        {isStartingChat ? <Loader2 className="w-4 h-4 animate-spin" /> : <><MessageCircle className="w-4 h-4 mr-2" /> Message</>}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -204,11 +301,11 @@ export default function ProfilePage() {
                   <p className="font-bold text-lg">{formatNumber(profileData.postsCount)}</p>
                   <p className="text-sm text-muted-foreground">Posts</p>
                 </div>
-                <Link to="/followers/followers" className="text-center hover:opacity-80 transition-opacity">
+                <Link to={`/followers/${profileData._id}?tab=followers`} className="text-center hover:opacity-80 transition-opacity">
                   <p className="font-bold text-lg">{formatNumber(profileData.followers.length)}</p>
                   <p className="text-sm text-muted-foreground">Followers</p>
                 </Link>
-                <Link to="/followers/following" className="text-center hover:opacity-80 transition-opacity">
+                <Link to={`/followers/${profileData._id}?tab=following`} className="text-center hover:opacity-80 transition-opacity">
                   <p className="font-bold text-lg">{formatNumber(profileData.following.length)}</p>
                   <p className="text-sm text-muted-foreground">Following</p>
                 </Link>
@@ -227,18 +324,20 @@ export default function ProfilePage() {
           </div>
         </motion.div>
 
-        <EditProfileDialog
-          isOpen={isEditOpen}
-          onClose={() => setIsEditOpen(false)}
-          user={{
-            displayName: profileData.name,
-            username: profileData.username,
-            bio: profileData.bio,
-            website: profileData.website,
-            avatar: profileData.profilePic
-          }}
-          onProfileUpdate={handleProfileUpdate}
-        />
+        {isOwnProfile && (
+          <EditProfileDialog
+            isOpen={isEditOpen}
+            onClose={() => setIsEditOpen(false)}
+            user={{
+              displayName: profileData.name,
+              username: profileData.username,
+              bio: profileData.bio,
+              website: profileData.website,
+              avatar: profileData.profilePic
+            }}
+            onProfileUpdate={handleProfileUpdate}
+          />
+        )}
 
         {/* --- Tabs --- */}
         <div className="glass rounded-2xl overflow-hidden min-h-75">

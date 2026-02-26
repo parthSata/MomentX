@@ -10,8 +10,6 @@ import { api } from "@/lib/axios";
 import type { Post } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-
-// ✅ Import the new simplified image viewer
 import { ProfileImageViewDialog } from "@/components/profile/ProfileQuickViewDialog";
 
 type TabType = "posts" | "reels" | "tagged";

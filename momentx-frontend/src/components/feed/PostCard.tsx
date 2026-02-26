@@ -14,7 +14,6 @@ interface PostCardProps {
 }
 
 export function PostCard({ post }: PostCardProps) {
-  // Safe User Retrieval
   const currentUser = useMemo(() => {
     try {
       const stored = localStorage.getItem("momentx_user");
@@ -31,19 +30,26 @@ export function PostCard({ post }: PostCardProps) {
   const [showHeart, setShowHeart] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+
+  // ✅ Caption Truncation State
   const [showFullCaption, setShowFullCaption] = useState(false)
 
   const lastTapRef = useRef(0)
 
-  // --- Video States ---
+  // ✅ SAFELY parse video logic
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isMuted, setIsMuted] = useState(true) // Must default to true for mobile autoplay
-  const hasVideo = !!(post as any).videoUrl;
+  const [isMuted, setIsMuted] = useState(true)
 
-  // Auto-play Video when scrolled into view
+  const rawVideoUrl = (post as any).videoUrl;
+  const hasVideo = typeof rawVideoUrl === 'string' && rawVideoUrl.trim().length > 0;
+
   useEffect(() => {
     if (!hasVideo || !videoRef.current) return;
+
+    // For Safari Autoplay
+    videoRef.current.defaultMuted = true;
+    videoRef.current.muted = isMuted;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -54,27 +60,22 @@ export function PostCard({ post }: PostCardProps) {
           setIsPlaying(false);
         }
       },
-      { threshold: 0.6 } // Play when 60% of video is visible
+      { threshold: 0.6 }
     );
 
     observer.observe(videoRef.current);
     return () => observer.disconnect();
-  }, [hasVideo]);
+  }, [hasVideo, isMuted]);
 
-  // ✅ FIX: Removed unused 'e' parameter
   const handleMediaInteract = () => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300; // 300ms window for double tap
+    const DOUBLE_TAP_DELAY = 300;
 
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      // It's a Double Tap!
-      if (!isLiked) {
-        handleLike();
-      }
+      if (!isLiked) handleLike();
       setShowHeart(true);
       setTimeout(() => setShowHeart(false), 800);
     } else {
-      // It's a Single Tap!
       if (hasVideo && videoRef.current) {
         if (isPlaying) {
           videoRef.current.pause();
@@ -87,53 +88,47 @@ export function PostCard({ post }: PostCardProps) {
     lastTapRef.current = now;
   };
 
-  // Like API
   const handleLike = async () => {
-    const prevLiked = isLiked
-    const prevLikes = likes
+    const prevLiked = isLiked;
+    const prevLikes = likes;
 
-    setIsLiked(!isLiked)
-    setLikes(prev => isLiked ? prev - 1 : prev + 1)
+    setIsLiked(!isLiked);
+    setLikes(prev => isLiked ? prev - 1 : prev + 1);
 
     if (!isLiked) {
-      setShowHeart(true)
-      setTimeout(() => setShowHeart(false), 800)
+      setShowHeart(true);
+      setTimeout(() => setShowHeart(false), 800);
     }
 
     try {
       await api.post(`/posts/${post._id}/like`)
     } catch (error) {
-      setIsLiked(prevLiked)
-      setLikes(prevLikes)
-      toast.error("Failed to like post")
+      setIsLiked(prevLiked);
+      setLikes(prevLikes);
+      toast.error("Failed to like post");
     }
   }
 
-  // Save API
   const handleSave = async () => {
-    const prevSaved = isSaved
-    setIsSaved(!isSaved)
+    const prevSaved = isSaved;
+    setIsSaved(!isSaved);
 
     try {
-      await api.post(`/posts/${post._id}/save`)
-      toast.success(isSaved ? "Removed from saved" : "Post saved!", {
-        duration: 1500,
-      })
+      await api.post(`/posts/${post._id}/save`);
+      toast.success(isSaved ? "Removed from saved" : "Post saved!", { duration: 1500 });
     } catch (error) {
-      setIsSaved(prevSaved)
-      toast.error("Failed to save post")
+      setIsSaved(prevSaved);
     }
   }
 
-  // Delete Post
   const handleDeletePost = async () => {
-    if (!confirm("Delete this post?")) return;
+    if (!confirm("Delete this content?")) return;
     try {
       await api.delete(`/posts/${post._id}/delete`);
-      toast.success("Post deleted");
+      toast.success("Content deleted");
       window.location.reload();
     } catch (error) {
-      toast.error("Failed to delete post");
+      toast.error("Failed to delete content");
     }
   }
 
@@ -144,12 +139,24 @@ export function PostCard({ post }: PostCardProps) {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric"
-    }).toUpperCase();
+    return new Date(dateString).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }).toUpperCase();
   }
+
+  // ✅ PERFECT CAPTION TRUNCATION
+  const renderCaption = () => {
+    if (!post.caption) return null;
+
+    const isLong = post.caption.length > 80;
+    const textToShow = (!showFullCaption && isLong) ? post.caption.slice(0, 80).trim() + "..." : post.caption;
+
+    return (
+      <span className="text-foreground/90 whitespace-pre-wrap leading-relaxed">
+        {textToShow.split(" ").map((word, i) =>
+          word.startsWith("#") ? <span key={i} className="text-primary font-medium">{word} </span> : word + " "
+        )}
+      </span>
+    );
+  };
 
   return (
     <>
@@ -158,15 +165,9 @@ export function PostCard({ post }: PostCardProps) {
         animate={{ opacity: 1, y: 0 }}
         className="glass rounded-2xl overflow-hidden mb-6 relative border border-border/50"
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4">
           <Link to={`/u/${post.user.username}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <AvatarRing
-              src={post.user.profilePic || "/default-avatar.png"}
-              alt={post.user.username}
-              size="sm"
-              hasStory={false}
-            />
+            <AvatarRing src={post.user.profilePic || "/default-avatar.png"} alt={post.user.username} size="sm" hasStory={false} />
             <div>
               <div className="flex items-center gap-1">
                 <span className="font-semibold text-sm">{post.user.name}</span>
@@ -176,7 +177,6 @@ export function PostCard({ post }: PostCardProps) {
                   </svg>
                 )}
               </div>
-
               {post.location && (
                 <p className="text-xs text-muted-foreground flex items-center gap-0.5">
                   <MapPin className="w-3 h-3" /> {post.location}
@@ -185,21 +185,14 @@ export function PostCard({ post }: PostCardProps) {
             </div>
           </Link>
 
-          {/* Post Settings */}
           <div className="relative">
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="p-2 hover:bg-muted rounded-full transition-colors"
-            >
+            <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-muted rounded-full transition-colors">
               <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
             </button>
             {showSettings && (
               <div className="absolute right-0 mt-2 w-40 bg-popover rounded-xl shadow-lg border border-border overflow-hidden z-20">
                 {post.user._id === currentUser._id ? (
-                  <button
-                    onClick={handleDeletePost}
-                    className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-muted/50 flex items-center gap-2"
-                  >
+                  <button onClick={handleDeletePost} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-muted/50 flex items-center gap-2">
                     <Trash2 className="w-4 h-4" /> Delete
                   </button>
                 ) : (
@@ -210,7 +203,6 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         </div>
 
-        {/* ✅ FIX: Applied canonical tailwind classes sm:aspect-4/5 and md:max-h-150 */}
         <div
           className="relative w-full aspect-square sm:aspect-4/5 max-h-[75vh] md:max-h-150 bg-black cursor-pointer group flex items-center justify-center overflow-hidden"
           onClick={handleMediaInteract}
@@ -219,8 +211,7 @@ export function PostCard({ post }: PostCardProps) {
             <>
               <video
                 ref={videoRef}
-                src={(post as any).videoUrl}
-                // 'object-contain' ensures video is never cut off on weird aspect ratios
+                src={rawVideoUrl}
                 className="w-full h-full object-contain"
                 loop
                 muted={isMuted}
@@ -261,71 +252,41 @@ export function PostCard({ post }: PostCardProps) {
           </AnimatePresence>
         </div>
 
-        {/* Actions */}
         <div className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                onClick={handleLike}
-                className="transition-colors"
-              >
-                <Heart
-                  className={cn(
-                    "w-6 h-6",
-                    isLiked ? "text-red-500 fill-red-500" : "text-foreground"
-                  )}
-                />
+              <motion.button whileTap={{ scale: 0.9 }} onClick={handleLike} className="transition-colors">
+                <Heart className={cn("w-6 h-6", isLiked ? "text-red-500 fill-red-500" : "text-foreground")} />
               </motion.button>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="hover:text-muted-foreground transition-colors"
-              >
+              <button onClick={() => setIsModalOpen(true)} className="hover:text-muted-foreground transition-colors">
                 <MessageCircle className="w-6 h-6 -rotate-90" />
               </button>
               <button className="hover:text-muted-foreground transition-colors">
                 <Send className="w-6 h-6" />
               </button>
             </div>
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={handleSave}
-              className="transition-colors"
-            >
-              <Bookmark
-                className={cn(
-                  "w-6 h-6",
-                  isSaved ? "text-foreground fill-foreground" : "text-foreground"
-                )}
-              />
+            <motion.button whileTap={{ scale: 0.9 }} onClick={handleSave} className="transition-colors">
+              <Bookmark className={cn("w-6 h-6", isSaved ? "text-foreground fill-foreground" : "text-foreground")} />
             </motion.button>
           </div>
 
           <p className="font-semibold text-sm">{formatNumber(likes)} likes</p>
 
-          {/* Caption with "... more" truncation */}
+          {/* ✅ FIXED CAPTION RENDERER */}
           {post.caption && (
             <div className="text-sm">
               <Link to={`/u/${post.user.username}`} className="font-semibold mr-2 hover:underline">
                 {post.user.username}
               </Link>
 
-              <span className="text-foreground/90 whitespace-pre-wrap leading-relaxed">
-                {(!showFullCaption && post.caption.length > 80)
-                  ? post.caption.slice(0, 80).split(" ").map((word, i) =>
-                    word.startsWith("#") ? <span key={i} className="text-primary font-medium">{word} </span> : word + " "
-                  )
-                  : post.caption.split(" ").map((word, i) =>
-                    word.startsWith("#") ? <span key={i} className="text-primary font-medium">{word} </span> : word + " "
-                  )}
-              </span>
+              {renderCaption()}
 
               {post.caption.length > 80 && !showFullCaption && (
                 <button
                   onClick={() => setShowFullCaption(true)}
                   className="text-muted-foreground font-semibold ml-1 hover:text-foreground"
                 >
-                  ... more
+                  more
                 </button>
               )}
             </div>

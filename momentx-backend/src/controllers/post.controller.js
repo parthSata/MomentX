@@ -195,23 +195,37 @@ const getUserSavedPosts = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(userId))
     throw new ApiError(400, 'Invalid User ID');
 
-  // ✅ Apply Strong Filter to Populate Match
-  const user = await User.findById(userId).populate({
-    path: 'savedPosts',
-    match: VISIBLE_FILTER,
-    options: { sort: { createdAt: -1 } },
-    populate: { path: 'user', select: 'username name profilePic isVerified' },
-  });
-
+  const user = await User.findById(userId);
   if (!user) throw new ApiError(404, 'User not found');
 
-  const validSavedPosts = user.savedPosts.filter((p) => p !== null);
+  const savedIds = user.savedPosts; // Array of ObjectIds
 
-  const formattedPosts = await formatPosts(validSavedPosts, currentUserId);
+  // ✅ Fetch from both collections independently since refs are mixed
+  const [posts, reels] = await Promise.all([
+    Post.find({ _id: { $in: savedIds }, ...VISIBLE_FILTER })
+      .populate('user', 'username name profilePic isVerified')
+      .lean(),
+    Reel.find({ _id: { $in: savedIds }, ...VISIBLE_FILTER })
+      .populate('user', 'username name profilePic isVerified')
+      .lean(),
+  ]);
+
+  const allSavedContent = [...posts, ...reels];
+
+  // ✅ Sort them strictly by the order they were saved (newest first)
+  const reversedSavedIds = [...savedIds].reverse().map((id) => id.toString());
+  allSavedContent.sort((a, b) => {
+    return (
+      reversedSavedIds.indexOf(a._id.toString()) -
+      reversedSavedIds.indexOf(b._id.toString())
+    );
+  });
+
+  const formattedPosts = await formatPosts(allSavedContent, currentUserId);
 
   return res
     .status(200)
-    .json(new ApiResponse(200, formattedPosts, 'Saved posts fetched'));
+    .json(new ApiResponse(200, formattedPosts, 'Saved content fetched'));
 });
 
 // --- 5. GET TAGGED POSTS ---

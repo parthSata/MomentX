@@ -66,7 +66,8 @@ export function Header({ onMenuClick, showSearch = true }: HeaderProps) {
               <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />
             </Button>
           </Link>
-          <Link to="/chat" className="hidden md:block">
+          {/* ✅ FIX: Removed "hidden md:block" so it shows on mobile */}
+          <Link to="/chat">
             <Button variant="ghost" size="icon" className="relative">
               <MessageCircle className="w-5 h-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />

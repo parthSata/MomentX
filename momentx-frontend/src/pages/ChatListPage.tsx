@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Edit, MoreHorizontal, Loader2, X, UserPlus, MessageCircle, Trash2 } from "lucide-react";
+import { Search, Edit, MoreHorizontal, Loader2, X, UserPlus, MessageCircle, Trash2, ArrowLeft } from "lucide-react"; // ✅ Added ArrowLeft
 import { Input } from "@/components/ui/input";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { useNavigate } from "react-router-dom";
@@ -42,7 +42,7 @@ export default function ChatListPage() {
     fetchChats();
   }, []);
 
-  // ✅ REAL-TIME LISTENER: Updates Preview & Unread Count
+  // REAL-TIME LISTENER: Updates Preview & Unread Count
   useEffect(() => {
     if (!socketRef.current) return;
 
@@ -154,7 +154,7 @@ export default function ChatListPage() {
     navigate(`/chat/${chatId}`, { state: { user } });
   };
 
-  // Dedup logic using Map (just in case)
+  // Dedup logic using Map
   const chatMap = new Map<string, any>();
   localChats.forEach((chat: any) => {
     const otherUserId = chat.user?._id;
@@ -245,12 +245,25 @@ export default function ChatListPage() {
 
       {/* Header */}
       <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="sticky top-0 z-40 glass-strong p-4">
+
+        {/* ✅ FIX: Added Back Button Next to Messages Title */}
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-display font-bold bg-linear-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">Messages</h1>
+          <div className="flex items-center gap-3">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => navigate("/")}
+              className="p-2 glass rounded-full"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </motion.button>
+            <h1 className="text-2xl font-display font-bold bg-linear-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">Messages</h1>
+          </div>
           <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setIsNewChatOpen(true)} className="p-2 glass rounded-full hover:bg-primary/20 transition-colors">
             <Edit className="w-5 h-5" />
           </motion.button>
         </div>
+
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input variant="glass" placeholder="Search messages..." value={query} onChange={(e) => setQuery(e.target.value)} className="pl-12" />
@@ -296,17 +309,15 @@ export default function ChatListPage() {
                 <span className="text-xs text-muted-foreground">{chat.lastMessageAt ? formatDistanceToNowStrict(new Date(chat.lastMessageAt), { addSuffix: true }) : ""}</span>
               </div>
               <div className="flex items-center justify-between mt-1">
-                {/* ✅ UPDATED TEXT LOGIC */}
                 <p
                   className={`text-sm truncate ${chat.unreadCount > 0
-                      ? "text-foreground font-bold" // Black in Light, White in Dark
-                      : "text-muted-foreground"
+                    ? "text-foreground font-bold"
+                    : "text-muted-foreground"
                     }`}
                 >
                   {chat.lastMessage || "Start a conversation"}
                 </p>
 
-                {/* ✅ UPDATED BADGE LOGIC */}
                 {chat.unreadCount > 0 && (
                   <span className="ml-2 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
                     {chat.unreadCount}

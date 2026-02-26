@@ -12,9 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/axios";
-import { PostViewDialog } from "@/components/feed/PostViewDialog"; // Reusing your PostView Dialog
+import { PostViewDialog } from "@/components/feed/PostViewDialog";
 import type { Post } from "@/types";
 
+// ✅ Added "Saved Content" back to the UI options
 const settingsSections = [
   {
     title: "Account",
@@ -39,9 +40,7 @@ export default function SettingsPage() {
 
   const [activeView, setActiveView] = useState<string | null>("profile");
 
-  // ---------------------------------------------------------
   // EDIT PROFILE STATE
-  // ---------------------------------------------------------
   const [formData, setFormData] = useState({
     name: "",
     username: "",
@@ -53,9 +52,7 @@ export default function SettingsPage() {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ---------------------------------------------------------
-  // SECURITY (PASSWORD) STATE
-  // ---------------------------------------------------------
+  // SECURITY STATE
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -63,15 +60,12 @@ export default function SettingsPage() {
   });
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  // ---------------------------------------------------------
-  // SAVED CONTENT STATE
-  // ---------------------------------------------------------
+  // ✅ SAVED CONTENT STATE
   const [savedPosts, setSavedPosts] = useState<Post[]>([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isPostViewOpen, setIsPostViewOpen] = useState(false);
 
-  // Sync profile form data
   useEffect(() => {
     if (authUser) {
       setFormData({
@@ -84,18 +78,16 @@ export default function SettingsPage() {
     }
   }, [authUser]);
 
-  // Fetch saved posts when navigating to "saved" view
+  // ✅ Fetch Saved Posts & Reels dynamically
   useEffect(() => {
     if (activeView === "saved" && authUser) {
       const fetchSavedPosts = async () => {
         setIsLoadingSaved(true);
         try {
           const { data } = await api.get(`/posts/saved-posts/${authUser._id}`);
-          // Ensure it handles both raw arrays or data.data objects depending on backend consistency
           const items = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
           setSavedPosts(items);
         } catch (error) {
-          console.error("Failed to load saved posts", error);
           toast.error("Could not load saved content");
         } finally {
           setIsLoadingSaved(false);
@@ -151,11 +143,9 @@ export default function SettingsPage() {
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
       return toast.error("All fields are required");
     }
-
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       return toast.error("New passwords do not match");
     }
-
     if (passwordData.newPassword.length < 6) {
       return toast.error("Password must be at least 6 characters long");
     }
@@ -193,20 +183,11 @@ export default function SettingsPage() {
             <div className="flex flex-col items-center gap-4 p-6 glass-strong rounded-2xl">
               <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                 <AvatarRing src={previewImage || "/default-avatar.png"} size="xl" />
-                <button
-                  type="button"
-                  className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
+                <button type="button" className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <Camera className="w-6 h-6 text-white" />
                 </button>
               </div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImageChange}
-                accept="image/*"
-                className="hidden"
-              />
+              <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
               <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                 Change Photo
               </Button>
@@ -215,45 +196,28 @@ export default function SettingsPage() {
             <div className="space-y-4 glass-strong p-6 rounded-2xl">
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-1 block">Name</label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="bg-background/50 border-border/50"
-                  maxLength={30}
-                />
+                <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="bg-background/50 border-border/50" maxLength={30} />
               </div>
+
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-1 block">Username</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
-                  <Input
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/\s/g, "") })}
-                    className="pl-10 bg-background/50 border-border/50"
-                    maxLength={20}
-                  />
+                  <Input value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/\s/g, "") })} className="pl-10 bg-background/50 border-border/50" maxLength={20} />
                 </div>
               </div>
+
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-1 block">Website</label>
-                <Input
-                  value={formData.website}
-                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                  className="bg-background/50 border-border/50"
-                  placeholder="yourwebsite.com"
-                />
+                <Input value={formData.website} onChange={(e) => setFormData({ ...formData, website: e.target.value })} className="bg-background/50 border-border/50" placeholder="yourwebsite.com" />
               </div>
+
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-1 block">Bio</label>
-                <textarea
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  className="w-full bg-background/50 border border-border/50 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                  rows={4}
-                  maxLength={150}
-                />
+                <textarea value={formData.bio} onChange={(e) => setFormData({ ...formData, bio: e.target.value })} className="w-full bg-background/50 border border-border/50 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" rows={4} maxLength={150} placeholder="Tell us about yourself..." />
                 <p className="text-xs text-muted-foreground text-right mt-1">{formData.bio.length}/150</p>
               </div>
+
               <Button type="submit" className="w-full mt-4 h-12" disabled={isUpdatingProfile}>
                 {isUpdatingProfile ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Updating...</> : "Save Changes"}
               </Button>
@@ -279,9 +243,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-3 gap-1 md:gap-2">
                 {savedPosts.map((post, index) => {
                   const isVideo = (post as any).videoUrl || (post as any).type === 'reel';
-                  const thumbnail = isVideo
-                    ? ((post as any).thumbnailUrl || (post as any).image)
-                    : (post.images?.[0] || (post as any).image);
+                  const thumbnail = isVideo ? ((post as any).thumbnailUrl || (post as any).image) : (post.images?.[0] || (post as any).image);
 
                   return (
                     <motion.div
@@ -296,13 +258,14 @@ export default function SettingsPage() {
                       }}
                       className="relative group overflow-hidden cursor-pointer aspect-square bg-secondary/30 rounded-md md:rounded-xl"
                     >
-                      <img
-                        src={thumbnail || "/placeholder-image.jpg"}
-                        alt="Saved Post"
-                        className="w-full h-full object-cover"
-                      />
+                      {isVideo && (post as any).videoUrl ? (
+                        <video src={(post as any).videoUrl} className="w-full h-full object-cover pointer-events-none" muted playsInline />
+                      ) : (
+                        <img src={thumbnail || "/placeholder-image.jpg"} alt="Saved Post" className="w-full h-full object-cover" />
+                      )}
+
                       {isVideo && (
-                        <div className="absolute top-2 right-2 text-white drop-shadow-md">
+                        <div className="absolute top-2 right-2 text-white drop-shadow-md z-10">
                           <Play className="w-4 h-4 md:w-5 md:h-5 fill-white" />
                         </div>
                       )}
@@ -333,11 +296,7 @@ export default function SettingsPage() {
                 onClick={toggleTheme}
                 className={`w-14 h-8 rounded-full p-1 transition-colors ${theme === "dark" ? "bg-gradient-primary" : "bg-muted"}`}
               >
-                <motion.div
-                  animate={{ x: theme === "dark" ? 24 : 0 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  className="w-6 h-6 bg-white rounded-full shadow-md"
-                />
+                <motion.div animate={{ x: theme === "dark" ? 24 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} className="w-6 h-6 bg-white rounded-full shadow-md" />
               </motion.button>
             </div>
           </div>
@@ -364,37 +323,18 @@ export default function SettingsPage() {
                 <h3 className="font-medium text-xl">Change Password</h3>
                 <p className="text-sm text-muted-foreground">Ensure your account is using a long, random password to stay secure.</p>
               </div>
-
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-1 block">Current Password</label>
-                <Input
-                  type="password"
-                  value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                  className="bg-background/50 border-border/50"
-                />
+                <Input type="password" value={passwordData.currentPassword} onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })} className="bg-background/50 border-border/50" />
               </div>
-
               <div className="pt-2">
                 <label className="text-sm font-medium text-muted-foreground mb-1 block">New Password</label>
-                <Input
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                  className="bg-background/50 border-border/50"
-                />
+                <Input type="password" value={passwordData.newPassword} onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })} className="bg-background/50 border-border/50" />
               </div>
-
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-1 block">Confirm New Password</label>
-                <Input
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                  className="bg-background/50 border-border/50"
-                />
+                <Input type="password" value={passwordData.confirmPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} className="bg-background/50 border-border/50" />
               </div>
-
               <Button type="submit" className="w-full mt-6 h-12" disabled={isUpdatingPassword}>
                 {isUpdatingPassword ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Updating...</> : "Update Password"}
               </Button>
@@ -416,7 +356,6 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background pb-20 md:pb-0 flex flex-col md:flex-row">
       <div className={`w-full md:w-80 lg:w-96 md:border-r border-border md:h-screen md:overflow-y-auto shrink-0 ${activeView ? 'hidden md:block' : 'block'}`}>
         <PageHeader title="Settings" />
-
         <div className="p-4 space-y-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -433,27 +372,17 @@ export default function SettingsPage() {
           </motion.div>
 
           {settingsSections.map((section, sectionIndex) => (
-            <motion.div
-              key={section.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + sectionIndex * 0.1 }}
-            >
+            <motion.div key={section.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + sectionIndex * 0.1 }}>
               <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 px-2">{section.title}</h3>
               <div className="glass-strong rounded-2xl overflow-hidden">
                 {section.items.map((item, index) => (
                   <button
                     key={item.id}
                     onClick={() => setActiveView(item.id)}
-                    className={`w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors ${activeView === item.id ? "bg-white/10" : ""
-                      } ${index !== section.items.length - 1 ? "border-b border-border/50" : ""}`}
+                    className={`w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors ${activeView === item.id ? "bg-white/10" : ""} ${index !== section.items.length - 1 ? "border-b border-border/50" : ""}`}
                   >
-                    <div className="p-2 bg-secondary rounded-xl">
-                      <item.icon className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="font-medium text-sm text-foreground">{item.label}</p>
-                    </div>
+                    <div className="p-2 bg-secondary rounded-xl"><item.icon className="w-5 h-5 text-primary" /></div>
+                    <div className="flex-1 text-left"><p className="font-medium text-sm text-foreground">{item.label}</p></div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground opacity-50" />
                   </button>
                 ))}
@@ -462,29 +391,25 @@ export default function SettingsPage() {
           ))}
 
           <motion.button
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 p-4 glass-strong rounded-2xl text-red-500 hover:bg-red-500/10 transition-colors mt-8"
           >
             <LogOut className="w-5 h-5" />
             <span className="font-medium">Log Out</span>
           </motion.button>
-
         </div>
       </div>
 
       <div className={`flex-1 md:h-screen md:overflow-y-auto bg-background/50 ${!activeView ? 'hidden md:block' : 'block'}`}>
         {activeView && (
-          <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border p-4 flex items-center gap-3 md:hidden">
+          <div className="sticky top-0 bg-background/80 backdrop-blur-md border-b border-border p-4 flex items-center gap-3 md:hidden z-50">
             <button onClick={() => setActiveView(null)} className="p-2 bg-secondary rounded-full">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <h2 className="font-bold text-lg capitalize">{activeView.replace("-", " ")}</h2>
           </div>
         )}
-
         <div className="p-4 md:p-8 max-w-2xl mx-auto pb-32 md:pb-8">
           {renderActiveView()}
         </div>
