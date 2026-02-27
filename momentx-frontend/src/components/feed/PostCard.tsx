@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2, MapPin, Play, Volume2, VolumeX } from "lucide-react"
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, MapPin, Play, Volume2, VolumeX } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Post } from "@/types"
 import { AvatarRing } from "@/components/ui/avatar-ring"
@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { PostModal } from "./PostModal"
 import { api } from "@/lib/axios"
 import { Link } from "react-router-dom"
+import { FeedPostOptionsDialog } from "@/components/post/FeedPostOptionsDialog" // ✅ Imported here
 
 interface PostCardProps {
   post: Post
@@ -29,14 +30,14 @@ export function PostCard({ post }: PostCardProps) {
   const [likes, setLikes] = useState(post.likes)
   const [showHeart, setShowHeart] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
 
-  // ✅ Caption Truncation State
+  // Options Dialog state
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false)
+
+  // Caption Truncation State
   const [showFullCaption, setShowFullCaption] = useState(false)
-
   const lastTapRef = useRef(0)
 
-  // ✅ SAFELY parse video logic
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
@@ -47,7 +48,6 @@ export function PostCard({ post }: PostCardProps) {
   useEffect(() => {
     if (!hasVideo || !videoRef.current) return;
 
-    // For Safari Autoplay
     videoRef.current.defaultMuted = true;
     videoRef.current.muted = isMuted;
 
@@ -142,7 +142,6 @@ export function PostCard({ post }: PostCardProps) {
     return new Date(dateString).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }).toUpperCase();
   }
 
-  // ✅ PERFECT CAPTION TRUNCATION
   const renderCaption = () => {
     if (!post.caption) return null;
 
@@ -185,22 +184,9 @@ export function PostCard({ post }: PostCardProps) {
             </div>
           </Link>
 
-          <div className="relative">
-            <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-muted rounded-full transition-colors">
-              <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
-            </button>
-            {showSettings && (
-              <div className="absolute right-0 mt-2 w-40 bg-popover rounded-xl shadow-lg border border-border overflow-hidden z-20">
-                {post.user._id === currentUser._id ? (
-                  <button onClick={handleDeletePost} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-muted/50 flex items-center gap-2">
-                    <Trash2 className="w-4 h-4" /> Delete
-                  </button>
-                ) : (
-                  <button className="w-full text-left px-4 py-2 text-sm hover:bg-muted/50">Report</button>
-                )}
-              </div>
-            )}
-          </div>
+          <button onClick={() => setIsOptionsOpen(true)} className="p-2 hover:bg-muted rounded-full transition-colors">
+            <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
+          </button>
         </div>
 
         <div
@@ -272,7 +258,6 @@ export function PostCard({ post }: PostCardProps) {
 
           <p className="font-semibold text-sm">{formatNumber(likes)} likes</p>
 
-          {/* ✅ FIXED CAPTION RENDERER */}
           {post.caption && (
             <div className="text-sm">
               <Link to={`/u/${post.user.username}`} className="font-semibold mr-2 hover:underline">
@@ -309,6 +294,15 @@ export function PostCard({ post }: PostCardProps) {
         post={post}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      {/* Shared Options Dialog */}
+      <FeedPostOptionsDialog
+        isOpen={isOptionsOpen}
+        onClose={() => setIsOptionsOpen(false)}
+        postId={post._id}
+        isOwnPost={post.user._id === currentUser._id}
+        onDelete={handleDeletePost}
       />
     </>
   )

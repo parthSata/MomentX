@@ -2,7 +2,8 @@ import { Link, useLocation } from "react-router-dom"
 import { motion } from "framer-motion"
 import {
   Home, Search, Film, MessageCircle, Bell,
-  PlusSquare, Settings} from "lucide-react"
+  PlusSquare, Settings
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AvatarRing } from "@/components/ui/avatar-ring"
 import { useAuth } from "@/context/AuthContext"
@@ -18,7 +19,6 @@ const mainNavItems = [
 ]
 
 const secondaryNavItems = [
-  // { icon: TrendingUp, path: "/activity", label: "Activity" },
   { icon: Settings, path: "/settings", label: "Settings" },
 ]
 
