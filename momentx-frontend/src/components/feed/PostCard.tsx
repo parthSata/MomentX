@@ -8,7 +8,10 @@ import { toast } from "sonner"
 import { PostModal } from "./PostModal"
 import { api } from "@/lib/axios"
 import { Link } from "react-router-dom"
-import { FeedPostOptionsDialog } from "@/components/post/FeedPostOptionsDialog" // ✅ Imported here
+import { FeedPostOptionsDialog } from "@/components/post/FeedPostOptionsDialog"
+import { LikesCountDialog } from "@/components/post/LikesCountDialog"
+// ✅ Import Share Dialog
+import { ShareDialog } from "@/components/reels/ShareDialog"
 
 interface PostCardProps {
   post: Post
@@ -30,11 +33,12 @@ export function PostCard({ post }: PostCardProps) {
   const [likes, setLikes] = useState(post.likes)
   const [showHeart, setShowHeart] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
-
-  // Options Dialog state
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
+  const [isLikesOpen, setIsLikesOpen] = useState(false)
 
-  // Caption Truncation State
+  // ✅ Add Share State
+  const [isShareOpen, setIsShareOpen] = useState(false)
+
   const [showFullCaption, setShowFullCaption] = useState(false)
   const lastTapRef = useRef(0)
 
@@ -47,7 +51,6 @@ export function PostCard({ post }: PostCardProps) {
 
   useEffect(() => {
     if (!hasVideo || !videoRef.current) return;
-
     videoRef.current.defaultMuted = true;
     videoRef.current.muted = isMuted;
 
@@ -62,7 +65,6 @@ export function PostCard({ post }: PostCardProps) {
       },
       { threshold: 0.6 }
     );
-
     observer.observe(videoRef.current);
     return () => observer.disconnect();
   }, [hasVideo, isMuted]);
@@ -70,7 +72,6 @@ export function PostCard({ post }: PostCardProps) {
   const handleMediaInteract = () => {
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
-
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
       if (!isLiked) handleLike();
       setShowHeart(true);
@@ -91,15 +92,12 @@ export function PostCard({ post }: PostCardProps) {
   const handleLike = async () => {
     const prevLiked = isLiked;
     const prevLikes = likes;
-
     setIsLiked(!isLiked);
     setLikes(prev => isLiked ? prev - 1 : prev + 1);
-
     if (!isLiked) {
       setShowHeart(true);
       setTimeout(() => setShowHeart(false), 800);
     }
-
     try {
       await api.post(`/posts/${post._id}/like`)
     } catch (error) {
@@ -112,7 +110,6 @@ export function PostCard({ post }: PostCardProps) {
   const handleSave = async () => {
     const prevSaved = isSaved;
     setIsSaved(!isSaved);
-
     try {
       await api.post(`/posts/${post._id}/save`);
       toast.success(isSaved ? "Removed from saved" : "Post saved!", { duration: 1500 });
@@ -144,10 +141,8 @@ export function PostCard({ post }: PostCardProps) {
 
   const renderCaption = () => {
     if (!post.caption) return null;
-
     const isLong = post.caption.length > 80;
     const textToShow = (!showFullCaption && isLong) ? post.caption.slice(0, 80).trim() + "..." : post.caption;
-
     return (
       <span className="text-foreground/90 whitespace-pre-wrap leading-relaxed">
         {textToShow.split(" ").map((word, i) =>
@@ -183,7 +178,6 @@ export function PostCard({ post }: PostCardProps) {
               )}
             </div>
           </Link>
-
           <button onClick={() => setIsOptionsOpen(true)} className="p-2 hover:bg-muted rounded-full transition-colors">
             <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -195,43 +189,23 @@ export function PostCard({ post }: PostCardProps) {
         >
           {hasVideo ? (
             <>
-              <video
-                ref={videoRef}
-                src={rawVideoUrl}
-                className="w-full h-full object-contain"
-                loop
-                muted={isMuted}
-                playsInline
-              />
+              <video ref={videoRef} src={rawVideoUrl} className="w-full h-full object-contain" loop muted={isMuted} playsInline />
               {!isPlaying && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
                   <Play className="w-16 h-16 text-white/80 fill-white/80" />
                 </div>
               )}
-              <button
-                onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}
-                className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10"
-              >
+              <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </button>
             </>
           ) : (
-            <img
-              src={post.images?.[0] || (post as any).thumbnailUrl || "/placeholder-image.jpg"}
-              alt={post.caption || "Post content"}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
+            <img src={post.images?.[0] || (post as any).thumbnailUrl || "/placeholder-image.jpg"} alt={post.caption || "Post content"} className="w-full h-full object-cover" loading="lazy" />
           )}
 
           <AnimatePresence>
             {showHeart && (
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
-              >
+              <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                 <Heart className="w-24 h-24 text-red-500 fill-red-500 animate-heart-pop drop-shadow-[0_0_40px_rgba(239,68,68,0.8)]" />
               </motion.div>
             )}
@@ -247,7 +221,9 @@ export function PostCard({ post }: PostCardProps) {
               <button onClick={() => setIsModalOpen(true)} className="hover:text-muted-foreground transition-colors">
                 <MessageCircle className="w-6 h-6 -rotate-90" />
               </button>
-              <button className="hover:text-muted-foreground transition-colors">
+
+              {/* ✅ Trigger Share Dialog */}
+              <button onClick={() => setIsShareOpen(true)} className="hover:text-muted-foreground transition-colors">
                 <Send className="w-6 h-6" />
               </button>
             </div>
@@ -256,21 +232,18 @@ export function PostCard({ post }: PostCardProps) {
             </motion.button>
           </div>
 
-          <p className="font-semibold text-sm">{formatNumber(likes)} likes</p>
+          <button onClick={() => setIsLikesOpen(true)} className="font-semibold text-sm hover:text-muted-foreground transition-colors">
+            {formatNumber(likes)} likes
+          </button>
 
           {post.caption && (
             <div className="text-sm">
               <Link to={`/u/${post.user.username}`} className="font-semibold mr-2 hover:underline">
                 {post.user.username}
               </Link>
-
               {renderCaption()}
-
               {post.caption.length > 80 && !showFullCaption && (
-                <button
-                  onClick={() => setShowFullCaption(true)}
-                  className="text-muted-foreground font-semibold ml-1 hover:text-foreground"
-                >
+                <button onClick={() => setShowFullCaption(true)} className="text-muted-foreground font-semibold ml-1 hover:text-foreground">
                   more
                 </button>
               )}
@@ -281,29 +254,18 @@ export function PostCard({ post }: PostCardProps) {
             {formatDate(post.createdAt)}
           </p>
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-1"
-          >
+          <button onClick={() => setIsModalOpen(true)} className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-1">
             {post.comments > 0 ? `View all ${post.comments} comments` : "Add a comment..."}
           </button>
         </div>
       </motion.article>
 
-      <PostModal
-        post={post}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
+      <PostModal post={post} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <FeedPostOptionsDialog isOpen={isOptionsOpen} onClose={() => setIsOptionsOpen(false)} postId={post._id} isOwnPost={post.user._id === currentUser._id} onDelete={handleDeletePost} />
+      <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={post._id} likesCount={likes} />
 
-      {/* Shared Options Dialog */}
-      <FeedPostOptionsDialog
-        isOpen={isOptionsOpen}
-        onClose={() => setIsOptionsOpen(false)}
-        postId={post._id}
-        isOwnPost={post.user._id === currentUser._id}
-        onDelete={handleDeletePost}
-      />
+      {/* ✅ ADDED: Share Dialog */}
+      <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} postId={post._id} />
     </>
   )
 }

@@ -11,6 +11,9 @@ import {
   getUserSavedPosts,
   getUserTaggedPosts,
   searchHashtags,
+  editPost,
+  getPostById, // ✅ IMPORT NEW CONTROLLER
+  getPostLikes, // ✅ IMPORT NEW CONTROLLER
 } from '../controllers/post.controller.js';
 
 const router = Router();
@@ -31,9 +34,13 @@ router.route('/tagged-posts/:userId').get(getUserTaggedPosts);
 // --- Search ---
 router.route('/search/tags').get(searchHashtags);
 
-// --- Interactions ---
+// --- Interactions & Single Post Fetch ---
 router.route('/:postId/like').post(togglePostLike);
 router.route('/:postId/save').post(toggleSavePost);
 router.route('/:postId/delete').delete(deletePost);
+
+// ✅ FIXED: Added GET request for fetching a single post by ID
+router.route('/:postId').get(getPostById).put(editPost);
+router.route('/:postId/likes').get(getPostLikes); // ✅ ADDED LIKES ROUTE
 
 export default router;

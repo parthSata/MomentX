@@ -10,7 +10,6 @@ import { ApiError } from './utils/ApiError.js';
 import { initStoryCleanup } from '../cron/StoryCleanup.js';
 import { User } from './models/user.model.js';
 
-
 import userRouter from './routes/user.routes.js';
 import postRouter from './routes/post.routes.js';
 import storyRoutes from './routes/story.routes.js';
@@ -22,6 +21,7 @@ import exploreRouter from './routes/explore.routes.js';
 import commentRouter from './routes/comment.route.js';
 import adminRouter from './routes/admin.routes.js';
 import activityRouter from './routes/activity.routes.js';
+import reportRouter from './routes/report.routes.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -163,6 +163,7 @@ app.use('/api/v1/reels', reelRouter); // ✅ Reel routes
 app.use('/api/v1/explore', exploreRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/activity', activityRouter);
+app.use('/api/v1/reports', reportRouter); // ✅ Report routes
 
 // Error Handling
 app.use((err, req, res, next) => {

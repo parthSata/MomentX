@@ -4,6 +4,9 @@ import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Volume2, VolumeX,
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { cn } from "@/lib/utils";
 import { ReelCommentsSheet } from "./ReelCommentsSheet";
+import { LikesCountDialog } from "@/components/post/LikesCountDialog";
+// ✅ Import Share Dialog
+import { ShareDialog } from "@/components/reels/ShareDialog";
 import { api } from "@/lib/axios";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -36,28 +39,22 @@ interface ReelCardProps {
     onToggleMute: () => void;
 }
 
-export function ReelCard({
-    reel,
-    isActive,
-    muted,
-    onToggleMute,
-}: ReelCardProps) {
+export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps) {
     const { user: currentUser, refreshUser } = useAuth();
-
     const videoRef = useRef<HTMLVideoElement>(null);
     const [showFullCaption, setShowFullCaption] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [showHeart, setShowHeart] = useState(false);
-
     const [isLiked, setIsLiked] = useState(reel.isLiked || false);
     const [likeCount, setLikeCount] = useState(reel.likes || 0);
     const [commentCount, setCommentCount] = useState(reel.commentsCount || 0);
     const [isSaved, setIsSaved] = useState(reel.isSaved || false);
-
-    // State for following
     const [isFollowing, setIsFollowing] = useState(false);
+    const [isLikesOpen, setIsLikesOpen] = useState(false);
 
-    // ✅ FIX: Cast currentUser to any to bypass the missing 'following' type error
+    // ✅ Add Share State
+    const [isShareOpen, setIsShareOpen] = useState(false);
+
     useEffect(() => {
         const authUser = currentUser as any;
         if (authUser && authUser.following && reel.user?._id) {
@@ -81,9 +78,7 @@ export function ReelCard({
             if (isActive) {
                 const playPromise = videoRef.current.play();
                 if (playPromise !== undefined) {
-                    playPromise.catch((error) => {
-                        console.warn("Reel Autoplay failed:", error);
-                    });
+                    playPromise.catch((error) => console.warn("Reel Autoplay failed:", error));
                 }
             } else {
                 videoRef.current.pause();
@@ -95,10 +90,8 @@ export function ReelCard({
     const handleLike = async () => {
         const prevLiked = isLiked;
         const prevCount = likeCount;
-
         setIsLiked(!prevLiked);
         setLikeCount(prev => prevLiked ? prev - 1 : prev + 1);
-
         try {
             await api.post(`/posts/${reel._id}/like`);
         } catch (error) {
@@ -115,7 +108,7 @@ export function ReelCard({
 
     const handleSave = async () => {
         const prevSaved = isSaved;
-        setIsSaved(!prevSaved);
+        setIsSaved(!isSaved);
         try {
             await api.post(`/posts/${reel._id}/save`);
         } catch (error) {
@@ -127,7 +120,6 @@ export function ReelCard({
         if (!reel.user?._id) return;
         const prevStatus = isFollowing;
         setIsFollowing(!isFollowing);
-
         try {
             await api.post(`/users/follow/${reel.user._id}`);
             refreshUser();
@@ -137,13 +129,10 @@ export function ReelCard({
     };
 
     const hasVideo = typeof reel.videoUrl === 'string' && reel.videoUrl.trim() !== "";
-
     const isOwnReel = currentUser?._id === reel.user?._id;
 
     return (
         <div className="h-full w-full flex items-center justify-center bg-black relative">
-
-            {/* Blurred Background */}
             {hasVideo && (
                 <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
                     <video src={reel.videoUrl} className="w-full h-full object-cover blur-3xl scale-110" muted playsInline />
@@ -151,9 +140,7 @@ export function ReelCard({
                 </div>
             )}
 
-            {/* Main Container */}
             <div className="relative h-full w-full md:max-w-100 lg:max-w-112.5 mx-auto bg-black md:rounded-xl overflow-hidden shadow-2xl" onDoubleClick={handleDoubleTap}>
-
                 {hasVideo ? (
                     <video
                         ref={videoRef}
@@ -165,25 +152,19 @@ export function ReelCard({
                         onClick={onToggleMute}
                     />
                 ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-white/50">
-                        Content Unavailable
-                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center text-white/50">Content Unavailable</div>
                 )}
 
-                {/* Gradient Overlay */}
                 <div className="absolute inset-0 bg-linear-to-b from-black/30 via-transparent to-black/80 pointer-events-none" />
 
-                {/* Mute Button */}
                 <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                     onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
                     className="absolute top-4 right-4 z-30 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition-colors"
                 >
                     {muted ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}
                 </motion.button>
 
-                {/* Double Tap Heart Animation */}
                 <AnimatePresence>
                     {showHeart && isActive && (
                         <motion.div
@@ -197,19 +178,23 @@ export function ReelCard({
                     )}
                 </AnimatePresence>
 
-                {/* Side Actions Bar */}
                 <div className="absolute right-3 bottom-20 md:bottom-20 flex flex-col items-center gap-5 z-20 pb-4">
-                    <button onClick={(e) => { e.stopPropagation(); handleLike(); }} className="flex flex-col items-center gap-1 active:scale-90 transition-transform">
-                        <Heart className={cn("w-7 h-7 transition-colors", isLiked ? "text-red-500 fill-red-500" : "text-white")} />
-                        <span className="text-white text-xs font-semibold">{likeCount}</span>
-                    </button>
+                    <div className="flex flex-col items-center gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); handleLike(); }} className="active:scale-90 transition-transform">
+                            <Heart className={cn("w-7 h-7 transition-colors", isLiked ? "text-red-500 fill-red-500" : "text-white")} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setIsLikesOpen(true); }} className="text-white text-xs font-semibold hover:text-gray-300 transition-colors">
+                            {likeCount}
+                        </button>
+                    </div>
 
                     <button onClick={(e) => { e.stopPropagation(); setShowComments(true); }} className="flex flex-col items-center gap-1 active:scale-90 transition-transform">
                         <MessageCircle className="w-7 h-7 text-white" />
                         <span className="text-white text-xs font-semibold">{commentCount}</span>
                     </button>
 
-                    <button className="flex flex-col items-center gap-1 active:scale-90 transition-transform">
+                    {/* ✅ Trigger Share Dialog */}
+                    <button onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} className="flex flex-col items-center gap-1 active:scale-90 transition-transform">
                         <Send className="w-7 h-7 text-white -rotate-12" />
                         <span className="text-white text-xs font-semibold">{reel.sharesCount || 0}</span>
                     </button>
@@ -230,7 +215,6 @@ export function ReelCard({
                     </Link>
                 </div>
 
-                {/* Bottom Info Section */}
                 <div className="absolute bottom-6 md:bottom-4 left-4 right-16 z-20 pointer-events-auto text-left">
                     <div className="flex items-center gap-2 mb-3">
                         <Link to={`/u/${reel.user?.username}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -275,15 +259,11 @@ export function ReelCard({
                     </div>
                 </div>
 
-                {/* Comment Sheet */}
-                <ReelCommentsSheet
-                    isOpen={showComments}
-                    onClose={() => setShowComments(false)}
-                    postId={reel._id}
-                    commentCount={commentCount.toString()}
-                    onCommentAdded={() => setCommentCount(prev => prev + 1)}
-                />
+                <ReelCommentsSheet isOpen={showComments} onClose={() => setShowComments(false)} postId={reel._id} commentCount={commentCount.toString()} onCommentAdded={() => setCommentCount(prev => prev + 1)} />
+                <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={reel._id} likesCount={likeCount} />
 
+                {/* ✅ Added Share Dialog */}
+                <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} postId={reel._id} />
             </div>
         </div>
     );

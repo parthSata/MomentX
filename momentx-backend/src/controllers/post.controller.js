@@ -349,6 +349,61 @@ const deletePost = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { postId }, 'Deleted successfully'));
 });
 
+const editPost = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+  const { caption, location, tags } = req.body;
+  const userId = req.user._id;
+
+  // 1. Try to find the item in the Post collection first
+  let item = await Post.findById(postId);
+  let isReel = false;
+
+  // 2. If it is not found in Posts, try finding it in the Reel collection
+  if (!item) {
+    item = await Reel.findById(postId);
+    isReel = true;
+  }
+
+  // 3. If neither has it, return a 404
+  if (!item) {
+    throw new ApiError(404, 'Post or Reel not found');
+  }
+
+  // 4. Check if the current user actually owns the content
+  if (item.user.toString() !== userId.toString()) {
+    throw new ApiError(403, 'You are not authorized to edit this content');
+  }
+
+  // 5. Update the fields
+  item.caption = caption;
+
+  if (location !== undefined) {
+    item.location = location;
+  }
+
+  // If you added tags support in your schema, update them too
+  if (tags !== undefined) {
+    // Split tags by comma if sent as a string, clean them up, and assign
+    item.hashtags =
+      typeof tags === 'string'
+        ? tags.split(',').map((tag) => tag.trim().replace(/^#/, ''))
+        : tags;
+  }
+
+  // 6. Save the changes to the database
+  await item.save();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        item,
+        isReel ? 'Reel updated successfully' : 'Post updated successfully',
+      ),
+    );
+});
+
 // --- SEARCH (Fixed for Reels) ---
 const searchHashtags = asyncHandler(async (req, res) => {
   const { query } = req.query;
@@ -394,6 +449,78 @@ const searchHashtags = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, results, 'Hashtag results fetched'));
 });
 
+const getPostById = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+  const currentUserId = req.user._id;
+
+  if (!mongoose.Types.ObjectId.isValid(postId)) {
+    throw new ApiError(400, 'Invalid Post ID');
+  }
+
+  // 1. Try finding in Posts first
+  let content = await Post.findById(postId).populate(
+    'user',
+    'username name profilePic isVerified',
+  );
+  let isReel = false;
+
+  // 2. If not found in Posts, try finding in Reels
+  if (!content) {
+    content = await Reel.findById(postId).populate(
+      'user',
+      'username name profilePic isVerified',
+    );
+    isReel = true;
+  }
+
+  if (!content) {
+    throw new ApiError(404, 'Post or Reel not found');
+  }
+
+  // Format using your existing formatPosts helper
+  const formattedContentArray = await formatPosts([content], currentUserId);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        formattedContentArray[0],
+        'Content fetched successfully',
+      ),
+    );
+});
+
+const getPostLikes = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(postId)) {
+    throw new ApiError(400, 'Invalid Post ID');
+  }
+
+  // 1. Try finding in Posts first
+  let item = await Post.findById(postId).populate(
+    'likes',
+    'username name profilePic isVerified',
+  );
+
+  // 2. If not found, try Reels
+  if (!item) {
+    item = await Reel.findById(postId).populate(
+      'likes',
+      'username name profilePic isVerified',
+    );
+  }
+
+  if (!item) {
+    throw new ApiError(404, 'Post or Reel not found');
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, item.likes, 'Likes fetched successfully'));
+});
+
 export {
   createPost,
   getHomeFeed,
@@ -404,4 +531,7 @@ export {
   toggleSavePost,
   deletePost,
   searchHashtags,
+  editPost,
+  getPostById,
+  getPostLikes,
 };
