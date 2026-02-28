@@ -255,7 +255,6 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
         } catch (error) { toast.error("Failed to delete comment"); }
     };
 
-    // ✅ FIXED: Restored formatTimeAgo and formatPostDate
     const formatTimeAgo = (dateString: string) => {
         if (!dateString) return "";
         try {
@@ -469,11 +468,12 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                 postId={normalizedPost._id}
             />
 
+            {/* ✅ FIXED: Passes the full post object */}
             {normalizedPost && (
                 <ShareDialog
                     isOpen={isShareOpen}
                     onClose={() => setIsShareOpen(false)}
-                    postId={normalizedPost._id}
+                    post={normalizedPost}
                 />
             )}
         </>

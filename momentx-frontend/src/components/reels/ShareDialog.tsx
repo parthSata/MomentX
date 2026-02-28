@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { api } from "@/lib/axios";
 
-// Interface to match your MongoDB User schema
+// Match your MongoDB User schema
 interface UserProfile {
     _id: string;
     username: string;
@@ -49,32 +49,42 @@ const MailIcon = () => <Mail className="w-5 h-5" />;
 interface ShareDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    postId: string;
+    // ✅ Changed from postId: string to post: any to access all content details for sharing
+    post: any;
 }
 
-export function ShareDialog({ isOpen, onClose, postId }: ShareDialogProps) {
+export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
 
     // Real State Variables
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isSending, setIsSending] = useState(false);
 
-    // Fetch Users dynamically when the dialog opens
+    // Fetch REAL Users dynamically when the dialog opens
     useEffect(() => {
         if (isOpen) {
             setLoading(true);
-            // ✅ FIX: Changed from "/users" to "/users/all" matching your backend route
+
             api.get("/users/all")
                 .then((res) => {
-                    const fetchedUsers = Array.isArray(res.data.data)
-                        ? res.data.data
-                        : (res.data.data?.users || []);
-                    setUsers(fetchedUsers);
+                    const payload = res.data?.message || res.data?.message || res.data;
+
+                    if (Array.isArray(payload)) {
+                        setUsers(payload);
+                    } else if (payload?.users && Array.isArray(payload.users)) {
+                        setUsers(payload.users);
+                    } else if (payload?.docs && Array.isArray(payload.docs)) {
+                        setUsers(payload.docs);
+                    } else {
+                        setUsers([]);
+                    }
                 })
                 .catch((err) => {
                     console.error("Failed to load users for share sheet", err);
                     toast.error("Failed to load friends list");
+                    setUsers([]);
                 })
                 .finally(() => {
                     setLoading(false);
@@ -101,19 +111,43 @@ export function ShareDialog({ isOpen, onClose, postId }: ShareDialogProps) {
         );
     };
 
+    // ✅ Actual Backend Share Logic
     const handleSend = async () => {
-        if (selectedProfiles.length > 0) {
-            // NOTE: Add actual backend chat logic here in the future
-            // await api.post(`/chat/share`, { postId, userIds: selectedProfiles });
+        if (selectedProfiles.length === 0 || !post) return;
+        setIsSending(true);
 
-            toast.success(`Shared with ${selectedProfiles.length} people!`);
+        try {
+            // Build the robust sharedPost payload
+            const sharedData = {
+                type: (post.videoUrl || post.isVideo) ? "reel" : "post",
+                postId: post._id,
+                thumbnail: post.thumbnailUrl || post.images?.[0] || post.imageUrl || post.videoUrl || "/placeholder-image.jpg",
+                username: post.user?.username || "Unknown",
+                userAvatar: post.user?.profilePic || post.user?.avatar || "/default-avatar.png",
+                caption: post.caption
+            };
+
+            // Loop through selected users and send message via Chat API
+            await Promise.all(
+                selectedProfiles.map(userId =>
+                    api.post(`/chats/send/${userId}`, { sharedPost: sharedData })
+                )
+            );
+
+            toast.success(`Sent to ${selectedProfiles.length} chat${selectedProfiles.length > 1 ? 's' : ''}!`);
             onClose();
+        } catch (error) {
+            console.error("Failed to share", error);
+            toast.error("Failed to send post.");
+        } finally {
+            setIsSending(false);
             setSelectedProfiles([]);
         }
     };
 
     const handleCopyLink = () => {
-        navigator.clipboard.writeText(`${window.location.origin}/p/${postId}`);
+        if (!post?._id) return;
+        navigator.clipboard.writeText(`${window.location.origin}/p/${post._id}`);
         toast.success("Link copied to clipboard!");
         onClose();
     };
@@ -265,8 +299,10 @@ export function ShareDialog({ isOpen, onClose, postId }: ShareDialogProps) {
                                 >
                                     <button
                                         onClick={handleSend}
-                                        className="w-full bg-blue-500 text-white font-semibold py-3 rounded-xl hover:bg-blue-600 transition-colors"
+                                        disabled={isSending}
+                                        className="w-full bg-blue-500 text-white font-semibold py-3 rounded-xl hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                                     >
+                                        {isSending && <Loader2 className="w-5 h-5 animate-spin text-white" />}
                                         Send ({selectedProfiles.length})
                                     </button>
                                 </motion.div>

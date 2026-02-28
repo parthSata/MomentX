@@ -10,7 +10,6 @@ import { api } from "@/lib/axios"
 import { Link } from "react-router-dom"
 import { FeedPostOptionsDialog } from "@/components/post/FeedPostOptionsDialog"
 import { LikesCountDialog } from "@/components/post/LikesCountDialog"
-// ✅ Import Share Dialog
 import { ShareDialog } from "@/components/reels/ShareDialog"
 
 interface PostCardProps {
@@ -35,8 +34,6 @@ export function PostCard({ post }: PostCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isLikesOpen, setIsLikesOpen] = useState(false)
-
-  // ✅ Add Share State
   const [isShareOpen, setIsShareOpen] = useState(false)
 
   const [showFullCaption, setShowFullCaption] = useState(false)
@@ -178,6 +175,7 @@ export function PostCard({ post }: PostCardProps) {
               )}
             </div>
           </Link>
+
           <button onClick={() => setIsOptionsOpen(true)} className="p-2 hover:bg-muted rounded-full transition-colors">
             <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -222,7 +220,6 @@ export function PostCard({ post }: PostCardProps) {
                 <MessageCircle className="w-6 h-6 -rotate-90" />
               </button>
 
-              {/* ✅ Trigger Share Dialog */}
               <button onClick={() => setIsShareOpen(true)} className="hover:text-muted-foreground transition-colors">
                 <Send className="w-6 h-6" />
               </button>
@@ -264,8 +261,8 @@ export function PostCard({ post }: PostCardProps) {
       <FeedPostOptionsDialog isOpen={isOptionsOpen} onClose={() => setIsOptionsOpen(false)} postId={post._id} isOwnPost={post.user._id === currentUser._id} onDelete={handleDeletePost} />
       <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={post._id} likesCount={likes} />
 
-      {/* ✅ ADDED: Share Dialog */}
-      <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} postId={post._id} />
+      {/* ✅ FIXED: Passes the full post object */}
+      <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} post={post} />
     </>
   )
 }

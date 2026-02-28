@@ -1,17 +1,26 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema(
   {
     chatId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Chat",
+      ref: 'Chat',
       required: true,
     },
 
     sender: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
+    },
+    // ✅ ADDED: Schema for Shared Posts/Reels
+    sharedPost: {
+      type: { type: String, enum: ['post', 'reel'] },
+      postId: { type: mongoose.Schema.Types.ObjectId },
+      thumbnail: String,
+      username: String,
+      userAvatar: String,
+      caption: String,
     },
 
     text: { type: String },
@@ -19,14 +28,14 @@ const messageSchema = new mongoose.Schema(
     video: { type: String },
     audio: { type: String },
 
-    seenBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    seenBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     storyReply: {
-      storyId: { type: mongoose.Schema.Types.ObjectId, ref: "Story" },
+      storyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Story' },
       storyUrl: String,
       storyType: String,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export default mongoose.model("Message", messageSchema);
+export default mongoose.model('Message', messageSchema);

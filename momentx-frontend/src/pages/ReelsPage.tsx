@@ -43,7 +43,7 @@ export default function ReelsPage() {
       }
     };
 
-    container.addEventListener("scroll", handleScroll);
+    container.addEventListener("scroll", handleScroll, { passive: true });
     return () => container.removeEventListener("scroll", handleScroll);
   }, [currentIndex, reels.length]);
 
@@ -82,7 +82,7 @@ export default function ReelsPage() {
             </button>
           </div>
         ) : (
-          <div ref={containerRef} className="h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide pb-18 md:pb-0">
+          <div ref={containerRef} className="absolute inset-0 overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
             {reels.map((reel, index) => (
               <div key={reel._id} className="h-full w-full snap-start snap-always relative">
                 <ReelCard
@@ -97,7 +97,7 @@ export default function ReelsPage() {
         )}
 
         {/* Navigation Buttons (Desktop) */}
-        <div className="hidden lg:flex absolute right-8 top-1/2 -translate-y-1/2 flex-col gap-4 z-40">
+        <div className="hidden lg:flex absolute right-8 top-1/2 -translate-y-1/2 flex-col gap-4 z-40 pointer-events-auto">
           <button
             onClick={() => scrollToReel("up")}
             disabled={currentIndex === 0}
@@ -123,7 +123,7 @@ export default function ReelsPage() {
         </div>
 
         {/* Create Reel Button (Desktop) */}
-        <div className="hidden lg:block absolute top-6 right-10 z-40">
+        <div className="hidden lg:block absolute top-6 right-10 z-40 pointer-events-auto">
           <button
             onClick={() => navigate("/reels/create")}
             className="p-3 bg-linear-to-r from-pink-500 to-violet-500 rounded-full shadow-lg hover:shadow-pink-500/20 transition-shadow"
@@ -133,8 +133,10 @@ export default function ReelsPage() {
         </div>
 
         {/* Bottom Nav overlayed securely */}
-        <div className="absolute bottom-0 w-full z-50">
-          <BottomNav />
+        <div className="absolute bottom-0 w-full z-50 pointer-events-none">
+          <div className="pointer-events-auto">
+            <BottomNav />
+          </div>
         </div>
       </div>
     </div>

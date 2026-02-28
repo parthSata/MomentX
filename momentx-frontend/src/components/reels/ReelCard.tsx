@@ -5,8 +5,7 @@ import { AvatarRing } from "@/components/ui/avatar-ring";
 import { cn } from "@/lib/utils";
 import { ReelCommentsSheet } from "./ReelCommentsSheet";
 import { LikesCountDialog } from "@/components/post/LikesCountDialog";
-// ✅ Import Share Dialog
-import { ShareDialog } from "@/components/reels/ShareDialog";
+import { ShareDialog } from "@/components/reels/ShareDialog"; // Ensure this matches your path
 import { api } from "@/lib/axios";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -51,8 +50,6 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
     const [isSaved, setIsSaved] = useState(reel.isSaved || false);
     const [isFollowing, setIsFollowing] = useState(false);
     const [isLikesOpen, setIsLikesOpen] = useState(false);
-
-    // ✅ Add Share State
     const [isShareOpen, setIsShareOpen] = useState(false);
 
     useEffect(() => {
@@ -133,10 +130,11 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
 
     return (
         <div className="h-full w-full flex items-center justify-center bg-black relative">
+            {/* Blurred Background - Fills empty space gracefully */}
             {hasVideo && (
-                <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
-                    <video src={reel.videoUrl} className="w-full h-full object-cover blur-3xl scale-110" muted playsInline />
-                    <div className="absolute inset-0 bg-black/40" />
+                <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-50">
+                    <video src={reel.videoUrl} className="w-full h-full object-cover blur-2xl scale-110" muted playsInline />
+                    <div className="absolute inset-0 bg-black/60" />
                 </div>
             )}
 
@@ -145,7 +143,7 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
                     <video
                         ref={videoRef}
                         src={reel.videoUrl || undefined}
-                        className="absolute inset-0 w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-contain"
                         loop
                         muted={muted}
                         playsInline
@@ -178,7 +176,8 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
                     )}
                 </AnimatePresence>
 
-                <div className="absolute right-3 bottom-20 md:bottom-20 flex flex-col items-center gap-5 z-20 pb-4">
+                {/* Right Side Buttons */}
+                <div className="absolute right-3 bottom-24 md:bottom-20 flex flex-col items-center gap-5 z-20 pb-4">
                     <div className="flex flex-col items-center gap-1">
                         <button onClick={(e) => { e.stopPropagation(); handleLike(); }} className="active:scale-90 transition-transform">
                             <Heart className={cn("w-7 h-7 transition-colors", isLiked ? "text-red-500 fill-red-500" : "text-white")} />
@@ -193,7 +192,6 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
                         <span className="text-white text-xs font-semibold">{commentCount}</span>
                     </button>
 
-                    {/* ✅ Trigger Share Dialog */}
                     <button onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} className="flex flex-col items-center gap-1 active:scale-90 transition-transform">
                         <Send className="w-7 h-7 text-white -rotate-12" />
                         <span className="text-white text-xs font-semibold">{reel.sharesCount || 0}</span>
@@ -205,17 +203,18 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
 
                     <button className="active:scale-90 transition-transform"><MoreHorizontal className="w-7 h-7 text-white" /></button>
 
-                    <Link to={`/u/${reel.user?.username}`} className="w-9 h-9 mt-2 rounded-lg border border-white/20 overflow-hidden bg-black/50 block">
-                        <motion.img
-                            animate={isActive ? { rotate: 360 } : {}}
-                            transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                    {/* ✅ FIXED: Removed the restrictive classes that were cropping the profile picture */}
+                    <Link to={`/u/${reel.user?.username}`} className="mt-2 block hover:opacity-80 transition-opacity">
+                        <AvatarRing
                             src={reel.user?.avatar || reel.user?.profilePic || "/default-avatar.png"}
-                            className="w-full h-full object-cover"
+                            size="sm"
+                            hasStory={false}
                         />
                     </Link>
                 </div>
 
-                <div className="absolute bottom-6 md:bottom-4 left-4 right-16 z-20 pointer-events-auto text-left">
+                {/* Bottom Info Section */}
+                <div className="absolute bottom-24 md:bottom-12 left-4 right-16 z-20 pointer-events-auto text-left">
                     <div className="flex items-center gap-2 mb-3">
                         <Link to={`/u/${reel.user?.username}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                             <AvatarRing src={reel.user?.avatar || reel.user?.profilePic || "/default-avatar.png"} size="sm" />
@@ -262,8 +261,7 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
                 <ReelCommentsSheet isOpen={showComments} onClose={() => setShowComments(false)} postId={reel._id} commentCount={commentCount.toString()} onCommentAdded={() => setCommentCount(prev => prev + 1)} />
                 <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={reel._id} likesCount={likeCount} />
 
-                {/* ✅ Added Share Dialog */}
-                <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} postId={reel._id} />
+                <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} post={reel} />
             </div>
         </div>
     );

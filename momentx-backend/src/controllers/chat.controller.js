@@ -75,10 +75,10 @@ export const uploadChatMedia = asyncHandler(async (req, res) => {
 
 export const sendMessage = asyncHandler(async (req, res) => {
   const { receiverId } = req.params;
-  const { text, image, video, audio } = req.body;
+  const { text, image, video, audio, sharedPost } = req.body; // ✅ Added sharedPost
   const senderId = req.user._id;
 
-  if (!text && !image && !video && !audio)
+  if (!text && !image && !video && !audio && !sharedPost)
     throw new ApiError(400, 'Message cannot be empty');
 
   // 1. Get Chat
@@ -92,26 +92,35 @@ export const sendMessage = asyncHandler(async (req, res) => {
     image,
     video,
     audio,
+    sharedPost, // ✅ Save shared content
     seenBy: [senderId],
   });
 
   // 3. Update Chat Last Message
   const previewText =
-    text || (image ? '📷 Image' : video ? '🎥 Video' : '🎵 Audio');
+    text ||
+    (sharedPost
+      ? `Shared a ${sharedPost.type}`
+      : image
+        ? '📷 Image'
+        : video
+          ? '🎥 Video'
+          : '🎵 Audio');
+
   await Chat.findByIdAndUpdate(chat._id, {
     lastMessage: previewText,
     lastMessageAt: new Date(),
   });
 
-  // 4. ✅ EMIT TO PARTICIPANTS (User Rooms)
-  // This ensures the receiver gets it even if they haven't joined the "chat room"
+  // 4. EMIT TO PARTICIPANTS (User Rooms)
   if (req.io) {
     chat.participants.forEach((participantId) => {
-      // Emit to everyone.
-      // The frontend logic (senderId check) will prevent duplicates for the sender.
       req.io.to(participantId.toString()).emit('newMessage', newMessage);
     });
   }
+
+  // ✅ Important: Populate the sender so the frontend doesn't crash on newly sent messages
+  await newMessage.populate('sender', 'username profilePic name');
 
   return res.status(201).json(new ApiResponse(201, newMessage, 'Message sent'));
 });

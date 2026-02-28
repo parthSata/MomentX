@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { PageTransition } from "./PageTransition";
+
 import HomePage from "@/pages/HomePage";
 import ProfilePage from "@/pages/ProfilePage";
 import ExplorePage from "@/pages/ExplorePage";
@@ -18,12 +20,13 @@ import AdminPage from "@/pages/AdminPage";
 import CreatePostPage from "@/pages/CreatePostPage";
 import FollowersPage from "@/pages/FollowersPage";
 
-// ✅ IMPORT THE NEW PAGE
+// ✅ IMPORT THE NEW PAGES
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import CreateReelPage from "@/pages/CreateReelPage";
 import UserProfilePage from "@/pages/UserProfilePage";
 import ActivityPage from "@/pages/ActivityPage";
 import SettingsPage from "@/pages/SettingsPage";
+import { SplashScreen } from "@/components/SplashScreen"; // ✅ IMPORT SPLASH SCREEN
 
 // Admin route protection
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -38,204 +41,222 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 export function AnimatedRoutes() {
   const location = useLocation();
+  const [showSplash, setShowSplash] = useState(false);
+
+  useEffect(() => {
+    // Check if the user has already seen the splash screen this session
+    const hasSeenSplash = sessionStorage.getItem("hasSeenSplash");
+
+    if (!hasSeenSplash) {
+      setShowSplash(true);
+      sessionStorage.setItem("hasSeenSplash", "true");
+    }
+  }, []);
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route
-          path="/"
-          element={
-            <PageTransition>
-              <HomePage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <PageTransition>
-              <ProfilePage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/explore"
-          element={
-            <PageTransition>
-              <ExplorePage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            <PageTransition>
-              <LoginPage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/signup"
-          element={
-            <PageTransition>
-              <SignupPage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/forgot-password"
-          element={
-            <PageTransition>
-              <ForgotPasswordPage />
-            </PageTransition>
-          }
-        />
+    <>
+      <AnimatePresence mode="wait">
+        {showSplash && (
+          <SplashScreen onComplete={() => setShowSplash(false)} />
+        )}
+      </AnimatePresence>
 
-        {/* ✅ ADDED THIS MISSING ROUTE */}
-        <Route
-          path="/reels/create"
-          element={
-            <PageTransition>
-              <CreateReelPage />
-            </PageTransition>
-          }
-        />
+      <div className={showSplash ? "hidden" : "block"}>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route
+              path="/"
+              element={
+                <PageTransition>
+                  <HomePage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <PageTransition>
+                  <ProfilePage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/explore"
+              element={
+                <PageTransition>
+                  <ExplorePage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/login"
+              element={
+                <PageTransition>
+                  <LoginPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/signup"
+              element={
+                <PageTransition>
+                  <SignupPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/forgot-password"
+              element={
+                <PageTransition>
+                  <ForgotPasswordPage />
+                </PageTransition>
+              }
+            />
 
-        <Route
-          path="/settings"
-          element={
-            <PageTransition>
-              <SettingsPage />
-            </PageTransition>
-          }
-        />
+            <Route
+              path="/reels/create"
+              element={
+                <PageTransition>
+                  <CreateReelPage />
+                </PageTransition>
+              }
+            />
 
-        {/* ✅ ADDED THIS MISSING ROUTE */}
-        <Route
-          path="/create-reel"
-          element={
-            <PageTransition>
-              <CreateReelPage />
-            </PageTransition>
-          }
-        />
+            <Route
+              path="/settings"
+              element={
+                <PageTransition>
+                  <SettingsPage />
+                </PageTransition>
+              }
+            />
 
-        <Route
-          path="/activity"
-          element={
-            <PageTransition>
-              <ActivityPage />
-            </PageTransition>
-          }
-        />
+            <Route
+              path="/create-reel"
+              element={
+                <PageTransition>
+                  <CreateReelPage />
+                </PageTransition>
+              }
+            />
 
-        {/* ✅ THIS IS THE MISSING ROUTE FIX */}
-        <Route
-          path="/reset-password"
-          element={
-            <PageTransition>
-              <ResetPasswordPage />
-            </PageTransition>
-          }
-        />
+            <Route
+              path="/activity"
+              element={
+                <PageTransition>
+                  <ActivityPage />
+                </PageTransition>
+              }
+            />
 
-        <Route
-          path="/u/:username"
-          element={
-            <PageTransition>
-              <UserProfilePage />
-            </PageTransition>
-          }
-        />
+            <Route
+              path="/reset-password"
+              element={
+                <PageTransition>
+                  <ResetPasswordPage />
+                </PageTransition>
+              }
+            />
 
-        <Route
-          path="/chat"
-          element={
-            <PageTransition>
-              <ChatListPage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/chat/:id"
-          element={
-            <PageTransition>
-              <ChatPage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/reels"
-          element={
-            <PageTransition>
-              <ReelsPage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/notifications"
-          element={
-            <PageTransition>
-              <NotificationsPage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/search"
-          element={
-            <PageTransition>
-              <SearchPage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/admin/login"
-          element={
-            <PageTransition>
-              <AdminLoginPage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <AdminRoute>
-              <PageTransition>
-                <AdminPage />
-              </PageTransition>
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/create"
-          element={
-            <PageTransition>
-              <CreatePostPage />
-            </PageTransition>
-          }
-        />
+            <Route
+              path="/u/:username"
+              element={
+                <PageTransition>
+                  <UserProfilePage />
+                </PageTransition>
+              }
+            />
 
-        <Route
-          path="/followers"
-          element={<Navigate to="/followers/followers" replace />}
-        />
-        <Route
-          path="/followers/:type"
-          element={
-            <PageTransition>
-              <FollowersPage />
-            </PageTransition>
-          }
-        />
-        <Route
-          path="*"
-          element={
-            <PageTransition>
-              <NotFound />
-            </PageTransition>
-          }
-        />
-      </Routes>
-    </AnimatePresence>
+            <Route
+              path="/chat"
+              element={
+                <PageTransition>
+                  <ChatListPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/chat/:id"
+              element={
+                <PageTransition>
+                  <ChatPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/reels"
+              element={
+                <PageTransition>
+                  <ReelsPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <PageTransition>
+                  <NotificationsPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/search"
+              element={
+                <PageTransition>
+                  <SearchPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/admin/login"
+              element={
+                <PageTransition>
+                  <AdminLoginPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <PageTransition>
+                    <AdminPage />
+                  </PageTransition>
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/create"
+              element={
+                <PageTransition>
+                  <CreatePostPage />
+                </PageTransition>
+              }
+            />
+
+            <Route
+              path="/followers"
+              element={<Navigate to="/followers/followers" replace />}
+            />
+            <Route
+              path="/followers/:type"
+              element={
+                <PageTransition>
+                  <FollowersPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="*"
+              element={
+                <PageTransition>
+                  <NotFound />
+                </PageTransition>
+              }
+            />
+          </Routes>
+        </AnimatePresence>
+      </div>
+    </>
   );
 }

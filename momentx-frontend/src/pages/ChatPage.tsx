@@ -27,6 +27,9 @@ import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 import { api } from "@/lib/axios";
 import Peer from "simple-peer";
 import { CallScreen } from "@/components/chat/CallScreen";
+import { SharedContentBubble } from "@/components/chat/SharedContentBubble";
+import { toast } from "sonner"; // ✅ Added for error handling
+import { PostViewDialog } from "@/components/feed/PostViewDialog"; // ✅ IMPORT POST VIEW DIALOG
 
 const MessageText = ({ text, isMe }: { text: string; isMe: boolean }) => {
   const [expanded, setExpanded] = useState(false);
@@ -90,6 +93,10 @@ export default function ChatPage() {
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [fullScreenVideo, setFullScreenVideo] = useState<string | null>(null);
 
+  // ✅ ADDED: State for Post View Dialog
+  const [viewPostData, setViewPostData] = useState<any | null>(null);
+  const [isPostViewOpen, setIsPostViewOpen] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -136,7 +143,6 @@ export default function ChatPage() {
     fetchMessages();
     fetchChats();
     setLocalMessages([]);
-
   }, [chatId]);
 
   // Scroll to bottom when messages change
@@ -453,6 +459,18 @@ export default function ChatPage() {
     setInputText((prev) => prev + emojiData.emoji);
   };
 
+  // ✅ ADDED: Fetch and Open Post when a shared post is clicked
+  const handleViewSharedContent = async (postId: string) => {
+    try {
+      const { data } = await api.get(`/posts/${postId}`);
+      setViewPostData(data.data);
+      setIsPostViewOpen(true);
+    } catch (error) {
+      console.error("Failed to load post:", error);
+      toast.error("Content not found or has been deleted.");
+    }
+  };
+
   const allMessages = [...messages, ...localMessages]
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .filter((msg, index, self) => index === self.findIndex((m) => m._id === msg._id));
@@ -596,7 +614,7 @@ export default function ChatPage() {
       <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="glass-strong p-4 z-40 relative"
+        className="glass-strong p-4 z-40 relative border-b border-border/50"
       >
         {isSelectionMode ? (
           <div className="flex items-center justify-between animate-in fade-in duration-200">
@@ -615,7 +633,7 @@ export default function ChatPage() {
             <button
               onClick={handleDeleteSelected}
               disabled={selectedMessageIds.length === 0}
-              className="p-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-full disabled:opacity-50 transition-colors"
+              className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-full disabled:opacity-50 transition-colors"
             >
               <Trash2 className="w-5 h-5" />
             </button>
@@ -654,13 +672,13 @@ export default function ChatPage() {
                 {showMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 top-12 w-48 bg-gray-900 border border-white/10 rounded-xl shadow-xl z-20 overflow-hidden">
+                    <div className="absolute right-0 top-12 w-48 bg-popover border border-border rounded-xl shadow-xl z-20 overflow-hidden">
                       <button
                         onClick={() => {
                           setIsSelectionMode(true);
                           setShowMenu(false);
                         }}
-                        className="w-full text-left px-4 py-3 hover:bg-white/5 flex items-center gap-2 text-sm transition-colors"
+                        className="w-full text-left px-4 py-3 hover:bg-muted flex items-center gap-2 text-sm transition-colors"
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         Select Messages
@@ -685,7 +703,6 @@ export default function ChatPage() {
             const isMe = senderId === currentUser?._id;
             const isSelected = selectedMessageIds.includes(msg._id!);
 
-            // ✅ FIX: Safety check for Invalid Date
             const dateObj = new Date(msg.createdAt);
             const isValidDate = !isNaN(dateObj.getTime());
             const timeString = isValidDate
@@ -715,19 +732,27 @@ export default function ChatPage() {
                 <div className={`max-w-[85%] sm:max-w-[75%] md:max-w-[60%]`}>
                   <div
                     className={`
-                      p-3 rounded-2xl relative
-                      ${isMe
-                        ? "bg-blue-100 dark:bg-linear-to-r dark:from-blue-600 dark:to-indigo-500 text-gray-900 dark:text-white rounded-br-none shadow-sm dark:shadow-none"
-                        : "bg-gray-800 text-white rounded-bl-none shadow-sm dark:shadow-none"
+                      relative
+                      ${msg.sharedPost
+                        ? "p-0 bg-transparent shadow-none border-none"
+                        : `p-3 rounded-2xl shadow-sm dark:shadow-none ${isMe
+                          ? "bg-blue-100 dark:bg-linear-to-r dark:from-blue-600 dark:to-indigo-500 text-gray-900 dark:text-white rounded-br-none"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-none"}`
                       }
                       ${msg.isOptimistic ? "opacity-70" : "opacity-100"}
                       ${isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}
                     `}
                   >
-                    {msg.image ? (
+                    {/* ✅ RENDER SHARED POST/REEL FIRST AND ATTACH ONCLICK */}
+                    {msg.sharedPost ? (
+                      <SharedContentBubble
+                        content={msg.sharedPost}
+                        onClick={() => handleViewSharedContent(msg.sharedPost.postId)}
+                      />
+                    ) : msg.image ? (
                       <div
                         className="relative overflow-hidden cursor-pointer group bg-black/10 dark:bg-black/20 rounded-lg"
-                        style={{ maxWidth: "280px", maxHeight: "350px" }} // Explicit constraints
+                        style={{ maxWidth: "280px", maxHeight: "350px" }}
                         onClick={() => !isSelectionMode && setFullScreenImage(msg.image || "")}
                       >
                         <img
@@ -795,7 +820,7 @@ export default function ChatPage() {
       </div>
 
       {!isSelectionMode && (
-        <div className="glass-strong p-3 sm:p-4">
+        <div className="glass-strong p-3 sm:p-4 border-t border-border/50">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
 
           <AnimatePresence>
@@ -814,7 +839,7 @@ export default function ChatPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => triggerUpload("image/*,video/*")}
-              className="p-2 glass rounded-full hover:bg-white/10 shrink-0"
+              className="p-2 glass rounded-full hover:bg-muted shrink-0"
             >
               <Camera className="w-5 h-5 text-primary" />
             </button>
@@ -831,23 +856,23 @@ export default function ChatPage() {
                     handleSend();
                   }
                 }}
-                className="pr-24"
+                className="pr-24 h-12"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 <button
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className="p-1.5 hover:bg-white/10 rounded-full"
+                  className="p-1.5 hover:bg-muted rounded-full"
                 >
                   <Smile className="w-5 h-5 text-muted-foreground" />
                 </button>
                 <button
-                  className="p-1.5 hover:bg-white/10 rounded-full hidden sm:block"
+                  className="p-1.5 hover:bg-muted rounded-full hidden sm:block"
                   onClick={() => triggerUpload("image/*")}
                 >
                   <ImageIcon className="w-5 h-5 text-muted-foreground" />
                 </button>
                 <button
-                  className="p-1.5 hover:bg-white/10 rounded-full"
+                  className="p-1.5 hover:bg-muted rounded-full"
                   onClick={() => triggerUpload("audio/*")}
                 >
                   <Music className="w-5 h-5 text-muted-foreground" />
@@ -868,6 +893,13 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+
+      {/* ✅ ADDED: Post View Dialog */}
+      <PostViewDialog
+        isOpen={isPostViewOpen}
+        onClose={() => setIsPostViewOpen(false)}
+        post={viewPostData}
+      />
     </div>
   );
 }
