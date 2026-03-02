@@ -75,7 +75,7 @@ export const uploadChatMedia = asyncHandler(async (req, res) => {
 
 export const sendMessage = asyncHandler(async (req, res) => {
   const { receiverId } = req.params;
-  const { text, image, video, audio, sharedPost } = req.body; // ✅ Added sharedPost
+  const { text, image, video, audio, sharedPost } = req.body;
   const senderId = req.user._id;
 
   if (!text && !image && !video && !audio && !sharedPost)
@@ -84,7 +84,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   // 1. Get Chat
   const chat = await getOrCreatePrivateChat(senderId, receiverId);
 
-  // 2. Create Message
+  // 2. Create Message (The text saved here is now ENCRYPTED gibberish)
   const newMessage = await Message.create({
     chatId: chat._id,
     sender: senderId,
@@ -92,20 +92,20 @@ export const sendMessage = asyncHandler(async (req, res) => {
     image,
     video,
     audio,
-    sharedPost, // ✅ Save shared content
+    sharedPost,
     seenBy: [senderId],
   });
 
-  // 3. Update Chat Last Message
-  const previewText =
-    text ||
-    (sharedPost
-      ? `Shared a ${sharedPost.type}`
-      : image
-        ? '📷 Image'
-        : video
-          ? '🎥 Video'
-          : '🎵 Audio');
+
+  const previewText = sharedPost
+    ? `Shared a ${sharedPost.type}`
+    : image
+      ? '📷 Image'
+      : video
+        ? '🎥 Video'
+        : audio
+          ? '🎵 Audio'
+          : '🔒 Encrypted Message'; // Show this instead of the raw encrypted base64 string
 
   await Chat.findByIdAndUpdate(chat._id, {
     lastMessage: previewText,
@@ -119,7 +119,6 @@ export const sendMessage = asyncHandler(async (req, res) => {
     });
   }
 
-  // ✅ Important: Populate the sender so the frontend doesn't crash on newly sent messages
   await newMessage.populate('sender', 'username profilePic name');
 
   return res.status(201).json(new ApiResponse(201, newMessage, 'Message sent'));

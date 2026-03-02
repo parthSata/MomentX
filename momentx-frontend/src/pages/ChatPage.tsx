@@ -1,22 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
-  Phone,
-  Video,
-  Send,
-  Image as ImageIcon,
-  Mic,
-  Smile,
-  Camera,
-  Music,
-  Loader2,
-  X,
-  Play,
-  MoreVertical,
-  Trash2,
-  CheckCircle2,
-  Circle,
+  ArrowLeft, Phone, Video, Send, Image as ImageIcon,
+  Mic, Smile, Camera, Music, Loader2, X, Play,
+  MoreVertical, Trash2, CheckCircle2, Circle,
 } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { AvatarRing } from "@/components/ui/avatar-ring";
@@ -28,8 +15,11 @@ import { api } from "@/lib/axios";
 import Peer from "simple-peer";
 import { CallScreen } from "@/components/chat/CallScreen";
 import { SharedContentBubble } from "@/components/chat/SharedContentBubble";
-import { toast } from "sonner"; // ✅ Added for error handling
-import { PostViewDialog } from "@/components/feed/PostViewDialog"; // ✅ IMPORT POST VIEW DIALOG
+import { toast } from "sonner";
+import { PostViewDialog } from "@/components/feed/PostViewDialog";
+
+// ✅ IMPORT ONLY THE 2 FUNCTIONS NEEDED
+import { encryptMessage, decryptMessage } from "@/lib/cryptoUtils";
 
 const MessageText = ({ text, isMe }: { text: string; isMe: boolean }) => {
   const [expanded, setExpanded] = useState(false);
@@ -93,7 +83,6 @@ export default function ChatPage() {
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [fullScreenVideo, setFullScreenVideo] = useState<string | null>(null);
 
-  // ✅ ADDED: State for Post View Dialog
   const [viewPostData, setViewPostData] = useState<any | null>(null);
   const [isPostViewOpen, setIsPostViewOpen] = useState(false);
 
@@ -127,7 +116,6 @@ export default function ChatPage() {
     }
   }, []);
 
-  // Recover correct chat partner after page refresh
   useEffect(() => {
     if (!chatId || chats.length === 0 || chatUser._id !== "") return;
     const found = chats.find((c) => c._id === chatId);
@@ -136,21 +124,17 @@ export default function ChatPage() {
     }
   }, [chats, chatId]);
 
-  // Fetch messages and chats when chatId changes
   useEffect(() => {
     if (!chatId) return;
-
     fetchMessages();
     fetchChats();
     setLocalMessages([]);
   }, [chatId]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, localMessages, isTyping, selectedMedia]);
 
-  // Fetch user online status & profile pic
   useEffect(() => {
     const fetchUserStatus = async () => {
       if (!chatUser._id) return;
@@ -170,14 +154,12 @@ export default function ChatPage() {
     fetchUserStatus();
   }, [chatId, chatUser._id]);
 
-  // Join chat room
   useEffect(() => {
     if (socketRef.current && chatId) {
       socketRef.current.emit("join_chat", chatId);
     }
   }, [chatId, socketRef]);
 
-  // Call socket listeners
   useEffect(() => {
     if (!socketRef.current) return;
 
@@ -203,7 +185,6 @@ export default function ChatPage() {
     };
   }, []);
 
-  // Main real-time socket logic
   useEffect(() => {
     if (!socketRef.current) return;
     const socket = socketRef.current;
@@ -216,25 +197,22 @@ export default function ChatPage() {
 
       const isMe = String(incomingSenderId) === String(currentUser?._id);
 
-      if (isMe) return; // optimistic already handled
+      if (isMe) return;
+
+      const decryptedNewMessage = {
+        ...newMessage,
+        text: newMessage.text ? decryptMessage(newMessage.text) : ""
+      };
 
       setLocalMessages((prev) => {
-        const exists =
-          prev.some((m) => m._id === newMessage._id) ||
-          messages.some((m) => m._id === newMessage._id);
-
+        const exists = prev.some((m) => m._id === decryptedNewMessage._id) || messages.some((m) => m._id === decryptedNewMessage._id);
         if (exists) return prev;
 
-        const isRecentDuplicate = prev.some(
-          (m) =>
-            m.text === newMessage.text &&
-            (typeof m.sender === "string" ? m.sender : m.sender?._id) === incomingSenderId &&
-            Math.abs(new Date(m.createdAt).getTime() - new Date(newMessage.createdAt).getTime()) < 1000
-        );
-
+        // Prevent duplicate spam
+        const isRecentDuplicate = prev.some((m) => m.text === decryptedNewMessage.text && (typeof m.sender === "string" ? m.sender : m.sender?._id) === incomingSenderId && Math.abs(new Date(m.createdAt).getTime() - new Date(decryptedNewMessage.createdAt).getTime()) < 1000);
         if (isRecentDuplicate) return prev;
 
-        return [...prev, newMessage];
+        return [...prev, decryptedNewMessage];
       });
     };
 
@@ -279,7 +257,6 @@ export default function ChatPage() {
 
   const initiateCall = (type: "voice" | "video") => {
     if (!currentUser || !chatUser._id) return;
-
     setCallType(type);
     setIsCallActive(true);
 
@@ -288,7 +265,6 @@ export default function ChatPage() {
       .then((currentStream) => {
         setStream(currentStream);
         const peer = new Peer({ initiator: true, trickle: false, stream: currentStream });
-
         peer.on("signal", (data) => {
           socketRef.current?.emit("callUser", {
             userToCall: chatUser._id,
@@ -297,7 +273,6 @@ export default function ChatPage() {
             name: currentUser.name,
           });
         });
-
         peer.on("stream", (remote) => setRemoteStream(remote));
         connectionRef.current = peer;
       })
@@ -313,11 +288,9 @@ export default function ChatPage() {
       .then((currentStream) => {
         setStream(currentStream);
         const peer = new Peer({ initiator: false, trickle: false, stream: currentStream });
-
         peer.on("signal", (data) => {
           socketRef.current?.emit("answerCall", { signal: data, to: incomingCall.from });
         });
-
         peer.on("stream", (remote) => setRemoteStream(remote));
         peer.signal(incomingCall.signal);
         connectionRef.current = peer;
@@ -375,6 +348,9 @@ export default function ChatPage() {
   const handleSend = async () => {
     if (!inputText.trim() || !chatUser._id) return;
 
+    // ✅ ENCRYPT INSTANTLY (1 Argument)
+    const encryptedText = encryptMessage(inputText);
+
     const tempId = `temp-${Date.now()}`;
     const tempMessage = {
       _id: tempId,
@@ -390,12 +366,9 @@ export default function ChatPage() {
     setShowEmojiPicker(false);
 
     try {
-      const serverMessage = await sendMessage(chatUser._id, inputText, "text");
-
-      // Replace optimistic message with real one
-      setLocalMessages((prev) =>
-        prev.map((m) => (m._id === tempId ? serverMessage : m))
-      );
+      const serverMessage = await sendMessage(chatUser._id, encryptedText, "text");
+      const smoothServerMessage = { ...serverMessage, text: tempMessage.text };
+      setLocalMessages((prev) => prev.map((m) => (m._id === tempId ? smoothServerMessage : m)));
     } catch (error) {
       console.error("Failed to send message:", error);
       setLocalMessages((prev) => prev.filter((m) => m._id !== tempId));
@@ -459,7 +432,6 @@ export default function ChatPage() {
     setInputText((prev) => prev + emojiData.emoji);
   };
 
-  // ✅ ADDED: Fetch and Open Post when a shared post is clicked
   const handleViewSharedContent = async (postId: string) => {
     try {
       const { data } = await api.get(`/posts/${postId}`);
@@ -709,6 +681,8 @@ export default function ChatPage() {
               ? dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
               : "--:--";
 
+            const displayText = msg.text?.startsWith("U2FsdGVkX1") ? decryptMessage(msg.text) : msg.text;
+
             return (
               <motion.div
                 key={msg._id || index}
@@ -743,7 +717,6 @@ export default function ChatPage() {
                       ${isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}
                     `}
                   >
-                    {/* ✅ RENDER SHARED POST/REEL FIRST AND ATTACH ONCLICK */}
                     {msg.sharedPost ? (
                       <SharedContentBubble
                         content={msg.sharedPost}
@@ -790,7 +763,8 @@ export default function ChatPage() {
                         />
                       </div>
                     ) : (
-                      <MessageText text={msg.text || ""} isMe={isMe} />
+                      // ✅ INSTANT DECRYPT (1 Argument)
+                      <MessageText text={displayText || ""} isMe={isMe} />
                     )}
                   </div>
                   <p className={`text-[10px] text-muted-foreground mt-1 ${isMe ? "text-right" : "text-left"}`}>
@@ -894,7 +868,6 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* ✅ ADDED: Post View Dialog */}
       <PostViewDialog
         isOpen={isPostViewOpen}
         onClose={() => setIsPostViewOpen(false)}

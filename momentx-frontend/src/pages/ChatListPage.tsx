@@ -9,6 +9,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { api } from "@/lib/axios";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { decryptMessage } from "@/lib/cryptoUtils";
 
 interface SearchUser {
   _id: string;
@@ -315,7 +316,7 @@ export default function ChatListPage() {
                     : "text-muted-foreground"
                     }`}
                 >
-                  {chat.lastMessage || "Start a conversation"}
+                  {decryptMessage(chat.lastMessage)}
                 </p>
 
                 {chat.unreadCount > 0 && (

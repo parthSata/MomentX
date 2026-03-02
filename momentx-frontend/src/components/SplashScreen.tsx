@@ -1,5 +1,7 @@
 import { useEffect } from "react";
-import { motion } from "framer-motion";
+// Fix (IDE Error 6133): Remove unused AnimatePresence
+// Fix (IDE Error 2322): Import Variants to properly type variants object
+import { motion, type Variants } from "framer-motion";
 
 interface SplashScreenProps {
     onComplete: () => void;
@@ -7,13 +9,53 @@ interface SplashScreenProps {
 
 export function SplashScreen({ onComplete }: SplashScreenProps) {
     useEffect(() => {
-        // The splash screen will automatically dismiss after 3.5 seconds
+        // The splash screen will automatically dismiss after 5 seconds
         const timer = setTimeout(() => {
             onComplete();
         }, 5000);
 
         return () => clearTimeout(timer);
     }, [onComplete]);
+
+    // ✅ Helper function for Parth Sata staggered text (previously undefined)
+    const staggeredText = (text: string) => {
+        const letters = Array.from(text);
+
+        const containerVariants: Variants = {
+            hidden: { opacity: 0 },
+            visible: {
+                opacity: 1,
+                transition: { staggerChildren: 0.05, delayChildren: 1.8 } // Appears after main content
+            }
+        };
+
+        const childVariants: Variants = {
+            hidden: { opacity: 0, y: 15 },
+            visible: {
+                opacity: 1,
+                y: 0,
+                transition: {
+                    ease: "backOut" as const, // ✅ Fix (IDE Error 2322): Cast literal for strict TS definition
+                    duration: 0.6
+                }
+            }
+        };
+
+        return (
+            <motion.span
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="inline-block"
+            >
+                {letters.map((letter, index) => (
+                    <motion.span key={index} variants={childVariants} className="inline-block">
+                        {letter === " " ? "\u00A0" : letter} {/* handle spaces correctly */}
+                    </motion.span>
+                ))}
+            </motion.span>
+        );
+    };
 
     return (
         <motion.div
@@ -25,6 +67,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                 filter: "blur(10px)",
                 transition: { duration: 0.6, ease: "easeInOut" }
             }}
+            // Fix (JIT utility warning): Updated z-index class from z-[100] to z-100
             className="fixed inset-0 z-100 flex flex-col items-center justify-center bg-black overflow-hidden"
         >
             {/* Background Glowing Orbs */}
@@ -41,14 +84,15 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                 className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600 rounded-full blur-[150px] mix-blend-screen pointer-events-none"
             />
 
-            {/* Main Logo Text */}
-            <div className="relative z-10 flex flex-col items-center">
+            {/* Main Content Wrapper (Centered vertically) */}
+            <div className="flex-1 flex flex-col items-center justify-center relative z-10">
+                {/* Main Logo Text */}
                 <motion.div
                     initial={{ y: 50, opacity: 0, scale: 0.8 }}
                     animate={{ y: 0, opacity: 1, scale: 1 }}
                     transition={{
                         duration: 1,
-                        ease: [0.16, 1, 0.3, 1], // Custom spring-like easing
+                        ease: [0.16, 1, 0.3, 1],
                     }}
                     className="flex items-center text-6xl md:text-8xl font-black tracking-tight font-display mb-4"
                 >
@@ -57,6 +101,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                         initial={{ rotate: -90, scale: 0 }}
                         animate={{ rotate: 0, scale: 1 }}
                         transition={{ delay: 0.4, type: "spring", stiffness: 200, damping: 10 }}
+                        // Fix (Canonical class suggestions): change bg-gradient-to-br to bg-linear-to-br (v4)
                         className="text-transparent bg-clip-text bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 drop-shadow-[0_0_20px_rgba(168,85,247,0.5)]"
                     >
                         X
@@ -81,20 +126,30 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                 </motion.div>
             </div>
 
-            {/* Loading Bar at the bottom */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.5 }}
-                className="absolute bottom-12 w-48 h-1 bg-white/10 rounded-full overflow-hidden"
-            >
+            {/* =========================================
+                Developed By Parth Sata (Bottom Credit)
+                ========================================= */}
+            {/* Fix (cssConflict): Removed 'relative' from the list as it conflicted with 'absolute' */}
+            <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center justify-center z-20">
                 <motion.div
-                    initial={{ x: "-100%" }}
-                    animate={{ x: "0%" }}
-                    transition={{ duration: 2, ease: "easeInOut", delay: 1.5 }}
-                    className="w-full h-full bg-linear-to-r from-blue-500 to-purple-500 rounded-full"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.6 }}
+                    // Fix (Canonical class suggestions): change bg-linear-to-r suggestion
+                    className="h-px w-20 bg-linear-to-r from-blue-500/0 via-white/30 to-blue-500/0 mb-3"
                 />
-            </motion.div>
+                <div className="text-gray-500 text-xs font-mono flex items-center gap-1.5">
+                    <span>Developed By</span>
+                    <motion.span
+                        // Fix (Canonical class suggestions): change bg-linear-to-r suggestion
+                        className="font-bold relative text-transparent bg-clip-text bg-linear-to-r from-cyan-400 via-white to-purple-400"
+                        style={{ filter: "drop-shadow(0 0 8px rgba(34, 211, 238, 0.5))" }}
+                    >
+                        {staggeredText("Parth Sata")}
+                    </motion.span>
+                </div>
+            </div>
+
         </motion.div>
     );
 }
