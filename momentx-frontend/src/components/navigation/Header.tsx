@@ -31,11 +31,20 @@ export function Header({ onMenuClick, showSearch = true }: HeaderProps) {
               whileHover={{ rotate: 180 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="absolute inset-0 bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink rounded-xl animate-gradient" />
-              <div className="absolute inset-0.5 bg-background rounded-[10px] flex items-center justify-center">
-                <span className="text-lg font-bold gradient-text">M</span>
+              {/* Gradient border */}
+              {/* <div className="absolute inset-0 bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink rounded-xl animate-gradient" /> */}
+
+              {/* Inner container with logo */}
+              <div className="absolute inset-0.5 bg-background rounded-[10px] flex items-center justify-center overflow-hidden">
+                <img
+                  src="/MomentX.png"
+                  alt="MomentX Logo"
+                  className="w-full h-full object-cover"
+                />
               </div>
             </motion.div>
+
+            {/* The 'Moment' text wordmark remains */}
             <span className="hidden sm:block text-xl font-display font-bold gradient-text">
               MomentX
             </span>

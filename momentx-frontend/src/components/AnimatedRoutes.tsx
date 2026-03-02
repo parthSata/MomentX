@@ -19,8 +19,6 @@ import SearchPage from "@/pages/SearchPage";
 import AdminPage from "@/pages/AdminPage";
 import CreatePostPage from "@/pages/CreatePostPage";
 import FollowersPage from "@/pages/FollowersPage";
-
-// ✅ IMPORT THE NEW PAGES
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import CreateReelPage from "@/pages/CreateReelPage";
 import UserProfilePage from "@/pages/UserProfilePage";

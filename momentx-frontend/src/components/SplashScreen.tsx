@@ -10,7 +10,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
         // The splash screen will automatically dismiss after 3.5 seconds
         const timer = setTimeout(() => {
             onComplete();
-        }, 8500);
+        }, 5000);
 
         return () => clearTimeout(timer);
     }, [onComplete]);
