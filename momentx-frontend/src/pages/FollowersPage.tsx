@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Search, UserPlus, UserCheck, Loader2 } from "lucide-react";
-import { useNavigate, useParams, Link } from "react-router-dom"; // ✅ Added Link here
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { api } from "@/lib/axios";
@@ -16,19 +16,30 @@ interface UserProfile {
   isVerified: boolean;
 }
 
+type TabType = "followers" | "following" | "suggestions";
+
 export default function FollowersPage() {
   const navigate = useNavigate();
   const { user: currentUser, refreshUser } = useAuth();
-  const { type } = useParams<{ type: "followers" | "following" }>();
 
-  const [activeTab, setActiveTab] = useState<"followers" | "following" | "suggestions">(type || "followers");
+  // Handle both params: `type` (followers/following) and optional `id` (if viewing someone else)
+  const { type, id } = useParams<{ type?: string; id?: string }>();
+
+  // Safely default the tab if an invalid URL is entered
+  const validTabs: TabType[] = ["followers", "following", "suggestions"];
+  const initialTab: TabType = validTabs.includes(type as TabType) ? (type as TabType) : "followers";
+
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [data, setData] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
 
   const [followingIds, setFollowingIds] = useState<string[]>([]);
 
-  // 1. Initialize following list
+  // If no specific user ID is passed in the URL, default to the logged-in user
+  const targetUserId = id || currentUser?._id;
+
+  // Initialize following list for checking the Follow button status
   useEffect(() => {
     const userWithFollowing = currentUser as any;
     if (userWithFollowing?.following) {
@@ -37,36 +48,44 @@ export default function FollowersPage() {
     }
   }, [currentUser]);
 
-  // 2. Fetch Data
+  // Fetch Data
   const fetchData = async () => {
-    if (!currentUser) return;
+    if (!targetUserId) return; // Wait until we have a valid User ID
     setLoading(true);
 
     try {
       let endpoint = "";
-      let rawData: any[] = [];
 
       if (activeTab === "followers") {
-        endpoint = `/users/followers/${currentUser._id}`;
+        endpoint = `/users/followers/${targetUserId}`;
       } else if (activeTab === "following") {
-        endpoint = `/users/following/${currentUser._id}`;
+        endpoint = `/users/following/${targetUserId}`;
       } else if (activeTab === "suggestions") {
-        endpoint = `/users/all`;
+        // ✅ FETCH FROM YOUR FAST AGGREGATION ENDPOINT
+        endpoint = `/explore/suggestions`; // Or `/users/suggestions` if you defined it there
+      }
+
+      // Safeguard against calling the base API (prevents the 404 error)
+      if (!endpoint) {
+        setLoading(false);
+        return;
       }
 
       const res = await api.get(endpoint);
+      let rawData: any[] = res.data?.data || [];
 
-      if (activeTab === "followers") {
-        rawData = res.data.data || res.data.followers || (Array.isArray(res.data) ? res.data : []);
-      } else if (activeTab === "following") {
-        rawData = res.data.data || res.data.following || (Array.isArray(res.data) ? res.data : []);
-      } else if (activeTab === "suggestions") {
-        rawData = res.data.message || res.data.users || (Array.isArray(res.data) ? res.data : []);
-      }
+      // ✅ NORMALIZE DATA: Map the fields because your aggregation 
+      // returns `displayName` and `avatar`, but our UI expects `name` and `profilePic`
+      let users: UserProfile[] = rawData.map((u: any) => ({
+        _id: u._id,
+        name: u.name || u.displayName || "Unknown",
+        username: u.username,
+        profilePic: u.profilePic || u.avatar || "",
+        isVerified: u.isVerified || false,
+      }));
 
-      let users: UserProfile[] = Array.isArray(rawData) ? rawData : [];
-
-      if (activeTab === "suggestions") {
+      // Extra frontend safety net to ensure we don't show currently followed users or ourselves
+      if (activeTab === "suggestions" && currentUser) {
         users = users.filter((u: UserProfile) => {
           if (!u || !u._id) return false;
           if (u._id === currentUser._id) return false;
@@ -86,9 +105,9 @@ export default function FollowersPage() {
 
   useEffect(() => {
     fetchData();
-  }, [activeTab, currentUser]);
+  }, [activeTab, targetUserId, followingIds.length]);
 
-  // 3. Handle Follow Toggle
+  // Handle Follow Toggle
   const handleFollow = async (targetId: string) => {
     const isCurrentlyFollowing = followingIds.includes(targetId);
 
@@ -188,8 +207,8 @@ export default function FollowersPage() {
                 {activeTab === 'suggestions'
                   ? "No new suggestions available."
                   : activeTab === 'followers'
-                    ? "You don't have followers yet."
-                    : "You aren't following anyone yet."}
+                    ? "No followers to display here."
+                    : "Not following anyone yet."}
               </p>
             </motion.div>
           ) : (
@@ -204,8 +223,6 @@ export default function FollowersPage() {
                 const isFollowing = followingIds.includes(user._id);
                 return (
                   <div key={user._id} className="flex items-center justify-between p-3 glass rounded-2xl">
-
-                    {/* ✅ WRAPPED AVATAR AND INFO IN LINK */}
                     <Link
                       to={`/u/${user.username}`}
                       className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
@@ -230,13 +247,12 @@ export default function FollowersPage() {
                       </div>
                     </Link>
 
-                    {/* ✅ KEPT FOLLOW BUTTON OUTSIDE THE LINK */}
                     {currentUser?._id !== user._id && (
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={(e) => {
-                          e.preventDefault(); // Just in case, though it's outside the Link
+                          e.preventDefault();
                           handleFollow(user._id);
                         }}
                         className={`px-4 py-2 rounded-full text-sm font-medium transition-all ml-2 shrink-0 ${isFollowing

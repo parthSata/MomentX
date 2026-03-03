@@ -62,12 +62,24 @@ export const createStory = async (req, res) => {
 
 export const getStories = async (req, res) => {
   try {
-    const stories = await Story.find({ expiresAt: { $gt: new Date() } })
+    const currentUserId = req.user?._id;
+
+    // 1. Fetch the current user to get their 'following' list
+    const currentUserDoc =
+      await User.findById(currentUserId).select('following');
+    const followingIds = currentUserDoc ? currentUserDoc.following : [];
+
+    // 2. Create an array of valid IDs (User's own ID + Following IDs)
+    const validUserIds = [...followingIds, currentUserId];
+
+    // 3. Filter the query using the validUserIds array
+    const stories = await Story.find({
+      expiresAt: { $gt: new Date() },
+      user: { $in: validUserIds },
+    })
       .populate('user', 'username avatar displayName profilePic')
       .populate('viewers.user', 'username avatar displayName profilePic')
       .sort({ createdAt: -1 });
-
-    const currentUserId = req.user?._id?.toString();
 
     const formattedStories = stories.map((story) => {
       const storyObj = story.toObject();
@@ -75,12 +87,13 @@ export const getStories = async (req, res) => {
         ...storyObj,
         isViewed: currentUserId
           ? storyObj.viewers.some(
-              (v) => v.user?._id.toString() === currentUserId,
+              (v) => v.user?._id?.toString() === currentUserId.toString(),
             )
           : false,
-        // ✅ Correctly check for likes using string comparison
         isLiked: currentUserId
-          ? storyObj.likes?.some((id) => id.toString() === currentUserId)
+          ? storyObj.likes?.some(
+              (id) => id.toString() === currentUserId.toString(),
+            )
           : false,
         viewers: storyObj.viewers,
         likes: storyObj.likes || [],

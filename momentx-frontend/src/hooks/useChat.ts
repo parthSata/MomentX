@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/axios';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/AuthContext';
-import { useCallback } from 'react';
 
 export interface ChatUser {
   _id: string;
@@ -61,7 +60,7 @@ export function useChat(chatId?: string) {
     }
   }, [chatId]);
 
-  // 3. Socket Logic (THE FIX IS HERE)
+  // Socket Logic
   useEffect(() => {
     if (!user?._id) return;
     if (!socketRef.current) {
@@ -75,7 +74,6 @@ export function useChat(chatId?: string) {
     const onConnect = () => socket.emit('join_user_room', user._id);
 
     const handleNewMessage = (newMsg: Message) => {
-      // ✅ Only add if it's not from us (Optimistic handles ours)
       const senderId =
         typeof newMsg.sender === 'string' ? newMsg.sender : newMsg.sender?._id;
       if (senderId === user._id) return;
@@ -86,6 +84,8 @@ export function useChat(chatId?: string) {
           return [...prev, newMsg];
         });
       }
+
+      // Fetch chats to update unread count globally
       fetchChats();
     };
 
@@ -99,7 +99,7 @@ export function useChat(chatId?: string) {
     };
   }, [user?._id, chatId, fetchChats]);
 
-  // 4. Send Message
+  // Send Message
   const sendMessage = async (
     receiverId: string,
     content: string,
@@ -108,7 +108,6 @@ export function useChat(chatId?: string) {
     if (!user?._id) return;
     const body: any = { [type]: content };
 
-    // ✅ FIX: Use full ISO string to prevent "Invalid Date"
     const tempMsg: Message = {
       _id: `temp-${Date.now()}`,
       sender: { _id: user._id },
@@ -121,7 +120,6 @@ export function useChat(chatId?: string) {
 
     try {
       const { data } = await api.post(`/chats/send/${receiverId}`, body);
-      // ✅ Update message ID from temp to real
       setMessages((prev) =>
         prev.map((m) => (m._id === tempMsg._id ? data.data : m)),
       );
@@ -132,12 +130,11 @@ export function useChat(chatId?: string) {
     }
   };
 
-  // 5. Delete Messages
+  // Delete Messages
   const deleteMessages = async (messageIds: string[]) => {
     if (!chatId) return;
     if (messageIds.length === 0) return;
 
-    // Optimistic UI
     const originalMessages = [...messages];
     setMessages((prev) => prev.filter((msg) => !messageIds.includes(msg._id)));
 
@@ -150,6 +147,12 @@ export function useChat(chatId?: string) {
     }
   };
 
+  // ✅ CALCULATE TOTAL UNREAD MESSAGES GLOBALLY
+  const totalUnreadMessages = chats.reduce(
+    (sum, chat) => sum + (chat.unreadCount || 0),
+    0,
+  );
+
   return {
     chats,
     messages,
@@ -159,5 +162,6 @@ export function useChat(chatId?: string) {
     sendMessage,
     deleteMessages,
     socketRef,
+    totalUnreadMessages, // ✅ EXPORT THE TOTAL
   };
 }

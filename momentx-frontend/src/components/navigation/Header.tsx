@@ -3,6 +3,8 @@ import { motion } from "framer-motion"
 import { Search, Bell, MessageCircle, PlusSquare, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "./ThemeToggle"
+import { useNotifications } from "@/hooks/useNotifications" // ✅ Imported
+import { useChat } from "@/hooks/useChat" // ✅ Imported
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -10,6 +12,9 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick, showSearch = true }: HeaderProps) {
+  // ✅ Get the counts from hooks
+  const { unreadCount: unreadNotifications } = useNotifications();
+  const { totalUnreadMessages } = useChat();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 glass-strong border-b border-border/50">
@@ -31,10 +36,6 @@ export function Header({ onMenuClick, showSearch = true }: HeaderProps) {
               whileHover={{ rotate: 180 }}
               transition={{ duration: 0.5 }}
             >
-              {/* Gradient border */}
-              {/* <div className="absolute inset-0 bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink rounded-xl animate-gradient" /> */}
-
-              {/* Inner container with logo */}
               <div className="absolute inset-0.5 bg-background rounded-[10px] flex items-center justify-center overflow-hidden">
                 <img
                   src="/MomentX.png"
@@ -44,7 +45,6 @@ export function Header({ onMenuClick, showSearch = true }: HeaderProps) {
               </div>
             </motion.div>
 
-            {/* The 'Moment' text wordmark remains */}
             <span className="hidden sm:block text-xl font-display font-bold gradient-text">
               MomentX
             </span>
@@ -69,17 +69,28 @@ export function Header({ onMenuClick, showSearch = true }: HeaderProps) {
               <PlusSquare className="w-5 h-5" />
             </Button>
           </Link>
+
+          {/* ✅ UPDATED NOTIFICATIONS BADGE */}
           <Link to="/notifications">
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />
+              {unreadNotifications > 0 && (
+                <span className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold px-1 rounded-full min-w-4 h-4 flex items-center justify-center shadow-md">
+                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                </span>
+              )}
             </Button>
           </Link>
-          {/* ✅ FIX: Removed "hidden md:block" so it shows on mobile */}
+
+          {/* ✅ UPDATED MESSAGES BADGE */}
           <Link to="/chat">
             <Button variant="ghost" size="icon" className="relative">
               <MessageCircle className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />
+              {totalUnreadMessages > 0 && (
+                <span className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold px-1 rounded-full min-w-4 h-4 flex items-center justify-center shadow-md">
+                  {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
+                </span>
+              )}
             </Button>
           </Link>
         </div>

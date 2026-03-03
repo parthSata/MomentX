@@ -4,7 +4,8 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import ApiResponse from '../utils/ApiResponse.js';
 import { uploadInCloudinary } from '../utils/cloudinary.js';
-import { Comment } from '../models/comment.model.js'; // ✅ Import Comment
+import { Comment } from '../models/comment.model.js';
+import { sendNotification } from '../utils/Notification.js'; // ✅ IMPORTED NOTIFICATION UTILITY
 import fs from 'fs';
 
 // ✅ Create New Reel
@@ -120,6 +121,15 @@ export const toggleLikeReel = asyncHandler(async (req, res) => {
   } else {
     // Like
     await Reel.findByIdAndUpdate(reelId, { $addToSet: { likes: userId } });
+
+    // ✅ FIRED NOTIFICATION HERE
+    await sendNotification({
+      req,
+      receiverId: reel.user, // The owner of the reel gets the notification
+      type: 'like',
+      reelId: reel._id, // Pass the reelId so the frontend knows it's a reel!
+    });
+
     return res
       .status(200)
       .json(new ApiResponse(200, { liked: true }, 'Reel liked'));

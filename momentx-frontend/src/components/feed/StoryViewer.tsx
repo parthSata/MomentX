@@ -52,12 +52,10 @@ export function StoryViewer({
       setMessage("")
       setIsInputFocused(false)
 
-      // ✅ FIX: Robust Like Check (Handle both string IDs and Object populated users)
+      // Robust Like Check (Handle both string IDs and Object populated users)
       if (currentUserId && (currentStory as any).likes) {
         const hasLiked = (currentStory as any).likes.some((like: any) => {
-          // If like is just an ID string
           if (typeof like === 'string') return like === currentUserId;
-          // If like is an object (populated user)
           if (typeof like === 'object' && like._id) return like._id === currentUserId;
           return false;
         });
@@ -151,7 +149,7 @@ export function StoryViewer({
     }
   };
 
-  // ✅ MESSAGE HANDLER
+  // MESSAGE HANDLER
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -160,10 +158,9 @@ export function StoryViewer({
 
     setIsSending(true);
     try {
-      // Call the function passed from parent (which calls useStories -> replyStory)
       await onReplyStory(currentStory._id, message);
       setMessage("");
-      setIsInputFocused(false); // Resume story
+      setIsInputFocused(false);
     } catch (error) {
       console.error("Failed to send reply", error);
     } finally {
@@ -407,25 +404,45 @@ export function StoryViewer({
                           <p>No views yet</p>
                         </div>
                       ) : (
-                        viewersList.map((viewer: any, idx: number) => (
-                          <div key={idx} className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition-colors">
-                            <div className="flex items-center gap-3">
-                              <AvatarRing
-                                src={viewer.user?.avatar || viewer.user?.profilePic}
-                                size="sm"
-                                alt={viewer.user?.username}
-                                hasStory={false}
-                              />
-                              <div className="flex flex-col">
-                                <span className="text-white text-sm font-medium">{viewer.user?.username || "Unknown User"}</span>
-                                <span className="text-white/50 text-xs">{viewer.user?.displayName}</span>
+                        viewersList.map((viewer: any, idx: number) => {
+
+                          // ✅ 1. CHECK IF THIS VIEWER HAS LIKED THE STORY
+                          const viewerId = viewer.user?._id?.toString();
+                          const viewerHasLiked = currentStory.likes?.some((like: any) => {
+                            const likeId = typeof like === 'object' ? like._id?.toString() : like?.toString();
+                            return likeId === viewerId;
+                          });
+
+                          return (
+                            <div key={idx} className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition-colors">
+                              <div className="flex items-center gap-3">
+
+                                {/* ✅ 2. WRAP AVATAR IN RELATIVE CONTAINER TO ADD HEART BADGE */}
+                                <div className="relative">
+                                  <AvatarRing
+                                    src={viewer.user?.avatar || viewer.user?.profilePic}
+                                    size="sm"
+                                    alt={viewer.user?.username}
+                                    hasStory={false}
+                                  />
+                                  {viewerHasLiked && (
+                                    <div className="absolute -bottom-1 -right-1 bg-[#121212] rounded-full p-0.5 z-10 shadow-md">
+                                      <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-col">
+                                  <span className="text-white text-sm font-medium">{viewer.user?.username || "Unknown User"}</span>
+                                  <span className="text-white/50 text-xs">{viewer.user?.displayName}</span>
+                                </div>
                               </div>
+                              <span className="text-white/30 text-[10px] font-medium">
+                                {viewer.viewedAt ? formatDistanceToNowStrict(new Date(viewer.viewedAt), { addSuffix: true }) : ""}
+                              </span>
                             </div>
-                            <span className="text-white/30 text-[10px] font-medium">
-                              {viewer.viewedAt ? formatDistanceToNowStrict(new Date(viewer.viewedAt), { addSuffix: true }) : ""}
-                            </span>
-                          </div>
-                        ))
+                          )
+                        })
                       )}
                     </div>
                   </motion.div>

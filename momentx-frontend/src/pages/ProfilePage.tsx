@@ -423,7 +423,10 @@ export default function ProfilePage() {
 
       <PostViewDialog
         isOpen={isPostViewOpen}
-        onClose={() => setIsPostViewOpen(false)}
+        onClose={() => {
+          setIsPostViewOpen(false);
+          setSelectedPost(null); // ✅ THIS IS THE FIX: Clear the state on close
+        }}
         post={selectedPost}
       />
 

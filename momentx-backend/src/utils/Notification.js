@@ -1,4 +1,4 @@
-import Notification from "../models/Notification.model.js";
+import Notification from '../models/Notification.model.js';
 
 export const sendNotification = async ({
   req,
@@ -6,7 +6,8 @@ export const sendNotification = async ({
   type,
   postId = null,
   commentId = null,
-  story= null,
+  story = null,
+  reelId = null,
 }) => {
   try {
     const senderId = req.user._id;
@@ -22,21 +23,23 @@ export const sendNotification = async ({
       post: postId,
       comment: commentId,
       story: story,
+      reel: reelId,
     });
 
     // 3. Populate sender info for real-time UI
     const populatedNotification = await Notification.findById(notification._id)
-      .populate("sender", "username profilePic")
-      .populate("post", "images") // To show post thumbnail if it's a like/comment
-      .populate("story", "url type"); // To show story info if applicable
+      .populate('sender', 'username profilePic')
+      .populate('post', 'images') // To show post thumbnail if it's a like/comment
+      .populate('reel', 'video videoUrl thumbnail image') // ✅ POPULATE REEL MEDIA
+      .populate('story', 'url type'); // To show story info if applicable
 
     // 4. Emit Socket Event to Receiver's Room
     if (req.io) {
       req.io
         .to(receiverId.toString())
-        .emit("new_notification", populatedNotification);
+        .emit('new_notification', populatedNotification);
     }
   } catch (error) {
-    console.error("❌ Notification Error:", error);
+    console.error('❌ Notification Error:', error);
   }
 };

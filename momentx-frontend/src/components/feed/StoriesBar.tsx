@@ -3,16 +3,14 @@ import { motion } from "framer-motion"
 import { Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AvatarRing } from "@/components/ui/avatar-ring"
-import { api } from "@/lib/axios" // ✅ Ensure API is imported
-import { toast } from "sonner" // ✅ Ensure Toast is imported
+import { api } from "@/lib/axios"
+import { toast } from "sonner"
 import type { Story } from "@/hooks/useStories"
-import { StoryUploadDialog } from "./StoryUploadDialog" // ✅ Import the dialog
+import { StoryUploadDialog } from "./StoryUploadDialog"
 
 interface StoriesBarProps {
   stories: Story[];
   onStoryClick: (storyId: string) => void;
-  // isUploading is handled internally now, removed from props to avoid conflict
-  // isUploading: boolean; 
   onFileSelect?: (file: File) => void;
   currentUser: any;
   onUploadSuccess?: () => void;
@@ -26,7 +24,6 @@ export function StoriesBar({
 }: StoriesBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // ✅ 1. Local State for Upload Management
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -34,7 +31,6 @@ export function StoriesBar({
 
   const safeStories = Array.isArray(stories) ? stories : [];
 
-  // Helper functions
   const getUserId = (user: any) => {
     if (!user) return "";
     return typeof user === 'object' ? user._id?.toString() : user.toString();
@@ -44,21 +40,27 @@ export function StoriesBar({
     return user?.avatar || user?.profilePic || "/default-avatar.png";
   }
 
+  // ✅ New helper to safely extract username without TS errors
+  const getUserName = (user: any) => {
+    if (typeof user === 'object' && user?.username) {
+      return user.username;
+    }
+    return "User";
+  }
+
   const currentUserId = getUserId(currentUser);
   const myStory = safeStories.find(s => getUserId(s.user) === currentUserId);
   const otherStories = safeStories.filter(s => getUserId(s.user) !== currentUserId);
 
-  // ✅ 2. Handle File Selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       setSelectedFile(file)
-      setIsDialogOpen(true) // Open the dialog immediately
+      setIsDialogOpen(true)
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
-  // ✅ 3. Handle Upload with Realtime Progress
   const handleUploadConfirm = async () => {
     if (!selectedFile) return;
 
@@ -71,7 +73,6 @@ export function StoriesBar({
     try {
       await api.post("/stories", formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        // 🚀 KEY: Capture Upload Progress here
         onUploadProgress: (progressEvent) => {
           const total = progressEvent.total || 1;
           const current = progressEvent.loaded;
@@ -84,7 +85,6 @@ export function StoriesBar({
       setIsDialogOpen(false);
       setSelectedFile(null);
 
-      // Refresh stories
       if (onUploadSuccess) onUploadSuccess();
       else window.location.reload();
 
@@ -108,7 +108,6 @@ export function StoriesBar({
         onChange={handleFileChange}
       />
 
-      {/* ✅ 4. Render the Dialog with Progress Props */}
       <StoryUploadDialog
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
@@ -165,29 +164,33 @@ export function StoriesBar({
         </motion.div>
 
         {/* === OTHER USERS STORIES === */}
-        {otherStories.map((story) => (
-          <motion.button
-            key={story._id}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => onStoryClick(story._id)}
-            className="flex flex-col items-center gap-2 shrink-0"
-          >
-            <AvatarRing
-              src={getUserAvatar(story.user)}
-              alt={story.user?.username || "User"}
-              size="lg"
-              hasStory
-              isViewed={story.isViewed}
-            />
-            <span className={cn(
-              "text-xs truncate w-16 text-center font-medium",
-              story.isViewed ? "text-muted-foreground" : "text-foreground"
-            )}>
-              {story.user?.username?.split('.')[0] || "User"}
-            </span>
-          </motion.button>
-        ))}
+        {otherStories.map((story) => {
+          const userName = getUserName(story.user);
+
+          return (
+            <motion.button
+              key={story._id}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onStoryClick(story._id)}
+              className="flex flex-col items-center gap-2 shrink-0"
+            >
+              <AvatarRing
+                src={getUserAvatar(story.user)}
+                alt={userName}
+                size="lg"
+                hasStory
+                isViewed={story.isViewed}
+              />
+              <span className={cn(
+                "text-xs truncate w-16 text-center font-medium",
+                story.isViewed ? "text-muted-foreground" : "text-foreground"
+              )}>
+                {userName.split('.')[0]}
+              </span>
+            </motion.button>
+          );
+        })}
       </div>
     </div>
   )

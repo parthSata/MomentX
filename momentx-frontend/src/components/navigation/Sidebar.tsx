@@ -1,13 +1,11 @@
 import { Link, useLocation } from "react-router-dom"
 import { motion } from "framer-motion"
-import {
-  Home, Search, Film, MessageCircle, Bell,
-  PlusSquare, Settings
-} from "lucide-react"
+import { Home, Search, Film, MessageCircle, Bell, PlusSquare, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AvatarRing } from "@/components/ui/avatar-ring"
 import { useAuth } from "@/context/AuthContext"
 import { useNotifications } from "@/hooks/useNotifications"
+import { useChat } from "@/hooks/useChat" // ✅ IMPORT USECHAT
 
 const mainNavItems = [
   { icon: Home, path: "/", label: "Home" },
@@ -25,7 +23,8 @@ const secondaryNavItems = [
 export function Sidebar() {
   const location = useLocation()
   const { user: currentUser } = useAuth()
-  const { unreadCount } = useNotifications()
+  const { unreadCount: unreadNotifications } = useNotifications()
+  const { totalUnreadMessages } = useChat() // ✅ GET TOTAL UNREAD MESSAGES
 
   if (!currentUser) return null;
 
@@ -35,6 +34,11 @@ export function Sidebar() {
         {mainNavItems.map((item) => {
           const isActive = location.pathname === item.path
           const Icon = item.icon
+
+          // Determine which count to show based on the tab
+          let badgeCount = 0;
+          if (item.label === "Notifications") badgeCount = unreadNotifications;
+          if (item.label === "Messages") badgeCount = totalUnreadMessages;
 
           return (
             <Link key={item.path} to={item.path}>
@@ -51,22 +55,19 @@ export function Sidebar() {
                 <div className="relative">
                   <Icon className={cn("w-5 h-5", isActive && "text-primary")} />
 
-                  {item.label === "Notifications" && unreadCount > 0 && (
+                  {/* Pulsing dot for new notifications/messages on the icon itself */}
+                  {badgeCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background animate-pulse" />
                   )}
                 </div>
 
                 <span className="font-medium">{item.label}</span>
 
-                {item.label === "Notifications" && unreadCount > 0 ? (
-                  // ✅ FIX: Changed min-w-[18px] to min-w-4.5
-                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-4.5 text-center">
-                    {unreadCount > 99 ? '99+' : unreadCount}
+                {/* ✅ DYNAMIC BADGE COUNT (Replaces empty red dot) */}
+                {badgeCount > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-4.5 text-center shadow-sm">
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
-                ) : (
-                  item.label === "Messages" && (
-                    <span className="ml-auto w-2 h-2 rounded-full bg-accent opacity-0" />
-                  )
                 )}
               </motion.div>
             </Link>

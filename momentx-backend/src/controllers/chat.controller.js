@@ -84,7 +84,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   // 1. Get Chat
   const chat = await getOrCreatePrivateChat(senderId, receiverId);
 
-  // 2. Create Message (The text saved here is now ENCRYPTED gibberish)
+  // 2. Create Message
   const newMessage = await Message.create({
     chatId: chat._id,
     sender: senderId,
@@ -96,23 +96,24 @@ export const sendMessage = asyncHandler(async (req, res) => {
     seenBy: [senderId],
   });
 
-
-  const previewText = sharedPost
-    ? `Shared a ${sharedPost.type}`
-    : image
-      ? '📷 Image'
-      : video
-        ? '🎥 Video'
-        : audio
-          ? '🎵 Audio'
-          : '🔒 Encrypted Message'; // Show this instead of the raw encrypted base64 string
+  const previewText =
+    text ||
+    (sharedPost
+      ? `Shared a ${sharedPost.type}`
+      : image
+        ? '📷 Image'
+        : video
+          ? '🎥 Video'
+          : audio
+            ? '🎵 Audio'
+            : 'Media');
 
   await Chat.findByIdAndUpdate(chat._id, {
     lastMessage: previewText,
     lastMessageAt: new Date(),
   });
 
-  // 4. EMIT TO PARTICIPANTS (User Rooms)
+  // 4. EMIT TO PARTICIPANTS
   if (req.io) {
     chat.participants.forEach((participantId) => {
       req.io.to(participantId.toString()).emit('newMessage', newMessage);
