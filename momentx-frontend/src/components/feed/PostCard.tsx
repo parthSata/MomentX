@@ -11,21 +11,15 @@ import { Link } from "react-router-dom"
 import { FeedPostOptionsDialog } from "@/components/post/FeedPostOptionsDialog"
 import { LikesCountDialog } from "@/components/post/LikesCountDialog"
 import { ShareDialog } from "@/components/reels/ShareDialog"
+import { useAuth } from "@/context/AuthContext"
 
 interface PostCardProps {
   post: Post
 }
 
 export function PostCard({ post }: PostCardProps) {
-  const currentUser = useMemo(() => {
-    try {
-      const stored = localStorage.getItem("momentx_user");
-      if (!stored || stored === "undefined") return {};
-      return JSON.parse(stored);
-    } catch (e) {
-      return {};
-    }
-  }, []);
+  // ✅ Access global auth state to check following list
+  const { user: authUser, refreshUser } = useAuth();
 
   const [isLiked, setIsLiked] = useState(post.isLiked)
   const [isSaved, setIsSaved] = useState(post.isSaved)
@@ -35,20 +29,39 @@ export function PostCard({ post }: PostCardProps) {
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isLikesOpen, setIsLikesOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
-
   const [showFullCaption, setShowFullCaption] = useState(false)
-  const lastTapRef = useRef(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
+  const lastTapRef = useRef(0)
+
+  // ✅ THE FIX: Determine if the current user follows this account using global context
+  const isFollowing = useMemo(() => {
+    if (!authUser || !authUser.following) return true;
+    // Check if post owner's ID is in our following array
+    return (authUser as any).following.some((id: any) =>
+      (typeof id === 'string' ? id : id._id) === post.user._id
+    );
+  }, [authUser, post.user._id]);
+
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await api.post(`/users/follow/${post.user._id}`);
+      toast.success(`Following ${post.user.username}`);
+      await refreshUser(); // ✅ Refresh auth state to update following list globally
+    } catch (error) {
+      toast.error("Failed to follow");
+    }
+  };
 
   const rawVideoUrl = (post as any).videoUrl;
   const hasVideo = typeof rawVideoUrl === 'string' && rawVideoUrl.trim().length > 0;
 
   useEffect(() => {
     if (!hasVideo || !videoRef.current) return;
-    videoRef.current.defaultMuted = true;
     videoRef.current.muted = isMuted;
 
     const observer = new IntersectionObserver(
@@ -68,8 +81,7 @@ export function PostCard({ post }: PostCardProps) {
 
   const handleMediaInteract = () => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
-    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+    if (now - lastTapRef.current < 300) {
       if (!isLiked) handleLike();
       setShowHeart(true);
       setTimeout(() => setShowHeart(false), 800);
@@ -88,18 +100,13 @@ export function PostCard({ post }: PostCardProps) {
 
   const handleLike = async () => {
     const prevLiked = isLiked;
-    const prevLikes = likes;
     setIsLiked(!isLiked);
     setLikes(prev => isLiked ? prev - 1 : prev + 1);
-    if (!isLiked) {
-      setShowHeart(true);
-      setTimeout(() => setShowHeart(false), 800);
-    }
     try {
       await api.post(`/posts/${post._id}/like`)
     } catch (error) {
       setIsLiked(prevLiked);
-      setLikes(prevLikes);
+      setLikes(post.likes);
       toast.error("Failed to like post");
     }
   }
@@ -109,27 +116,10 @@ export function PostCard({ post }: PostCardProps) {
     setIsSaved(!isSaved);
     try {
       await api.post(`/posts/${post._id}/save`);
-      toast.success(isSaved ? "Removed from saved" : "Post saved!", { duration: 1500 });
+      toast.success(isSaved ? "Removed from saved" : "Saved to collection", { duration: 1500 });
     } catch (error) {
       setIsSaved(prevSaved);
     }
-  }
-
-  const handleDeletePost = async () => {
-    if (!confirm("Delete this content?")) return;
-    try {
-      await api.delete(`/posts/${post._id}/delete`);
-      toast.success("Content deleted");
-      window.location.reload();
-    } catch (error) {
-      toast.error("Failed to delete content");
-    }
-  }
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M"
-    if (num >= 1000) return (num / 1000).toFixed(1) + "K"
-    return num.toString()
   }
 
   const formatDate = (dateString: string) => {
@@ -151,60 +141,49 @@ export function PostCard({ post }: PostCardProps) {
 
   return (
     <>
-      <motion.article
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-2xl overflow-hidden mb-6 relative border border-border/50"
-      >
+      <motion.article initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-2xl overflow-hidden mb-6 relative border border-border/50">
         <div className="flex items-center justify-between p-4">
-          <Link to={`/u/${post.user.username}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <AvatarRing src={post.user.profilePic || "/default-avatar.png"} alt={post.user.username} size="sm" hasStory={false} />
-            <div>
-              <div className="flex items-center gap-1">
-                <span className="font-semibold text-sm">{post.user.name}</span>
-                {post.user.isVerified && (
-                  <svg className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-                  </svg>
+          <div className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Link to={`/u/${post.user.username}`}>
+              <AvatarRing src={post.user.profilePic || "/default-avatar.png"} size="sm" />
+            </Link>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <Link to={`/u/${post.user.username}`} className="font-semibold text-sm hover:underline">{post.user.name}</Link>
+
+                {/* ✅ DYNAMIC FOLLOW BUTTON: Only shows if NOT following and NOT own post */}
+                {!isFollowing && post.user._id !== authUser?._id && (
+                  <button
+                    onClick={handleFollow}
+                    className="text-primary text-xs font-bold hover:text-primary/80 transition-colors"
+                  >
+                    • Follow
+                  </button>
                 )}
               </div>
-              {post.location && (
-                <p className="text-xs text-muted-foreground flex items-center gap-0.5">
-                  <MapPin className="w-3 h-3" /> {post.location}
-                </p>
-              )}
+              {post.location && <p className="text-[10px] text-muted-foreground flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" /> {post.location}</p>}
             </div>
-          </Link>
-
-          <button onClick={() => setIsOptionsOpen(true)} className="p-2 hover:bg-muted rounded-full transition-colors">
-            <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
-          </button>
+          </div>
+          <button onClick={() => setIsOptionsOpen(true)}><MoreHorizontal className="w-5 h-5 text-muted-foreground" /></button>
         </div>
 
-        <div
-          className="relative w-full aspect-square sm:aspect-4/5 max-h-[75vh] md:max-h-150 bg-black cursor-pointer group flex items-center justify-center overflow-hidden"
-          onClick={handleMediaInteract}
-        >
+        <div className="relative aspect-square bg-black flex items-center justify-center overflow-hidden" onClick={handleMediaInteract}>
           {hasVideo ? (
             <>
               <video ref={videoRef} src={rawVideoUrl} className="w-full h-full object-contain" loop muted={isMuted} playsInline />
-              {!isPlaying && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
-                  <Play className="w-16 h-16 text-white/80 fill-white/80" />
-                </div>
-              )}
-              <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
+              {!isPlaying && <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none"><Play className="w-16 h-16 text-white/80 fill-white" /></div>}
+              <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white z-10">
                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </button>
             </>
           ) : (
-            <img src={post.images?.[0] || (post as any).thumbnailUrl || "/placeholder-image.jpg"} alt={post.caption || "Post content"} className="w-full h-full object-cover" loading="lazy" />
+            <img src={post.images?.[0] || "/placeholder-image.jpg"} className="w-full h-full object-cover" />
           )}
 
           <AnimatePresence>
             {showHeart && (
-              <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                <Heart className="w-24 h-24 text-red-500 fill-red-500 animate-heart-pop drop-shadow-[0_0_40px_rgba(239,68,68,0.8)]" />
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1.2 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                <Heart className="w-24 h-24 text-red-500 fill-red-500 drop-shadow-xl" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -213,55 +192,29 @@ export function PostCard({ post }: PostCardProps) {
         <div className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <motion.button whileTap={{ scale: 0.9 }} onClick={handleLike} className="transition-colors">
-                <Heart className={cn("w-6 h-6", isLiked ? "text-red-500 fill-red-500" : "text-foreground")} />
-              </motion.button>
-              <button onClick={() => setIsModalOpen(true)} className="hover:text-muted-foreground transition-colors">
-                <MessageCircle className="w-6 h-6 -rotate-90" />
-              </button>
-
-              <button onClick={() => setIsShareOpen(true)} className="hover:text-muted-foreground transition-colors">
-                <Send className="w-6 h-6" />
-              </button>
+              <Heart className={cn("w-6 h-6 cursor-pointer transition-colors", isLiked ? "text-red-500 fill-red-500" : "text-foreground")} onClick={handleLike} />
+              <MessageCircle className="w-6 h-6 -rotate-90 cursor-pointer" onClick={() => setIsModalOpen(true)} />
+              <Send className="w-6 h-6 cursor-pointer" onClick={() => setIsShareOpen(true)} />
             </div>
-            <motion.button whileTap={{ scale: 0.9 }} onClick={handleSave} className="transition-colors">
-              <Bookmark className={cn("w-6 h-6", isSaved ? "text-foreground fill-foreground" : "text-foreground")} />
-            </motion.button>
+            <Bookmark className={cn("w-6 h-6 cursor-pointer", isSaved ? "fill-foreground" : "")} onClick={handleSave} />
           </div>
 
-          <button onClick={() => setIsLikesOpen(true)} className="font-semibold text-sm hover:text-muted-foreground transition-colors">
-            {formatNumber(likes)} likes
-          </button>
+          <button onClick={() => setIsLikesOpen(true)} className="font-semibold text-sm hover:underline">{likes} likes</button>
 
-          {post.caption && (
-            <div className="text-sm">
-              <Link to={`/u/${post.user.username}`} className="font-semibold mr-2 hover:underline">
-                {post.user.username}
-              </Link>
-              {renderCaption()}
-              {post.caption.length > 80 && !showFullCaption && (
-                <button onClick={() => setShowFullCaption(true)} className="text-muted-foreground font-semibold ml-1 hover:text-foreground">
-                  more
-                </button>
-              )}
-            </div>
-          )}
-
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-2">
-            {formatDate(post.createdAt)}
-          </p>
-
-          <button onClick={() => setIsModalOpen(true)} className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-1">
-            {post.comments > 0 ? `View all ${post.comments} comments` : "Add a comment..."}
-          </button>
+          <div className="text-sm">
+            <span className="font-semibold mr-2">{post.user.username}</span>
+            {renderCaption()}
+            {post.caption && post.caption.length > 80 && !showFullCaption && (
+              <button onClick={() => setShowFullCaption(true)} className="text-muted-foreground font-semibold ml-1">more</button>
+            )}
+          </div>
+          <p className="text-[10px] text-muted-foreground tracking-wide">{formatDate(post.createdAt)}</p>
         </div>
       </motion.article>
 
       <PostModal post={post} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      <FeedPostOptionsDialog isOpen={isOptionsOpen} onClose={() => setIsOptionsOpen(false)} postId={post._id} isOwnPost={post.user._id === currentUser._id} onDelete={handleDeletePost} />
+      <FeedPostOptionsDialog isOpen={isOptionsOpen} onClose={() => setIsOptionsOpen(false)} postId={post._id} isOwnPost={post.user._id === authUser?._id} onDelete={() => window.location.reload()} />
       <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={post._id} likesCount={likes} />
-
-      {/* ✅ FIXED: Passes the full post object */}
       <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} post={post} />
     </>
   )

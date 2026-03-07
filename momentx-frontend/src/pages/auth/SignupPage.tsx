@@ -1,85 +1,123 @@
-import { useState, useRef } from "react"
-import { motion } from "framer-motion"
-import { Link, useNavigate } from "react-router-dom"
-import { Eye, EyeOff, Mail, Lock, User, Phone, Camera, Sparkles, UserCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
-import { api } from "@/lib/axios"
-import { useAuth } from "@/context/AuthContext" // ✅ Import
+import { useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  Phone,
+  Camera,
+  Sparkles,
+  UserCircle,
+  ArrowLeft,
+  ShieldCheck
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { api } from "@/lib/axios";
+import { useAuth } from "@/context/AuthContext";
 
 export default function SignupPage() {
-  const navigate = useNavigate()
-  const { login } = useAuth() // ✅ Use Context
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  // UI State
+  const [step, setStep] = useState<1 | 2>(1); // 1: Registration, 2: OTP Verification
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
+  // Form State
   const [formData, setFormData] = useState({
     name: "",
     username: "",
     email: "",
     phone: "",
     password: "",
-  })
+  });
+  const [otp, setOtp] = useState("");
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      setAvatarFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setAvatarPreview(reader.result as string);
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+  // Step 1: Request OTP
+  const handleRequestOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
 
     try {
-      const data = new FormData()
-      data.append("name", formData.name)
-      data.append("username", formData.username)
-      data.append("email", formData.email)
-      data.append("password", formData.password)
-      data.append("phone", formData.phone)
+      // We call the endpoint to check existence and send mail
+      await api.post("/users/register-otp", {
+        email: formData.email,
+        username: formData.username
+      });
+
+      toast.success("Verification Code Sent", {
+        description: `Please check your inbox at ${formData.email}`,
+      });
+      setStep(2);
+    } catch (error: any) {
+      toast.error("Registration Error", {
+        description: error.response?.data?.message || "Something went wrong",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Step 2: Verify OTP and Register
+  const handleVerifyAndRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.length < 6) return toast.error("Please enter a valid 6-digit OTP");
+
+    setIsLoading(true);
+
+    try {
+      const data = new FormData();
+      data.append("name", formData.name);
+      data.append("username", formData.username);
+      data.append("email", formData.email);
+      data.append("password", formData.password);
+      data.append("phone", formData.phone);
+      data.append("otp", otp);
 
       if (avatarFile) {
-        data.append("profilePic", avatarFile)
+        data.append("profilePic", avatarFile);
       }
 
-      // ✅ Corrected Route: /users/register
-      const response = await api.post("/users/register", data, {
+      const response = await api.post("/users/register-verify", data, {
         headers: { "Content-Type": "multipart/form-data" },
-      })
+      });
 
-      // ✅ Auto-login if backend returns user data
       if (response.data?.data) {
-        login(response.data.data)
+        login(response.data.data);
       }
 
-      toast.success("Account Created!", {
+      toast.success("Account Verified!", {
         description: "Welcome to MomentX.",
-      })
+      });
 
-      navigate("/")
-
+      navigate("/");
     } catch (error: any) {
-      console.error("Signup error:", error)
-      toast.error("Registration Failed", {
-        description: error.response?.data?.message || "Something went wrong",
-      })
+      toast.error("Verification Failed", {
+        description: error.response?.data?.message || "Invalid or expired OTP",
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -87,160 +125,139 @@ export default function SignupPage() {
       <div className="absolute inset-0 bg-background">
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-neon-violet/20 rounded-full blur-3xl animate-pulse-slow" />
         <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-neon-pink/20 rounded-full blur-3xl animate-pulse-slow delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-neon-indigo/10 rounded-full blur-3xl animate-pulse-slow delay-500" />
       </div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
         className="w-full max-w-md relative z-10"
       >
         <div className="glass-strong rounded-3xl p-8 shadow-glow">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-            className="flex flex-col items-center mb-6"
-          >
-            <h1 className="text-2xl font-display font-bold gradient-text">Join MomentX</h1>
-            <p className="text-muted-foreground mt-1 text-sm">Create your account</p>
-          </motion.div>
-
-          {/* Avatar Upload UI */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
-            className="flex justify-center mb-6"
-          >
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="relative group"
-            >
-              <div className="w-24 h-24 rounded-full bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink p-0.5 animate-gradient">
-                <div className="w-full h-full rounded-full bg-background flex items-center justify-center overflow-hidden">
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <Camera className="w-8 h-8 text-muted-foreground" />
-                  )}
+          <AnimatePresence mode="wait">
+            {step === 1 ? (
+              <motion.div
+                key="step1"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+              >
+                <div className="flex flex-col items-center mb-6">
+                  <h1 className="text-2xl font-display font-bold gradient-text">Join MomentX</h1>
+                  <p className="text-muted-foreground mt-1 text-sm">Create your account</p>
                 </div>
-              </div>
-              <div className="absolute inset-0 rounded-full bg-background/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <Camera className="w-6 h-6 text-foreground" />
-              </div>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarChange}
-            />
-          </motion.div>
 
-          <form onSubmit={handleSignup} className="space-y-4">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.35 }}>
-              <div className="relative">
-                <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Full Name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="pl-11"
-                  required
-                />
-              </div>
-            </motion.div>
+                {/* Avatar Upload */}
+                <div className="flex justify-center mb-6">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="relative group">
+                    <div className="w-24 h-24 rounded-full bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink p-0.5 animate-gradient">
+                      <div className="w-full h-full rounded-full bg-background flex items-center justify-center overflow-hidden">
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          <Camera className="w-8 h-8 text-muted-foreground" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                </div>
 
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Username"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  className="pl-11"
-                  required
-                />
-              </div>
-            </motion.div>
+                <form onSubmit={handleRequestOTP} className="space-y-4">
+                  <div className="relative">
+                    <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input placeholder="Full Name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="pl-11" required />
+                  </div>
 
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="email"
-                  placeholder="Email address"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="pl-11"
-                  required
-                />
-              </div>
-            </motion.div>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input placeholder="Username" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} className="pl-11" required />
+                  </div>
 
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="tel"
-                  placeholder="Phone number"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="pl-11"
-                />
-              </div>
-            </motion.div>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input type="email" placeholder="Email address" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="pl-11" required />
+                  </div>
 
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }}>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="pl-11 pr-11"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input type="tel" placeholder="Phone number" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="pl-11" />
+                  </div>
+
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input type={showPassword ? "text" : "password"} placeholder="Password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="pl-11 pr-11" required />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="animate-spin" /> : "Send Verification Code"}
+                  </Button>
+                </form>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="step2"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <button onClick={() => setStep(1)} className="flex items-center text-xs text-muted-foreground hover:text-foreground mb-4 transition-colors">
+                  <ArrowLeft className="w-3 h-3 mr-1" /> Back to details
                 </button>
-              </div>
-            </motion.div>
 
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="pt-2">
-              <Button type="submit" variant="default" size="lg" className="w-full" disabled={isLoading}>
-                {isLoading ? (
-                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
-                    <Sparkles className="w-5 h-5" />
-                  </motion.div>
-                ) : (
-                  "Create Account"
-                )}
-              </Button>
-            </motion.div>
-          </form>
+                <div className="flex flex-col items-center mb-6 text-center">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                    <ShieldCheck className="w-8 h-8" />
+                  </div>
+                  <h1 className="text-2xl font-display font-bold">Verify Email</h1>
+                  <p className="text-muted-foreground mt-1 text-sm">Enter the 6-digit code sent to <br /> <span className="text-foreground font-medium">{formData.email}</span></p>
+                </div>
 
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="mt-6 text-center">
+                <form onSubmit={handleVerifyAndRegister} className="space-y-6">
+                  <div className="flex justify-center">
+                    <Input
+                      type="text"
+                      maxLength={6}
+                      placeholder="000000"
+                      className="text-center text-2xl tracking-[0.5em] font-mono h-14"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                      required
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full h-12" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="animate-spin w-5 h-5" /> : "Verify & Create Account"}
+                  </Button>
+
+                  <p className="text-center text-xs text-muted-foreground">
+                    Didn't receive the code? {" "}
+                    <button type="button" onClick={handleRequestOTP} className="text-primary hover:underline font-medium">Resend</button>
+                  </p>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 text-center">
             <p className="text-muted-foreground text-sm">
               Already have an account?{" "}
-              <Link to="/login" className="text-primary hover:underline font-medium">
-                Login
-              </Link>
+              <Link to="/login" className="text-primary hover:underline font-medium">Login</Link>
             </p>
           </motion.div>
         </div>
       </motion.div>
     </div>
-  )
+  );
+}
+
+// Simple internal Loader component for button
+function Loader2({ className }: { className?: string }) {
+  return (
+    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className={className}>
+      <Sparkles className="w-5 h-5" />
+    </motion.div>
+  );
 }

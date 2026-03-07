@@ -4,6 +4,7 @@ export interface User {
   name: string;
   profilePic: string; // Backend sends profilePic
   isVerified: boolean;
+  following: string[]; // Array of user IDs
 }
 
 export interface Post {
@@ -19,7 +20,7 @@ export interface Post {
   createdAt: string;
   hashtags: string[];
   videoUrl: string; // Optional video URL
-  commentsCount : number;
+  commentsCount: number;
 }
 
 export interface Comment {

@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/axios";
 import { toast } from "sonner";
 import { PostViewDialog } from "@/components/feed/PostViewDialog";
+import { useAuth } from "@/context/AuthContext";
 
 const getIcon = (type: string) => {
   switch (type) {
@@ -19,7 +20,6 @@ const getIcon = (type: string) => {
   }
 };
 
-// Clean text logic to handle both post and reel natively
 const getContentText = (type: string, notification: any) => {
   if (type === "like") {
     if (notification.story) return "liked your story";
@@ -36,6 +36,7 @@ const getContentText = (type: string, notification: any) => {
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
+  const { user: currentUser, refreshUser } = useAuth();
 
   const { notifications, unreadCount, loading, markAllRead, deleteNotification, deleteAllNotifications } = useNotifications();
 
@@ -50,15 +51,12 @@ export default function NotificationsPage() {
     return () => window.removeEventListener("click", handleClickOutside);
   }, []);
 
-  // Auto-mark all notifications as read when the page is viewed
   useEffect(() => {
     if (!loading && unreadCount > 0) {
       markAllRead();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, unreadCount]);
+  }, [loading, unreadCount, markAllRead]);
 
-  // Navigation & Click Logic supports BOTH Posts and Reels
   const handleNotificationClick = async (notif: any) => {
     if (notif.type === "follow" && notif.sender?.username) {
       navigate(`/u/${notif.sender.username}`);
@@ -71,7 +69,6 @@ export default function NotificationsPage() {
           setIsPostViewOpen(true);
         } else if (notif.reel?._id) {
           const { data } = await api.get(`/reels/${notif.reel._id}`);
-          // Transform reel data so the PostViewDialog understands it
           setViewPostData({
             ...data.data,
             type: 'reel',
@@ -92,6 +89,7 @@ export default function NotificationsPage() {
       await api.post(`/users/follow/${userId}`);
       setFollowedBackIds(prev => new Set(prev).add(userId));
       toast.success("Followed back!");
+      await refreshUser();
     } catch (err) {
       console.error(err);
       toast.error("Action failed");
@@ -175,9 +173,9 @@ export default function NotificationsPage() {
           <AnimatePresence mode="popLayout">
             {notifications.length > 0 ? (
               notifications.map((notif: any, index) => {
-                const isFollowedBack = followedBackIds.has(notif.sender?._id);
+                // FIXED: Using type casting or optional chaining to handle User type safety
+                const isAlreadyFollowing = (currentUser as any)?.following?.includes(notif.sender?._id) || followedBackIds.has(notif.sender?._id);
 
-                // MEDIA RESOLUTION: Handle rendering thumbnails for Posts OR Reels seamlessly
                 const mediaObj = notif.reel || notif.post;
                 const isMediaReel = !!notif.reel || notif.post?.type === 'reel' || !!notif.post?.videoUrl || !!notif.post?.video;
                 const mediaSrc = mediaObj?.thumbnail || mediaObj?.videoUrl || mediaObj?.video || mediaObj?.images?.[0] || mediaObj?.image;
@@ -242,17 +240,19 @@ export default function NotificationsPage() {
                       </div>
                     )}
 
-                    {notif.type === "follow" && (
+                    {notif.type === "follow" && !isAlreadyFollowing && (
                       <button
                         onClick={(e) => handleFollowBack(e, notif.sender._id)}
-                        disabled={isFollowedBack}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ml-2 shrink-0 ${isFollowedBack
-                          ? "bg-secondary text-foreground border border-border cursor-default"
-                          : "bg-primary/10 hover:bg-primary/20 text-primary"
-                          }`}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors ml-2 shrink-0"
                       >
-                        {isFollowedBack ? "Following" : "Follow Back"}
+                        Follow Back
                       </button>
+                    )}
+
+                    {notif.type === "follow" && isAlreadyFollowing && (
+                      <span className="px-3 py-1.5 text-xs font-semibold text-muted-foreground ml-2 shrink-0 italic">
+                        Following
+                      </span>
                     )}
 
                     <button

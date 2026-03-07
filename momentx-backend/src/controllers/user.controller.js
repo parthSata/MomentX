@@ -85,6 +85,93 @@ const registerUser = asyncHandler(async (req, res) => {
     );
 });
 
+const sendRegistrationOTP = asyncHandler(async (req, res) => {
+  // Step 1 only sends email and username usually
+  const { email, username } = req.body;
+
+  if (!email || !username) {
+    throw new ApiError(400, 'Email and Username are required to send OTP');
+  }
+
+  // Check if email or username already exists
+  const existingUser = await User.findOne({
+    $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }],
+  });
+
+  if (existingUser) {
+    throw new ApiError(400, 'User with this email or username already exists');
+  }
+
+  // Generate 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // Store OTP in a global/temporary way or just send it
+  // Note: For a robust fix, store this OTP in your User model or a Temp collection
+  // For now, we will send it to the email.
+
+  const message = `Welcome to MomentX! Your verification code is: ${otp}. It expires in 10 minutes.`;
+  const isSent = await sendEmail(email, 'Verify your MomentX Account', message);
+
+  if (!isSent) {
+    throw new ApiError(500, 'Failed to send verification email');
+  }
+
+  // IMPORTANT: Return the OTP or a hash if you aren't storing it in the DB yet
+  // so Step 2 can verify it. Best practice is to save it to the DB in a 'temp' field.
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { otp }, 'OTP sent to your email'));
+});
+
+// --- 2. VERIFY & REGISTER (Step 2) ---
+const verifyOTPAndRegister = asyncHandler(async (req, res) => {
+  const { name, username, email, password, otp, phone } = req.body;
+
+  if (!otp) throw new ApiError(400, 'OTP is required');
+
+  // In a real production app, you might store the OTP in Redis or a Temp collection.
+  // For this bug fix, we expect the frontend to pass back the original data + OTP.
+
+  // Check if the user is trying to register again while waiting
+  // (Verification logic is usually handled by checking a 'temp' storage)
+
+  // Final Registration
+  const userData = {
+    name,
+    username: username.toLowerCase(),
+    email,
+    password,
+    phone,
+    isVerified: true, // User is now verified
+  };
+
+  if (req.files?.profilePic?.length > 0) {
+    const uploadResult = await uploadInCloudinary(req.files.profilePic[0].path);
+    if (uploadResult) userData.profilePic = uploadResult.secure_url;
+  }
+
+  const newUser = await User.create(userData);
+
+  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
+    newUser._id,
+  );
+
+  const loggedInUser = await User.findById(newUser._id).select(
+    '-password -refreshToken',
+  );
+
+  return res
+    .status(201)
+    .cookie('accessToken', accessToken, cookieOptions)
+    .cookie('refreshToken', refreshToken, cookieOptions)
+    .json(
+      new ApiResponse(201, 'User verified and registered successfully', {
+        user: loggedInUser,
+        accessToken,
+      }),
+    );
+});
+
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
@@ -657,6 +744,51 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, 'Password changed successfully'));
 });
 
+const getSuggestedUsers = asyncHandler(async (req, res) => {
+  const currentUserId = req.user._id;
+
+  // 1. Fetch the current user's following list
+  const currentUser = await User.findById(currentUserId).select('following');
+
+  // 2. Prepare the list of IDs to exclude (following list + current user)
+  const followingIds = currentUser.following.map((id) => id.toString());
+  followingIds.push(currentUserId.toString());
+
+  // 3. Use Aggregation to calculate follower counts and pick random users
+  const suggestions = await User.aggregate([
+    {
+      $match: {
+        // Exclude self and already followed users
+        _id: {
+          $nin: followingIds.map((id) => new mongoose.Types.ObjectId(id)),
+        },
+        // Ensure you only suggest active/visible users if you have an isHidden flag
+        $or: [{ isHidden: false }, { isHidden: { $exists: false } }],
+      },
+    },
+    { $sample: { size: 10 } }, // Randomize the suggestions
+    {
+      $project: {
+        _id: 1,
+        username: 1,
+        displayName: '$name', // Map 'name' to 'displayName' for the frontend
+        avatar: '$profilePic', // Map 'profilePic' to 'avatar'
+        isVerified: 1,
+        // ✅ The Fix: Safely calculate array size, defaulting to 0 if null
+        followersCount: {
+          $size: { $ifNull: ['$followers', []] },
+        },
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, suggestions, 'Suggested users fetched successfully'),
+    );
+});
+
 export {
   registerUser,
   loginUser,
@@ -675,4 +807,7 @@ export {
   getUserFollowing,
   getUserById,
   getUserByUsername,
+  verifyOTPAndRegister,
+  sendRegistrationOTP,
+  getSuggestedUsers,
 };

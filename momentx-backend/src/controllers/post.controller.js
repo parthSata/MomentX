@@ -117,31 +117,45 @@ const createPost = asyncHandler(async (req, res) => {
 });
 
 // --- 2. GET FEED ---
+// post.controller.js
+
 const getHomeFeed = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
   const skip = (page - 1) * limit;
   const currentUserId = req.user._id;
 
-  // 1. Fetch Posts
-  const posts = await Post.find(VISIBLE_FILTER)
+  // 1. Get the current user to find their following list
+  const currentUser = await User.findById(currentUserId).select('following');
+
+  // 2. Create a list of IDs to fetch posts from
+  // Include the user's own ID if you want them to see their own posts in the feed
+  const followingList = [...currentUser.following, currentUserId];
+
+  // 3. Update the filter to only show posts from followed users
+  const FOLLOWED_USERS_FILTER = {
+    user: { $in: followingList },
+    ...VISIBLE_FILTER,
+  };
+
+  // 4. Fetch Posts
+  const posts = await Post.find(FOLLOWED_USERS_FILTER)
     .populate('user', 'username name profilePic isVerified')
     .populate('taggedUsers', 'username')
+    .sort({ createdAt: -1 }) // Sort here for better performance before lean
     .lean();
 
-  // 2. Fetch Reels
-  const reels = await Reel.find(VISIBLE_FILTER)
+  // 5. Fetch Reels
+  const reels = await Reel.find(FOLLOWED_USERS_FILTER)
     .populate('user', 'username name profilePic isVerified')
+    .sort({ createdAt: -1 })
     .lean();
 
-  // 3. Combine and Sort Chronologically (Newest first)
+  // 6. Combine, Sort and Paginate
   const allContent = [...posts, ...reels].sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   );
 
-  // 4. Apply Pagination (Skip and Limit on the combined array)
   const paginatedContent = allContent.slice(skip, skip + parseInt(limit));
-
-  // 5. Format the resulting page
   const formattedPosts = await formatPosts(paginatedContent, currentUserId);
 
   return res.status(200).json(

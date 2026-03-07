@@ -18,6 +18,8 @@ import {
   getUserById,
   getUserByUsername,
   changeCurrentPassword,
+  verifyOTPAndRegister, // This will handle /register-verify
+  sendRegistrationOTP, // This will handle /register-otp
 } from '../controllers/user.controller.js';
 import { upload } from '../middlewares/multer.middleware.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
@@ -29,7 +31,6 @@ const router = express.Router();
 const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    // Return the first error message to the frontend for cleaner toast notifications
     throw new ApiError(400, errors.array()[0].msg, errors.array());
   }
   next();
@@ -43,6 +44,25 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// ==========================================
+// 🔓 PUBLIC ROUTES
+// ==========================================
+
+// --- Step 1: Send OTP ---
+// Matches frontend: api.post("/users/register-otp")
+router.route('/register-otp').post(sendRegistrationOTP);
+
+// --- Step 2: Verify OTP & Finalize Registration ---
+// Matches frontend: api.post("/users/register-verify")
+router
+  .route('/register-verify')
+  .post(
+    upload.fields([{ name: 'profilePic', maxCount: 1 }]),
+    verifyOTPAndRegister,
+  );
+
+// Keep your existing registration route if needed for legacy support,
+// otherwise you can remove it.
 router
   .route('/register')
   .post(upload.fields([{ name: 'profilePic', maxCount: 1 }]), registerUser);
@@ -88,12 +108,12 @@ router
   );
 
 router.post('/refresh-token', refreshToken);
-router.route('/change-password').post(verifyJWT, changeCurrentPassword);
 
 // ==========================================
 // 🔒 SECURED ROUTES (Token Required)
 // ==========================================
 
+router.route('/change-password').post(verifyJWT, changeCurrentPassword);
 router.route('/current-user').get(verifyJWT, getCurrentUser);
 router.route('/logout').post(verifyJWT, logoutUser);
 router.get('/all', verifyJWT, getAllUsers);
@@ -123,7 +143,6 @@ router
         .withMessage('Username too short'),
       body('email').optional().isEmail(),
       body('password').optional().isLength({ min: 6 }),
-      body('status').optional().trim(),
       validate,
     ],
     updateProfile,

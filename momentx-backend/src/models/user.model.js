@@ -49,6 +49,12 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    emailOTP: String,
+    emailOTPExpires: Date,
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
     savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
 
     lastActive: { type: Date, default: Date.now },
