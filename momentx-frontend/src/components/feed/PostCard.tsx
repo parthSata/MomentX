@@ -18,7 +18,6 @@ interface PostCardProps {
 }
 
 export function PostCard({ post }: PostCardProps) {
-  // ✅ Access global auth state to check following list
   const { user: authUser, refreshUser } = useAuth();
 
   const [isLiked, setIsLiked] = useState(post.isLiked)
@@ -30,16 +29,41 @@ export function PostCard({ post }: PostCardProps) {
   const [isLikesOpen, setIsLikesOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [showFullCaption, setShowFullCaption] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isMuted, setIsMuted] = useState(true)
+
+  // ✅ GLOBAL MUTE LOGIC: Read initial state from localStorage
+  const [isMuted, setIsMuted] = useState(() => {
+    return localStorage.getItem("videoMuted") === "true";
+  });
+
   const lastTapRef = useRef(0)
 
-  // ✅ THE FIX: Determine if the current user follows this account using global context
+  // ✅ Listen for changes to the global mute state from other PostCards
+  useEffect(() => {
+    const handleMuteChange = () => {
+      const globalMuteStatus = localStorage.getItem("videoMuted") === "true";
+      setIsMuted(globalMuteStatus);
+    };
+
+    window.addEventListener("videoMuteToggle", handleMuteChange);
+    return () => window.removeEventListener("videoMuteToggle", handleMuteChange);
+  }, []);
+
+  // ✅ Toggle Function: Updates local, storage, and notifies other components
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newMuteStatus = !isMuted;
+    setIsMuted(newMuteStatus);
+    localStorage.setItem("videoMuted", String(newMuteStatus));
+    // Dispatch a custom event so other PostCards update their state instantly
+    window.dispatchEvent(new Event("videoMuteToggle"));
+  };
+
   const isFollowing = useMemo(() => {
     if (!authUser || !authUser.following) return true;
-    // Check if post owner's ID is in our following array
     return (authUser as any).following.some((id: any) =>
       (typeof id === 'string' ? id : id._id) === post.user._id
     );
@@ -51,10 +75,31 @@ export function PostCard({ post }: PostCardProps) {
     try {
       await api.post(`/users/follow/${post.user._id}`);
       toast.success(`Following ${post.user.username}`);
-      await refreshUser(); // ✅ Refresh auth state to update following list globally
+      await refreshUser();
     } catch (error) {
       toast.error("Failed to follow");
     }
+  };
+
+  const handleDeletePost = async () => {
+    if (isDeleting) return;
+    if (!window.confirm("Are you sure you want to delete this post?")) return;
+
+    setIsDeleting(true);
+    try {
+      await api.delete(`/posts/${post._id}/delete`);
+      toast.success("Post deleted successfully");
+      window.location.reload();
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete post.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleEditPost = () => {
+    toast.info("Edit mode coming soon!");
   };
 
   const rawVideoUrl = (post as any).videoUrl;
@@ -151,7 +196,6 @@ export function PostCard({ post }: PostCardProps) {
               <div className="flex items-center gap-2">
                 <Link to={`/u/${post.user.username}`} className="font-semibold text-sm hover:underline">{post.user.name}</Link>
 
-                {/* ✅ DYNAMIC FOLLOW BUTTON: Only shows if NOT following and NOT own post */}
                 {!isFollowing && post.user._id !== authUser?._id && (
                   <button
                     onClick={handleFollow}
@@ -172,7 +216,9 @@ export function PostCard({ post }: PostCardProps) {
             <>
               <video ref={videoRef} src={rawVideoUrl} className="w-full h-full object-contain" loop muted={isMuted} playsInline />
               {!isPlaying && <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none"><Play className="w-16 h-16 text-white/80 fill-white" /></div>}
-              <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white z-10">
+
+              {/* ✅ Mute button updated with global toggle function */}
+              <button onClick={toggleMute} className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white z-10 hover:bg-black/70 transition-colors">
                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </button>
             </>
@@ -213,7 +259,16 @@ export function PostCard({ post }: PostCardProps) {
       </motion.article>
 
       <PostModal post={post} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      <FeedPostOptionsDialog isOpen={isOptionsOpen} onClose={() => setIsOptionsOpen(false)} postId={post._id} isOwnPost={post.user._id === authUser?._id} onDelete={() => window.location.reload()} />
+
+      <FeedPostOptionsDialog
+        isOpen={isOptionsOpen}
+        onClose={() => setIsOptionsOpen(false)}
+        postId={post._id}
+        isOwnPost={post.user._id === authUser?._id}
+        onDelete={handleDeletePost}
+        onEdit={handleEditPost}
+      />
+
       <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={post._id} likesCount={likes} />
       <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} post={post} />
     </>

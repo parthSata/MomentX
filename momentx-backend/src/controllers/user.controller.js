@@ -379,18 +379,30 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 
   const postsCount = await Post.countDocuments({ user: user._id });
 
+  // Filter out duplicates and self-references
+  const cleanFollowers = [...new Set((userData.followers || []).map(id => id.toString()))]
+    .filter(id => id !== userData._id.toString());
+  const cleanFollowing = [...new Set((userData.following || []).map(id => id.toString()))]
+    .filter(id => id !== userData._id.toString());
+
+  const validFollowersDocs = await User.find({ _id: { $in: cleanFollowers } }).select('_id');
+  const validFollowingDocs = await User.find({ _id: { $in: cleanFollowing } }).select('_id');
+
+  const validFollowersIds = validFollowersDocs.map(doc => doc._id.toString());
+  const validFollowingIds = validFollowingDocs.map(doc => doc._id.toString());
+
   const userResponse = {
     _id: userData._id.toString(),
     username: userData.username,
     email: userData.email,
-    name: userData.name, // <--- Added
-    bio: userData.bio || '', // <--- Added
-    website: userData.website || '', // <--- Added
+    name: userData.name, 
+    bio: userData.bio || '', 
+    website: userData.website || '', 
     profilePic: userData.profilePic || '',
     status: userData.status,
     isOnline: userData.isOnline,
-    followers: userData.followers, // <--- Added
-    following: userData.following, // <--- Added
+    followers: validFollowersIds,
+    following: validFollowingIds,
     posts: userData.posts,
     postsCount: postsCount,
   };
@@ -604,8 +616,8 @@ const toggleFollowUser = asyncHandler(async (req, res) => {
       );
   } else {
     // Follow logic
-    await User.findByIdAndUpdate(currentUserId, { $push: { following: id } });
-    await User.findByIdAndUpdate(id, { $push: { followers: currentUserId } });
+    await User.findByIdAndUpdate(currentUserId, { $addToSet: { following: id } });
+    await User.findByIdAndUpdate(id, { $addToSet: { followers: currentUserId } });
 
     // ✅ SEND NOTIFICATION (New Follower)
     await sendNotification({
@@ -635,10 +647,14 @@ const getUserFollowers = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'User not found');
   }
 
+  const validFollowers = user.followers.filter(
+    (f) => f._id.toString() !== id.toString()
+  );
+
   return res
     .status(200)
     .json(
-      new ApiResponse(200, user.followers, 'Followers fetched successfully'),
+      new ApiResponse(200, validFollowers, 'Followers fetched successfully'),
     );
 });
 
@@ -655,12 +671,16 @@ const getUserFollowing = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'User not found');
   }
 
+  const validFollowing = user.following.filter(
+    (f) => f._id.toString() !== id.toString()
+  );
+
   return res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        user.following,
+        validFollowing,
         'Following list fetched successfully',
       ),
     );
@@ -685,21 +705,24 @@ const getUserById = asyncHandler(async (req, res) => {
 const getUserByUsername = asyncHandler(async (req, res) => {
   const { username } = req.params;
   const currentUserId = req.user?._id;
-
-  // 1. Find User
   const user = await User.findOne({ username }).select(
-    '-password -refresh_token',
+    '-password -refreshToken',
+  );
+  if (!user) throw new ApiError(404, 'User not found');
+
+  const postsCount = await Post.countDocuments({ user: user._id });
+
+  // ✅ FIX: Strict ID Filtering and deduplication
+  const validFollowers = [...new Set((user.followers || []).map(id => id.toString()))].filter(
+    (id) => id !== user._id.toString(),
+  );
+  const validFollowing = [...new Set((user.following || []).map(id => id.toString()))].filter(
+    (id) => id !== user._id.toString(),
   );
 
-  if (!user) {
-    throw new ApiError(404, 'User not found');
-  }
+  const activeFollowersCount = await User.countDocuments({ _id: { $in: validFollowers } });
+  const activeFollowingCount = await User.countDocuments({ _id: { $in: validFollowing } });
 
-  // 2. Get Aggregated Stats
-  const postsCount = await Post.countDocuments({ user: user._id });
-  const isFollowing = user.followers.includes(currentUserId);
-
-  // 3. Construct Response
   const userProfile = {
     _id: user._id,
     name: user.name,
@@ -708,17 +731,16 @@ const getUserByUsername = asyncHandler(async (req, res) => {
     website: user.website,
     profilePic: user.profilePic,
     isVerified: user.isVerified,
-    followersCount: user.followers.length,
-    followingCount: user.following.length,
+    followersCount: activeFollowersCount, // ✅ Added Clean Count
+    followingCount: activeFollowingCount, // ✅ Added Clean Count
     postsCount,
-    isFollowing, // Helpful for the UI button
+    isFollowing: validFollowers.some(
+      (id) => id.toString() === currentUserId?.toString(),
+    ),
   };
-
   return res
     .status(200)
-    .json(
-      new ApiResponse(200, userProfile, 'User profile fetched successfully'),
-    );
+    .json(new ApiResponse(200, userProfile, 'Fetched Profile'));
 });
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
@@ -746,47 +768,34 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 
 const getSuggestedUsers = asyncHandler(async (req, res) => {
   const currentUserId = req.user._id;
-
-  // 1. Fetch the current user's following list
   const currentUser = await User.findById(currentUserId).select('following');
+  const excludeIds = [
+    ...(currentUser.following || []).map((id) => id.toString()),
+    currentUserId.toString(),
+  ];
 
-  // 2. Prepare the list of IDs to exclude (following list + current user)
-  const followingIds = currentUser.following.map((id) => id.toString());
-  followingIds.push(currentUserId.toString());
-
-  // 3. Use Aggregation to calculate follower counts and pick random users
   const suggestions = await User.aggregate([
     {
       $match: {
-        // Exclude self and already followed users
-        _id: {
-          $nin: followingIds.map((id) => new mongoose.Types.ObjectId(id)),
-        },
-        // Ensure you only suggest active/visible users if you have an isHidden flag
+        _id: { $nin: excludeIds.map((id) => new mongoose.Types.ObjectId(id)) },
         $or: [{ isHidden: false }, { isHidden: { $exists: false } }],
       },
     },
-    { $sample: { size: 10 } }, // Randomize the suggestions
+    { $sample: { size: 10 } },
     {
       $project: {
         _id: 1,
         username: 1,
-        displayName: '$name', // Map 'name' to 'displayName' for the frontend
-        avatar: '$profilePic', // Map 'profilePic' to 'avatar'
+        displayName: '$name',
+        avatar: '$profilePic',
         isVerified: 1,
-        // ✅ The Fix: Safely calculate array size, defaulting to 0 if null
-        followersCount: {
-          $size: { $ifNull: ['$followers', []] },
-        },
+        followersCount: { $size: { $ifNull: ['$followers', []] } },
       },
     },
   ]);
-
   return res
     .status(200)
-    .json(
-      new ApiResponse(200, suggestions, 'Suggested users fetched successfully'),
-    );
+    .json(new ApiResponse(200, suggestions, 'Suggestions fetched'));
 });
 
 export {

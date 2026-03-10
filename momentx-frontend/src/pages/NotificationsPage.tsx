@@ -16,6 +16,7 @@ const getIcon = (type: string) => {
     case "like": return <Heart className="w-4 h-4 text-red-500 fill-red-500" />;
     case "comment": return <MessageCircle className="w-4 h-4 text-blue-500 fill-blue-500" />;
     case "follow": return <UserPlus className="w-4 h-4 text-green-500" />;
+    case "mention": return <UserPlus className="w-4 h-4 text-purple-500" />;
     default: return <Heart className="w-4 h-4" />;
   }
 };
@@ -29,6 +30,13 @@ const getContentText = (type: string, notification: any) => {
   if (type === "comment") {
     if (notification.reel || notification.post?.type === 'reel' || notification.post?.videoUrl || notification.post?.video) return "commented on your reel";
     return "commented on your post";
+  }
+  if (type === "mention") {
+    // Check if the notification object contains a reel ID or if the post object is actually a reel
+    if (notification.reel || notification.post?.type === 'reel') {
+      return "tagged you in a reel";
+    }
+    return "tagged you in a post";
   }
   if (type === "follow") return "started following you";
   return "interacted with you";
@@ -58,10 +66,9 @@ export default function NotificationsPage() {
   }, [loading, unreadCount, markAllRead]);
 
   const handleNotificationClick = async (notif: any) => {
-    if (notif.type === "follow" && notif.sender?.username) {
+    if (notif.type === "follow") {
       navigate(`/u/${notif.sender.username}`);
-    }
-    else if ((notif.type === "like" || notif.type === "comment")) {
+    } else if (["like", "comment", "mention"].includes(notif.type)) { // ✅ Added 'mention'
       try {
         if (notif.post?._id) {
           const { data } = await api.get(`/posts/${notif.post._id}`);
@@ -77,7 +84,6 @@ export default function NotificationsPage() {
           setIsPostViewOpen(true);
         }
       } catch (error) {
-        console.error("Failed to load content", error);
         toast.error("Content may have been deleted.");
       }
     }

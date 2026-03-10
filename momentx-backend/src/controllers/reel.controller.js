@@ -10,46 +10,53 @@ import fs from 'fs';
 
 // ✅ Create New Reel
 export const createReel = asyncHandler(async (req, res) => {
-  const { caption, hashtags } = req.body;
+  const { caption, hashtags, taggedUsers } = req.body; // Added taggedUsers
   const userId = req.user._id;
 
-  // 1. Check for video file
   if (!req.file) {
     throw new ApiError(400, 'Video file is required');
   }
 
-  const localFilePath = req.file.path;
+  const cloudResponse = await uploadInCloudinary(req.file.path, 'video');
 
-  // 2. Upload to Cloudinary (Video)
-  // We need to tell Cloudinary this is a video
-  const cloudResponse = await uploadInCloudinary(localFilePath, 'video');
-
-  if (!cloudResponse || !cloudResponse.secure_url) {
-    throw new ApiError(500, 'Failed to upload video to cloud');
-  }
-
-  // 3. Process Hashtags
   let parsedHashtags = [];
   if (hashtags) {
-    // If sent as JSON string array or comma separated
-    parsedHashtags = Array.isArray(hashtags)
-      ? hashtags
-      : hashtags.split(',').map((tag) => tag.trim().replace(/^#/, ''));
+    parsedHashtags = Array.isArray(hashtags) ? hashtags : hashtags.split(',');
   }
 
-  // 4. Create Reel in DB
+  // Handle Tagged Users
+  let parsedTags = [];
+  if (taggedUsers) {
+    try {
+      parsedTags =
+        typeof taggedUsers === 'string' ? JSON.parse(taggedUsers) : taggedUsers;
+    } catch (e) {
+      console.warn('Could not parse taggedUsers', e);
+    }
+  }
+
   const newReel = await Reel.create({
     user: userId,
     videoUrl: cloudResponse.secure_url,
-    thumbnailUrl: cloudResponse.eager
-      ? cloudResponse.eager[0].secure_url
-      : cloudResponse.secure_url.replace(/\.[^/.]+$/, '.jpg'), // Simple thumbnail logic
+    thumbnailUrl: cloudResponse.secure_url.replace(/\.[^/.]+$/, '.jpg'),
     caption,
     hashtags: parsedHashtags,
+    taggedUsers: parsedTags, // Store tags in Reel
     duration: cloudResponse.duration,
   });
 
-  // 5. Update User's Reel Count (Optional)
+  // Send notifications to tagged users
+  if (parsedTags.length > 0) {
+    parsedTags.forEach((taggedUserId) => {
+      sendNotification({
+        req,
+        receiverId: taggedUserId,
+        type: 'mention',
+        postId: newReel._id,
+      });
+    });
+  }
+
   await User.findByIdAndUpdate(userId, { $push: { reels: newReel._id } });
 
   return res

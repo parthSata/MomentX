@@ -1,4 +1,3 @@
-// src/components/post/FeedPostOptionsDialog.tsx
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -10,7 +9,7 @@ interface FeedPostOptionsDialogProps {
     onClose: () => void
     postId: string
     isOwnPost: boolean
-    onDelete: () => void
+    onDelete: () => void // Ensure this function handles the api.delete call
     onEdit?: () => void
 }
 
@@ -32,10 +31,23 @@ export function FeedPostOptionsDialog({ isOpen, onClose, postId, isOwnPost, onDe
         onClose()
     }
 
+    // Fixed Action Handlers
+    const handleDeleteClick = () => {
+        // Trigger the delete function passed from parent
+        onDelete();
+        // Close this dialog
+        onClose();
+    }
+
+    const handleEditClick = () => {
+        if (onEdit) onEdit();
+        onClose();
+    }
+
     const options = isOwnPost
         ? [
-            { label: "Edit", action: () => { if (onEdit) onEdit(); onClose(); } },
-            { label: "Delete", action: () => { onDelete(); onClose(); }, destructive: true },
+            { label: "Edit", action: handleEditClick },
+            { label: "Delete", action: handleDeleteClick, destructive: true },
             { label: "Copy link", action: handleCopyLink },
             { label: "Cancel", action: onClose },
         ]
@@ -50,31 +62,34 @@ export function FeedPostOptionsDialog({ isOpen, onClose, postId, isOwnPost, onDe
         <>
             <AnimatePresence>
                 {isOpen && !isReportOpen && (
-                    // ... (keep exact same layout for options dialog) ...
-                    <>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={onClose}
-                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
                         />
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[90%] max-w-sm glass-strong bg-background/95 border border-border/50 rounded-2xl overflow-hidden shadow-2xl"
+                            className="relative z-50 w-[90%] max-w-sm glass-strong bg-background/95 border border-border/50 rounded-2xl overflow-hidden shadow-2xl"
                         >
-                            <div className="divide-y divide-border/50">
+                            <div className="flex flex-col divide-y divide-border/50">
                                 {options.map((option) => (
                                     <button
+                                        type="button"
                                         key={option.label}
-                                        onClick={option.action}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            option.action();
+                                        }}
                                         className={cn(
-                                            "w-full py-4 text-center text-sm font-medium transition-colors hover:bg-muted/50",
-                                            option.destructive && "text-red-500 font-semibold",
-                                            option.label === "Cancel" && "text-muted-foreground"
+                                            "w-full py-4 text-center text-sm font-medium transition-colors hover:bg-muted/50 active:bg-muted",
+                                            option.destructive && "text-red-500 font-bold",
+                                            option.label === "Cancel" && "text-foreground"
                                         )}
                                     >
                                         {option.label}
@@ -82,11 +97,10 @@ export function FeedPostOptionsDialog({ isOpen, onClose, postId, isOwnPost, onDe
                                 ))}
                             </div>
                         </motion.div>
-                    </>
+                    </div>
                 )}
             </AnimatePresence>
 
-            {/* ✅ Pass required props to ReportDialog */}
             <ReportDialog
                 isOpen={isReportOpen}
                 onClose={() => {

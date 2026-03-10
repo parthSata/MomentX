@@ -11,6 +11,12 @@ const reelSchema = new mongoose.Schema(
     hashtags: [{ type: String }],
     isHidden: { type: Boolean, default: false },
     sharesCount: { type: Number, default: 0 },
+    taggedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     duration: { type: Number }, // Video duration in seconds
   },
   { timestamps: true },

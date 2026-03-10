@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react"; // ✅ Removed 'useCallback'
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Video, Hash, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Video, Hash, X, Loader2, UserPlus, ChevronRight, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { AvatarRing } from "@/components/ui/avatar-ring";
 import { toast } from "sonner";
 import { api } from "@/lib/axios";
 
@@ -21,6 +22,45 @@ export default function CreateReelPage() {
     const [tagInput, setTagInput] = useState("");
     const [isPosting, setIsPosting] = useState(false);
     const [showTagInput, setShowTagInput] = useState(false);
+
+    // User Tagging State
+    const [taggedUsers, setTaggedUsers] = useState<any[]>([]);
+    const [userSearchQuery, setUserSearchQuery] = useState("");
+    const [userSuggestions, setUserSuggestions] = useState<any[]>([]);
+    const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+    const [showUserTagInput, setShowUserTagInput] = useState(false);
+
+    // User Search Logic
+    useEffect(() => {
+        const searchUsers = async () => {
+            if (userSearchQuery.length < 2) {
+                setUserSuggestions([]);
+                return;
+            }
+            setIsSearchingUsers(true);
+            try {
+                const { data } = await api.get(`/users/search?query=${userSearchQuery}`);
+                setUserSuggestions(data.data || []);
+            } catch (error) {
+                console.error("User search failed", error);
+            } finally {
+                setIsSearchingUsers(false);
+            }
+        };
+
+        const timeoutId = setTimeout(searchUsers, 400);
+        return () => clearTimeout(timeoutId);
+    }, [userSearchQuery]);
+
+    const toggleTagUser = (user: any) => {
+        if (taggedUsers.find(u => u._id === user._id)) {
+            setTaggedUsers(taggedUsers.filter(u => u._id !== user._id));
+        } else {
+            setTaggedUsers([...taggedUsers, user]);
+        }
+        setUserSearchQuery("");
+        setUserSuggestions([]);
+    };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -62,6 +102,11 @@ export default function CreateReelPage() {
             formData.append("caption", caption);
             formData.append("hashtags", tags.join(","));
 
+            // Send Tagged User IDs as stringified JSON
+            if (taggedUsers.length > 0) {
+                formData.append("taggedUsers", JSON.stringify(taggedUsers.map(u => u._id)));
+            }
+
             await api.post("/reels/create", formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
@@ -80,7 +125,6 @@ export default function CreateReelPage() {
 
     return (
         <div className="min-h-screen bg-black text-white">
-            {/* Header */}
             <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -120,8 +164,6 @@ export default function CreateReelPage() {
 
             <div className="max-w-md mx-auto pb-20">
                 <AnimatePresence mode="wait">
-
-                    {/* Step 1: Select Video */}
                     {step === "select" && (
                         <motion.div
                             key="select"
@@ -132,7 +174,6 @@ export default function CreateReelPage() {
                         >
                             <div
                                 onClick={() => fileInputRef.current?.click()}
-                                // ✅ FIX: Updated to aspect-9/16
                                 className="w-full max-w-xs aspect-9/16 border-2 border-dashed border-white/20 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-white/5 transition-all"
                             >
                                 <div className="p-4 bg-white/10 rounded-full">
@@ -143,18 +184,10 @@ export default function CreateReelPage() {
                                     <p className="text-sm text-white/50">Up to 60 seconds</p>
                                 </div>
                             </div>
-
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="video/*"
-                                onChange={handleFileUpload}
-                                className="hidden"
-                            />
+                            <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileUpload} className="hidden" />
                         </motion.div>
                     )}
 
-                    {/* Step 2: Details */}
                     {step === "details" && selectedVideo && (
                         <motion.div
                             key="details"
@@ -163,9 +196,7 @@ export default function CreateReelPage() {
                             exit={{ opacity: 0, x: -20 }}
                             className="p-4 space-y-6"
                         >
-                            {/* Preview */}
                             <div className="flex gap-4">
-                                {/* ✅ FIX: Updated to aspect-9/16 */}
                                 <div className="w-24 aspect-9/16 bg-gray-900 rounded-lg overflow-hidden relative">
                                     <video src={selectedVideo} className="w-full h-full object-cover" muted autoPlay loop />
                                 </div>
@@ -174,39 +205,100 @@ export default function CreateReelPage() {
                                         value={caption}
                                         onChange={(e) => setCaption(e.target.value)}
                                         placeholder="Write a caption..."
-                                        className="h-full bg-transparent border-none resize-none focus:ring-0 text-base"
+                                        className="h-full bg-transparent border-none resize-none focus:ring-0 text-base placeholder:text-white/30"
                                     />
                                 </div>
                             </div>
 
                             <div className="h-px bg-white/10" />
 
-                            {/* Tags */}
+                            {/* Tag People */}
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => setShowUserTagInput(!showUserTagInput)}
+                                    className="flex items-center justify-between w-full py-2 group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <UserPlus className="w-5 h-5 text-primary" />
+                                        <span className="text-lg">Tag People</span>
+                                    </div>
+                                    <ChevronRight className={`w-5 h-5 text-white/50 transition-transform ${showUserTagInput ? 'rotate-90' : ''}`} />
+                                </button>
+
+                                {showUserTagInput && (
+                                    <div className="bg-white/5 p-4 rounded-2xl space-y-4 border border-white/5">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                                            <Input
+                                                value={userSearchQuery}
+                                                onChange={(e) => setUserSearchQuery(e.target.value)}
+                                                placeholder="Search for people..."
+                                                className="pl-10 bg-black/50 border-white/10 focus:border-primary"
+                                            />
+                                            {isSearchingUsers && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-primary" />}
+
+                                            {userSuggestions.length > 0 && (
+                                                <div className="absolute z-50 w-full mt-2 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
+                                                    {userSuggestions.map(user => (
+                                                        <button
+                                                            key={user._id}
+                                                            onClick={() => toggleTagUser(user)}
+                                                            className="w-full flex items-center gap-3 p-3 hover:bg-zinc-800 transition-colors border-b border-white/5 last:border-0"
+                                                        >
+                                                            <AvatarRing src={user.profilePic} size="sm" />
+                                                            <div className="text-left">
+                                                                <p className="text-sm font-bold">@{user.username}</p>
+                                                                <p className="text-[10px] text-white/50">{user.name}</p>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            {taggedUsers.map(user => (
+                                                <span key={user._id} className="px-3 py-1.5 bg-primary/20 text-primary rounded-full text-xs font-medium flex items-center gap-2 border border-primary/30">
+                                                    @{user.username}
+                                                    <X className="w-3.5 h-3.5 cursor-pointer hover:text-white" onClick={() => toggleTagUser(user)} />
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="h-px bg-white/10" />
+
+                            {/* Topics */}
                             <div className="space-y-3">
                                 <button
                                     onClick={() => setShowTagInput(!showTagInput)}
-                                    className="flex items-center gap-3 w-full py-2 hover:opacity-80"
+                                    className="flex items-center justify-between w-full py-2 group"
                                 >
-                                    <Hash className="w-5 h-5 text-white/70" />
-                                    <span className="text-lg">Add Topics</span>
+                                    <div className="flex items-center gap-3">
+                                        <Hash className="w-5 h-5 text-white/70" />
+                                        <span className="text-lg">Add Topics</span>
+                                    </div>
+                                    <ChevronRight className={`w-5 h-5 text-white/50 transition-transform ${showTagInput ? 'rotate-90' : ''}`} />
                                 </button>
 
                                 {showTagInput && (
-                                    <div className="bg-white/5 p-4 rounded-xl space-y-3">
+                                    <div className="bg-white/5 p-4 rounded-2xl space-y-3 border border-white/5">
                                         <div className="flex gap-2">
                                             <Input
                                                 value={tagInput}
                                                 onChange={(e) => setTagInput(e.target.value)}
                                                 placeholder="travel, food..."
-                                                className="bg-black/50 border-white/10"
+                                                className="bg-black/50 border-white/10 focus:border-primary"
                                                 onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
                                             />
                                             <Button onClick={handleAddTag} size="sm" variant="secondary">Add</Button>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
                                             {tags.map(t => (
-                                                <span key={t} className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm flex items-center gap-1 border border-primary/30">
-                                                    #{t} <X className="w-3 h-3 cursor-pointer" onClick={() => handleRemoveTag(t)} />
+                                                <span key={t} className="px-3 py-1 bg-white/10 text-white rounded-full text-sm flex items-center gap-1 border border-white/10">
+                                                    #{t} <X className="w-3 h-3 cursor-pointer hover:text-red-400" onClick={() => handleRemoveTag(t)} />
                                                 </span>
                                             ))}
                                         </div>
@@ -215,7 +307,6 @@ export default function CreateReelPage() {
                             </div>
                         </motion.div>
                     )}
-
                 </AnimatePresence>
             </div>
         </div>

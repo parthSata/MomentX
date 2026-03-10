@@ -247,16 +247,25 @@ const getUserTaggedPosts = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const currentUserId = req.user._id;
 
-  // ✅ Apply Strong Filter to Tagged
-  const posts = await Post.find({ taggedUsers: userId, ...VISIBLE_FILTER })
-    .populate('user', 'username name profilePic isVerified')
-    .sort({ createdAt: -1 });
+  // Fetch both Posts and Reels where the user is tagged
+  const [posts, reels] = await Promise.all([
+    Post.find({ taggedUsers: userId, ...VISIBLE_FILTER })
+      .populate('user', 'username name profilePic isVerified')
+      .lean(),
+    Reel.find({ taggedUsers: userId, ...VISIBLE_FILTER })
+      .populate('user', 'username name profilePic isVerified')
+      .lean(),
+  ]);
 
-  const formattedPosts = await formatPosts(posts, currentUserId);
+  const allTaggedContent = [...posts, ...reels].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
+
+  const formattedContent = await formatPosts(allTaggedContent, currentUserId);
 
   return res
     .status(200)
-    .json(new ApiResponse(200, formattedPosts, 'Tagged posts fetched'));
+    .json(new ApiResponse(200, formattedContent, 'Tagged content fetched'));
 });
 
 // --- INTERACTIONS (Unchanged) ---

@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 // ✅ UPDATE INTERFACE
 export interface Notification {
   _id: string;
-  type: 'like' | 'comment' | 'follow';
+  type: 'like' | 'comment' | 'follow' | 'mention' ;
   user: string; // Receiver ID
   sender: {
     _id: string;
