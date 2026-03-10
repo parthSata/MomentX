@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Phone, Video, Send, Image as ImageIcon,
   Mic, Smile, Camera, Music, Loader2, X, Play,
-  MoreVertical, Trash2, CheckCircle2, Circle,
+  MoreVertical, Trash2, CheckCircle2, Circle, Square
 } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { AvatarRing } from "@/components/ui/avatar-ring";
@@ -82,6 +82,13 @@ export default function ChatPage() {
   } | null>(null);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [fullScreenVideo, setFullScreenVideo] = useState<string | null>(null);
+
+  // ✅ AUDIO RECORDING STATES
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [viewPostData, setViewPostData] = useState<any | null>(null);
   const [isPostViewOpen, setIsPostViewOpen] = useState(false);
@@ -327,6 +334,7 @@ export default function ChatPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    const isNowTyping = value.trim() !== "";
     setInputText(value);
 
     const socket = socketRef.current;
@@ -334,7 +342,7 @@ export default function ChatPage() {
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
-    if (value.trim()) {
+    if (isNowTyping) {
       socket.emit("typing", { chatId, senderId: currentUser._id });
       typingTimeoutRef.current = setTimeout(() => {
         socket.emit("stopTyping", { chatId, senderId: currentUser._id });
@@ -398,6 +406,55 @@ export default function ChatPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  // ✅ AUDIO RECORDING FUNCTIONS
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const file = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+        const url = URL.createObjectURL(audioBlob);
+        setSelectedMedia({ file, url, type: "audio" });
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error("Recording error:", error);
+      toast.error("Microphone access denied");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      audioChunksRef.current = [];
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  };
+
   const confirmSendMedia = async () => {
     if (!selectedMedia || !chatUser._id) return;
     setUploading(true);
@@ -416,6 +473,7 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Upload failed:", error);
+      toast.error("Media upload failed");
     } finally {
       setUploading(false);
     }
@@ -441,6 +499,12 @@ export default function ChatPage() {
       console.error("Failed to load post:", error);
       toast.error("Content not found or has been deleted.");
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const allMessages = [...messages, ...localMessages]
@@ -811,55 +875,77 @@ export default function ChatPage() {
           </AnimatePresence>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => triggerUpload("image/*,video/*")}
-              className="p-2 glass rounded-full hover:bg-muted shrink-0"
-            >
-              <Camera className="w-5 h-5 text-primary" />
-            </button>
+            {!isRecording && (
+              <button
+                onClick={() => triggerUpload("image/*,video/*")}
+                className="p-2 glass rounded-full hover:bg-muted shrink-0"
+              >
+                <Camera className="w-5 h-5 text-primary" />
+              </button>
+            )}
 
             <div className="flex-1 relative">
-              <Input
-                variant="glass"
-                placeholder="Message..."
-                value={inputText}
-                onChange={handleInputChange}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                className="pr-24 h-12"
-              />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <button
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className="p-1.5 hover:bg-muted rounded-full"
-                >
-                  <Smile className="w-5 h-5 text-muted-foreground" />
-                </button>
-                <button
-                  className="p-1.5 hover:bg-muted rounded-full hidden sm:block"
-                  onClick={() => triggerUpload("image/*")}
-                >
-                  <ImageIcon className="w-5 h-5 text-muted-foreground" />
-                </button>
-                <button
-                  className="p-1.5 hover:bg-muted rounded-full"
-                  onClick={() => triggerUpload("audio/*")}
-                >
-                  <Music className="w-5 h-5 text-muted-foreground" />
-                </button>
-              </div>
+              {isRecording ? (
+                <div className="flex items-center justify-between h-12 px-4 bg-red-500/10 border border-red-500/20 rounded-xl animate-pulse">
+                  <div className="flex items-center gap-2 text-red-500">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                    <span className="text-sm font-medium">Recording {formatTime(recordingTime)}</span>
+                  </div>
+                  <button onClick={cancelRecording} className="text-xs font-bold text-muted-foreground hover:text-red-500 transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Input
+                    variant="glass"
+                    placeholder="Message..."
+                    value={inputText}
+                    onChange={handleInputChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    className="pr-24 h-12"
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className="p-1.5 hover:bg-muted rounded-full"
+                    >
+                      <Smile className="w-5 h-5 text-muted-foreground" />
+                    </button>
+                    <button
+                      className="p-1.5 hover:bg-muted rounded-full hidden sm:block"
+                      onClick={() => triggerUpload("image/*")}
+                    >
+                      <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                    </button>
+                    <button
+                      className="p-1.5 hover:bg-muted rounded-full"
+                      onClick={() => triggerUpload("audio/*")}
+                    >
+                      <Music className="w-5 h-5 text-muted-foreground" />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             <motion.button
-              onClick={handleSend}
-              className="p-3 bg-linear-to-r from-blue-600 to-indigo-600 rounded-full shrink-0"
+              whileTap={{ scale: 0.9 }}
+              onClick={inputText.trim() ? handleSend : isRecording ? stopRecording : startRecording}
+              className={`p-3 rounded-full shrink-0 transition-colors ${isRecording
+                ? "bg-red-500 shadow-lg shadow-red-500/20"
+                : "bg-linear-to-r from-blue-600 to-indigo-600"
+                }`}
             >
               {inputText.trim() ? (
                 <Send className="w-5 h-5 text-white" />
+              ) : isRecording ? (
+                <Square className="w-5 h-5 text-white fill-white" />
               ) : (
                 <Mic className="w-5 h-5 text-white" />
               )}
