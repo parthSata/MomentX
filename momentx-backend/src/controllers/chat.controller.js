@@ -14,19 +14,30 @@ export const getChats = asyncHandler(async (req, res) => {
 
   const formattedChats = await Promise.all(
     chats.map(async (chat) => {
-      const otherParticipant = chat.participants.find(
-        (p) => p._id.toString() !== currentUserId.toString(),
-      );
+      let otherParticipant = null;
+
+      if (!chat.isGroupChat) {
+        otherParticipant = chat.participants.find(
+          (p) => p._id.toString() !== currentUserId.toString(),
+        );
+      }
+
       const unreadCount = await Message.countDocuments({
         chatId: chat._id,
         seenBy: { $ne: currentUserId },
       });
+
       return {
         _id: chat._id,
-        user: otherParticipant,
+        isGroupChat: chat.isGroupChat,
+        groupName: chat.groupName,
+        groupAvatar: chat.groupAvatar, // assuming you have this or it's returned
+        user: otherParticipant, // Will be null for group chats
         lastMessage: chat.lastMessage,
         lastMessageAt: chat.lastMessageAt,
         unreadCount: unreadCount || 0,
+        participants: chat.participants, // Include participants for group chats
+        groupAdmins: chat.groupAdmins // Include admins for group chats
       };
     }),
   );
@@ -81,8 +92,12 @@ export const sendMessage = asyncHandler(async (req, res) => {
   if (!text && !image && !video && !audio && !sharedPost)
     throw new ApiError(400, 'Message cannot be empty');
 
-  // 1. Get Chat
-  const chat = await getOrCreatePrivateChat(senderId, receiverId);
+  // 1. Get Chat (Handles both Group Chats and Direct Messages)
+  let chat = await Chat.findById(receiverId).catch(() => null);
+  
+  if (!chat) {
+    chat = await getOrCreatePrivateChat(senderId, receiverId);
+  }
 
   // 2. Create Message
   const newMessage = await Message.create({
@@ -113,14 +128,14 @@ export const sendMessage = asyncHandler(async (req, res) => {
     lastMessageAt: new Date(),
   });
 
+  await newMessage.populate('sender', 'username profilePic name');
+
   // 4. EMIT TO PARTICIPANTS
   if (req.io) {
     chat.participants.forEach((participantId) => {
       req.io.to(participantId.toString()).emit('newMessage', newMessage);
     });
   }
-
-  await newMessage.populate('sender', 'username profilePic name');
 
   return res.status(201).json(new ApiResponse(201, newMessage, 'Message sent'));
 });
@@ -208,4 +223,90 @@ export const deleteChat = asyncHandler(async (req, res) => {
   await Chat.findByIdAndDelete(chatId);
   await Message.deleteMany({ chatId });
   return res.status(200).json(new ApiResponse(200, {}, 'Chat deleted'));
+});
+
+export const createGroupChat = asyncHandler(async (req, res) => {
+  const { name, participants } = req.body; // participants is an array of IDs
+  const adminId = req.user._id;
+
+  if (!name || !participants || participants.length < 1) {
+    throw new ApiError(400, 'Group name and at least one member required');
+  }
+
+  // Add current user to participants if not already there
+  const allParticipants = [...new Set([...participants, adminId.toString()])];
+
+  const chat = await Chat.create({
+    groupName: name,
+    participants: allParticipants,
+    isGroupChat: true,
+    groupAdmins: [adminId],
+    lastMessage: 'Group created',
+  });
+
+  const fullGroupChat = await Chat.findById(chat._id)
+    .populate('participants', 'name username profilePic isOnline')
+    .populate('groupAdmins', 'name username');
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, fullGroupChat, 'Group created'));
+});
+
+// ✅ ADD/REMOVE MEMBERS
+export const updateGroupMembers = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const { userId, action } = req.body; // action: 'add' or 'remove'
+
+  const chat = await Chat.findById(chatId);
+  if (!chat.groupAdmins.includes(req.user._id)) {
+    throw new ApiError(403, 'Only admins can manage members');
+  }
+
+  const update =
+    action === 'add'
+      ? { $addToSet: { participants: userId } }
+      : { $pull: { participants: userId, groupAdmins: userId } };
+
+  const updatedChat = await Chat.findByIdAndUpdate(chatId, update, {
+    new: true,
+  }).populate('participants', 'name username profilePic isOnline');
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedChat, 'Members updated'));
+});
+
+export const getGroupInfo = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+
+  const chat = await Chat.findById(chatId)
+    .populate('participants', 'name username profilePic isOnline')
+    .populate('groupAdmins', 'name username profilePic');
+
+  if (!chat || !chat.isGroupChat) {
+    throw new ApiError(404, 'Group chat not found');
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, chat, 'Group info fetched successfully'));
+});
+
+// ✅ TOGGLE ADMIN STATUS
+export const toggleGroupAdmin = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const { userId } = req.body;
+  const chat = await Chat.findById(chatId);
+
+  if (!chat.groupAdmins.includes(req.user._id))
+    throw new ApiError(403, 'Admin only');
+
+  const isAdmin = chat.groupAdmins.includes(userId);
+  const update = isAdmin
+    ? { $pull: { groupAdmins: userId } }
+    : { $addToSet: { groupAdmins: userId } };
+
+  await Chat.findByIdAndUpdate(chatId, update);
+  return res.status(200).json(new ApiResponse(200, {}, 'Admin status updated'));
 });

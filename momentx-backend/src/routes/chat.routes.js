@@ -8,6 +8,10 @@ import {
   createChat,
   cleanDuplicateChats,
   deleteChat,
+  createGroupChat,
+  updateGroupMembers,
+  getGroupInfo,
+  toggleGroupAdmin,
 } from '../controllers/chat.controller.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
 import { upload } from '../middlewares/multer.middleware.js'; // ✅ Import Multer
@@ -25,6 +29,13 @@ router.route('/upload').post(upload.single('file'), uploadChatMedia);
 router.post('/delete-messages', verifyJWT, deleteMessages);
 // ✅ Routes
 router.post('/cleanup', verifyJWT, cleanDuplicateChats);
-router.route('/:chatId').delete(deleteChat);
+router.route('/group').post(verifyJWT, createGroupChat);
+router.route('/group/:chatId/members').patch(verifyJWT, updateGroupMembers);
+router.route('/group/:chatId').get(verifyJWT, getGroupInfo);
+router.route('/group/:chatId/admin').patch(verifyJWT, toggleGroupAdmin);
+
+router.route('/:chatId')
+  .delete(verifyJWT, deleteChat);
+
 
 export default router;

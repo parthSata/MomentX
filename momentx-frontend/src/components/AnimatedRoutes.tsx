@@ -25,6 +25,7 @@ import UserProfilePage from "@/pages/UserProfilePage";
 import ActivityPage from "@/pages/ActivityPage";
 import SettingsPage from "@/pages/SettingsPage";
 import { SplashScreen } from "@/components/SplashScreen"; // ✅ IMPORT SPLASH SCREEN
+import GroupChatPage from "@/pages/GroupChatPage";
 
 // Admin route protection
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -79,6 +80,15 @@ export function AnimatedRoutes() {
               }
             />
             <Route
+              path="/group-chat/:id"
+              element={
+                <PageTransition>
+                  <GroupChatPage />
+                </PageTransition>
+              }
+            />
+
+            <Route
               path="/explore"
               element={
                 <PageTransition>
@@ -102,6 +112,8 @@ export function AnimatedRoutes() {
                 </PageTransition>
               }
             />
+
+
             <Route
               path="/forgot-password"
               element={

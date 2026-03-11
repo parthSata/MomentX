@@ -218,7 +218,7 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
         }
     };
 
-    const handleEditPost = async (updatedData: { caption: string; location: string; tags: string }) => {
+    const handleEditPost = async (updatedData: { caption: string; location: string; taggedUsers: string[] }) => {
         if (!localPostData) return;
         try {
             await api.put(`/posts/${localPostData._id}`, {

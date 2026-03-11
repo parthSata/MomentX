@@ -279,10 +279,11 @@ const refreshToken = asyncHandler(async (req, res) => {
 });
 
 const searchUser = asyncHandler(async (req, res) => {
-  const { query } = req.query; // Changed from 'username' to 'query' for generic usage
+  // ✅ FIX: Extract either 'query' or 'username' from req.query
+  const searchQuery = req.query.query || req.query.username;
   const currentUserId = req.user._id;
 
-  if (!query || query.trim() === '') {
+  if (!searchQuery || searchQuery.trim() === '') {
     return res.status(200).json(new ApiResponse(200, [], 'No query provided'));
   }
 
@@ -291,14 +292,14 @@ const searchUser = asyncHandler(async (req, res) => {
       { _id: { $ne: currentUserId } }, // Exclude self
       {
         $or: [
-          { username: { $regex: query, $options: 'i' } },
-          { name: { $regex: query, $options: 'i' } },
+          { username: { $regex: searchQuery.trim(), $options: 'i' } },
+          { name: { $regex: searchQuery.trim(), $options: 'i' } },
         ],
       },
     ],
   })
-    .select('name username profilePic isVerified')
-    .limit(10); // Limit results for performance
+    .select('name username profilePic isVerified isOnline') // ✅ Added isOnline for chat UI
+    .limit(10);
 
   return res
     .status(200)

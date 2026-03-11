@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Edit, MoreHorizontal, Loader2, X, UserPlus, MessageCircle, Trash2, ArrowLeft } from "lucide-react"; // ✅ Added ArrowLeft
+import { Search, Edit, MoreHorizontal, Loader2, X, UserPlus, MessageCircle, Trash2, ArrowLeft, Users } from "lucide-react"; // ✅ Added ArrowLeft
 import { Input } from "@/components/ui/input";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +10,7 @@ import { api } from "@/lib/axios";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { decryptMessage } from "@/lib/cryptoUtils";
+import { CreateGroupDialog } from "@/components/chat/CreateGroupDialog";
 
 interface SearchUser {
   _id: string;
@@ -32,7 +33,7 @@ export default function ChatListPage() {
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; chatId: string } | null>(null);
-
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false); // ✅ Toggle for Group Dialog
   // Sync local state when chats are fetched initially
   useEffect(() => {
     setLocalChats(chats);
@@ -157,18 +158,47 @@ export default function ChatListPage() {
 
   // Dedup logic using Map
   const chatMap = new Map<string, any>();
+  const groupChats: any[] = []; // Store group chats separately so we don't dedup them by user 
+
   localChats.forEach((chat: any) => {
-    const otherUserId = chat.user?._id;
-    if (!otherUserId) return;
-    chatMap.set(otherUserId, chat);
+    if (chat.isGroupChat) {
+      groupChats.push(chat);
+    } else {
+      const otherUserId = chat.user?._id;
+      if (!otherUserId) return;
+      chatMap.set(otherUserId, chat);
+    }
   });
 
-  const uniqueChats = Array.from(chatMap.values());
+  // Combine unique 1-on-1 chats with all group chats and sort by lastMessageAt
+  const uniqueChats = [...Array.from(chatMap.values()), ...groupChats].sort((a, b) => {
+    if (!a.lastMessageAt) return 1;
+    if (!b.lastMessageAt) return -1;
+    return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+  });
 
-  const filteredChats = uniqueChats.filter((c: any) =>
-    c.user?.name?.toLowerCase().includes(query.toLowerCase()) ||
-    c.user?.username?.toLowerCase().includes(query.toLowerCase())
-  );
+  const filteredChats = uniqueChats.filter((c: any) => {
+    if (c.isGroupChat) {
+      return c.groupName?.toLowerCase().includes(query.toLowerCase());
+    }
+    return c.user?.name?.toLowerCase().includes(query.toLowerCase()) || 
+           c.user?.username?.toLowerCase().includes(query.toLowerCase());
+  });
+
+  const handleGroupCreated = async (groupData: any) => {
+    try {
+      const { data } = await api.post("/chats/group", {
+        name: groupData.name,
+        participants: groupData.members // It's already an array of IDs
+      });
+      setIsCreateGroupOpen(false);
+      fetchChats();
+      navigate(`/group-chat/${data.data._id}`); // Navigate to Group Chat UI
+      toast.success("Group created successfully!");
+    } catch (error) {
+      toast.error("Failed to create group");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 relative text-foreground">
@@ -244,6 +274,13 @@ export default function ChatListPage() {
         )}
       </AnimatePresence>
 
+      {/* ✅ Create Group Dialog */}
+      <CreateGroupDialog
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onCreated={handleGroupCreated}
+      />
+
       {/* Header */}
       <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="sticky top-0 z-40 glass-strong p-4">
 
@@ -260,9 +297,21 @@ export default function ChatListPage() {
             </motion.button>
             <h1 className="text-2xl font-display font-bold bg-linear-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">Messages</h1>
           </div>
-          <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setIsNewChatOpen(true)} className="p-2 glass rounded-full hover:bg-primary/20 transition-colors">
-            <Edit className="w-5 h-5" />
-          </motion.button>
+          <div className="flex gap-2">
+            {/* ✅ NEW: CREATE GROUP BUTTON */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setIsCreateGroupOpen(true)}
+              className="p-2 glass rounded-full hover:bg-primary/20 transition-colors"
+              title="Create Group"
+            >
+              <Users className="w-5 h-5 text-primary" />
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setIsNewChatOpen(true)} className="p-2 glass rounded-full hover:bg-primary/20 transition-colors">
+              <Edit className="w-5 h-5" />
+            </motion.button>
+          </div>
         </div>
 
         <div className="relative">
@@ -292,21 +341,43 @@ export default function ChatListPage() {
       {/* Main Chat List */}
       <div className="px-4 space-y-2">
         {!loading && filteredChats.length === 0 && (<p className="text-center text-muted-foreground mt-10">No conversations yet.</p>)}
-        {filteredChats.map((chat: any, index) => (
+        {filteredChats.map((chat: any, index) => {
+          const isGroup = chat.isGroupChat;
+          const displayName = isGroup ? chat.groupName : (chat.user?.name || chat.user?.username);
+          const avatarUrl = isGroup ? chat.groupAvatar : chat.user?.profilePic;
+          const isOnline = isGroup ? false : chat.user?.isOnline;
+          const targetPath = isGroup ? `/group-chat/${chat._id}` : `/chat/${chat._id}`;
+
+          return (
           <motion.div
             key={chat._id}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.05 }}
             whileHover={{ x: 4 }}
-            onClick={() => handleNavigateToChat(chat._id, chat.user)}
+            onClick={() => {
+              if (isGroup) {
+                navigate(targetPath);
+              } else {
+                handleNavigateToChat(chat._id, chat.user);
+              }
+            }}
             onContextMenu={(e) => handleContextMenu(e, chat._id)}
             className="flex items-center gap-3 p-3 glass rounded-2xl cursor-pointer hover:bg-white/10 transition-all group relative"
           >
-            <AvatarRing src={chat.user?.profilePic} isOnline={chat.user?.isOnline} size="md" />
+            {isGroup && !avatarUrl ? (
+                <div className="w-12 h-12 shrink-0 rounded-full bg-primary/20 flex items-center justify-center">
+                   <Users className="w-6 h-6 text-primary" />
+                </div>
+            ) : (
+                <AvatarRing src={avatarUrl} isOnline={isOnline} size="md" />
+            )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <h4 className="font-semibold truncate text-foreground">{chat.user?.name || chat.user?.username}</h4>
+                <h4 className="font-semibold truncate text-foreground flex items-center gap-1.5">
+                  {isGroup && <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                  {displayName}
+                </h4>
                 <span className="text-xs text-muted-foreground">{chat.lastMessageAt ? formatDistanceToNowStrict(new Date(chat.lastMessageAt), { addSuffix: true }) : ""}</span>
               </div>
               <div className="flex items-center justify-between mt-1">
@@ -336,7 +407,8 @@ export default function ChatListPage() {
               <MoreHorizontal className="w-5 h-5 text-muted-foreground hover:text-foreground" />
             </motion.button>
           </motion.div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

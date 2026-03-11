@@ -110,7 +110,11 @@ export function useChat(chatId?: string) {
 
     const tempMsg: Message = {
       _id: `temp-${Date.now()}`,
-      sender: { _id: user._id },
+      sender: { 
+        _id: user._id, 
+        username: user.username, 
+        profilePic: user.profilePic 
+      },
       createdAt: new Date().toISOString(),
       isOptimistic: true,
       ...body,
