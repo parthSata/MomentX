@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 
 // 1. Create the instance
 export const api = axios.create({
-  baseURL: 'http://localhost:3000/api/v1',
+  baseURL: `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1`,
   withCredentials: true, // 👈 CRITICAL: Sends cookies automatically
   headers: {
     'Content-Type': 'application/json',

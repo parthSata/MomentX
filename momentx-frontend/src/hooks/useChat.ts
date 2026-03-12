@@ -81,7 +81,7 @@ export function useChat(chatId?: string) {
     useEffect(() => {
         if (!user?._id) return;
         if (!socketRef.current) {
-            socketRef.current = io('http://localhost:3000', {
+            socketRef.current = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000', {
                 transports: ['websocket'],
                 withCredentials: true,
             });
