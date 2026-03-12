@@ -7,7 +7,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import { ApiError } from './utils/ApiError.js';
-import { initStoryCleanup } from '../cron/StoryCleanup.js';
+import { initStoryCleanup } from '../cron/storyCleanup.js';
 import { User } from './models/user.model.js';
 
 import userRouter from './routes/user.routes.js';
