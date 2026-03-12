@@ -49,7 +49,7 @@ api.interceptors.response.use(
     // 🛑 1. HANDLE BANNED USERS (403 Forbidden)
     if (status === 403 && data?.message?.includes('suspended')) {
       toast.error('⛔ Account Suspended', {
-        description: 'Your access has been revoked. Please contact support.',
+        description: 'Your account has been suspended. Please contact MomentX Support Team.',
         duration: 5000,
       });
 
@@ -102,7 +102,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // ✅ ADDED TOAST HERE
         toast.error('Session Expired', {
-          description: 'Suspended user. Contact MomentX Support.',
+          description: 'Session Expire Re-login.',
           duration: 3000,
         });
 
