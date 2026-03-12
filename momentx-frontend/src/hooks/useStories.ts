@@ -58,6 +58,7 @@ export function useStories() {
     socketRef.current = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000', {
       transports: ['websocket'],
       reconnectionAttempts: 5,
+      withCredentials: true,
     });
 
     const socket = socketRef.current;

@@ -11,9 +11,10 @@ import { sendNotification } from '../utils/Notification.js';
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Days in milliseconds
+  secure: true, // Always true for Render/HTTPS
+  sameSite: 'None', // Always None for cross-domain (Vercel -> Render)
+  path: '/',
+  maxAge: 30 * 24 * 60 * 60 * 1000, 
 };
 
 const generateAccessAndRefereshTokens = async (userId) => {
@@ -253,8 +254,9 @@ const refreshToken = asyncHandler(async (req, res) => {
 
     const options = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+      secure: true,
+      sameSite: 'None',
+      path: '/',
     };
 
     return res

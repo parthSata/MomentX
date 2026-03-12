@@ -24,6 +24,7 @@ import activityRouter from './routes/activity.routes.js';
 import reportRouter from './routes/report.routes.js';
 
 const app = express();
+app.set('trust proxy', 1); // Trust the first proxy (Render) to allow secure cookies
 const server = http.createServer(app);
 
 // 1. Initialize Socket.io
