@@ -277,6 +277,35 @@ export const updateGroupMembers = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedChat, 'Members updated'));
 });
 
+export const updateGroupDetails = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const { groupName } = req.body;
+  
+  const chat = await Chat.findById(chatId);
+  if (!chat || !chat.isGroupChat) {
+    throw new ApiError(404, 'Group chat not found');
+  }
+
+  if (!chat.groupAdmins.includes(req.user._id)) {
+    throw new ApiError(403, 'Only admins can update group details');
+  }
+
+  const updates = {};
+  if (groupName) updates.groupName = groupName;
+  
+  if (req.file) {
+    const cloudResponse = await uploadInCloudinary(req.file.path);
+    if (!cloudResponse) throw new ApiError(500, 'Failed to upload group avatar');
+    updates.groupAvatar = cloudResponse.secure_url;
+  }
+
+  const updatedChat = await Chat.findByIdAndUpdate(chatId, updates, { new: true })
+    .populate('participants', 'name username profilePic isOnline')
+    .populate('groupAdmins', 'name username profilePic');
+
+  return res.status(200).json(new ApiResponse(200, updatedChat, 'Group details updated'));
+});
+
 export const getGroupInfo = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
 
@@ -309,4 +338,65 @@ export const toggleGroupAdmin = asyncHandler(async (req, res) => {
 
   await Chat.findByIdAndUpdate(chatId, update);
   return res.status(200).json(new ApiResponse(200, {}, 'Admin status updated'));
+});
+
+// ✅ LEAVE GROUP
+export const leaveGroup = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user._id;
+
+  const chat = await Chat.findById(chatId);
+  if (!chat || !chat.isGroupChat) {
+    throw new ApiError(404, 'Group chat not found');
+  }
+
+  // Remove user from participants and groupAdmins
+  const updatedChat = await Chat.findByIdAndUpdate(
+    chatId,
+    {
+      $pull: { participants: userId, groupAdmins: userId },
+    },
+    { new: true },
+  );
+
+  // If the group has no participants left, we could optionally delete it
+  if (updatedChat.participants.length === 0) {
+    await Chat.findByIdAndDelete(chatId);
+    await Message.deleteMany({ chatId });
+    return res.status(200).json(new ApiResponse(200, {}, 'Left and group deleted as no members left'));
+  }
+
+  // If the user was an admin and was the last admin, assign admin to someone else if possible
+  if (chat.groupAdmins.includes(userId) && updatedChat.groupAdmins.length === 0 && updatedChat.participants.length > 0) {
+    const nextAdminId = updatedChat.participants[0];
+    await Chat.findByIdAndUpdate(chatId, {
+      $addToSet: { groupAdmins: nextAdminId }
+    });
+  }
+
+  return res.status(200).json(new ApiResponse(200, {}, 'Left the group successfully'));
+});
+
+// ✅ CLEAR ALL MESSAGES
+export const clearChatMessages = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user._id;
+
+  const chat = await Chat.findById(chatId);
+  if (!chat) throw new ApiError(404, 'Chat not found');
+
+  if (!chat.participants.includes(userId)) {
+    throw new ApiError(403, 'You are not a participant of this chat');
+  }
+
+  // Delete all messages in this chat
+  await Message.deleteMany({ chatId });
+
+  // Update last message
+  await Chat.findByIdAndUpdate(chatId, {
+    lastMessage: 'Messages cleared',
+    lastMessageAt: new Date(),
+  });
+
+  return res.status(200).json(new ApiResponse(200, {}, 'Chat cleared successfully'));
 });

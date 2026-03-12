@@ -6,11 +6,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/axios";
 
 // Match your MongoDB User schema
-interface UserProfile {
-    _id: string;
-    username: string;
-    name?: string;
-    profilePic?: string;
+interface ShareableTarget {
+    _id: string; // User ID or Chat ID
+    name: string;
+    profilePic: string;
+    isGroup?: boolean;
 }
 
 const FacebookIcon = () => (
@@ -58,52 +58,57 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
     const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
 
     // Real State Variables
-    const [users, setUsers] = useState<UserProfile[]>([]);
+    const [targets, setTargets] = useState<ShareableTarget[]>([]);
     const [loading, setLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
 
-    // Fetch REAL Users dynamically when the dialog opens
+    // Fetch REAL Users and Groups dynamically when the dialog opens
     useEffect(() => {
-        if (isOpen) {
-            setLoading(true);
-
-            api.get("/users/all")
-                .then((res) => {
-                    const payload = res.data?.message || res.data?.message || res.data;
-
-                    if (Array.isArray(payload)) {
-                        setUsers(payload);
-                    } else if (payload?.users && Array.isArray(payload.users)) {
-                        setUsers(payload.users);
-                    } else if (payload?.docs && Array.isArray(payload.docs)) {
-                        setUsers(payload.docs);
-                    } else {
-                        setUsers([]);
-                    }
-                })
-                .catch((err) => {
-                    console.error("Failed to load users for share sheet", err);
-                    toast.error("Failed to load friends list");
-                    setUsers([]);
-                })
-                .finally(() => {
-                    setLoading(false);
-                });
-        } else {
-            // Reset state when closed
+        if (!isOpen) {
             setSearchQuery("");
             setSelectedProfiles([]);
+            return;
         }
+
+        setLoading(true);
+
+        Promise.all([
+            api.get("/users/all").catch(() => ({ data: [] })),
+            api.get("/chats").catch(() => ({ data: { data: [] } }))
+        ]).then(([usersRes, chatsRes]) => {
+            const usersPayload = usersRes.data?.message || usersRes.data?.users || usersRes.data?.docs || usersRes.data;
+            const fetchedUsers = Array.isArray(usersPayload) ? usersPayload : [];
+
+            const chatsPayload = chatsRes.data?.data || [];
+            const fetchedGroups = Array.isArray(chatsPayload) ? chatsPayload.filter(c => c.isGroupChat) : [];
+
+            // Map users to ShareableTarget
+            const mappedUsers: ShareableTarget[] = fetchedUsers.map(u => ({
+                _id: u._id,
+                name: u.username || u.name || "Unknown",
+                profilePic: u.profilePic || "/default-avatar.png",
+                isGroup: false
+            }));
+
+            // Map groups to ShareableTarget
+            const mappedGroups: ShareableTarget[] = fetchedGroups.map(g => ({
+                _id: g._id, // group chat uses its own _id as receiverId
+                name: g.groupName || "Unnamed Group",
+                profilePic: g.groupAvatar || "/group-avatar.png",
+                isGroup: true
+            }));
+
+            // Combine them, putting groups first, then users
+            setTargets([...mappedGroups, ...mappedUsers]);
+        }).finally(() => {
+            setLoading(false);
+        });
     }, [isOpen]);
 
     // Local filtering based on what is typed in the search bar
     const filteredProfiles = searchQuery
-        ? users.filter(
-            (p) =>
-                p.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (p.name && p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-        )
-        : users;
+        ? targets.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        : targets;
 
     const toggleProfile = (id: string) => {
         setSelectedProfiles((prev) =>
@@ -235,8 +240,8 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                                                         )}
                                                     >
                                                         <img
-                                                            src={profile.profilePic || "/default-avatar.png"}
-                                                            alt={profile.username}
+                                                            src={profile.profilePic}
+                                                            alt={profile.name}
                                                             className="w-full h-full object-cover"
                                                         />
                                                     </div>
@@ -251,11 +256,18 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                                                             </svg>
                                                         </motion.div>
                                                     )}
+                                                    {profile.isGroup && (
+                                                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-white/20 rounded-full flex items-center justify-center shadow-lg backdrop-blur-md">
+                                                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5m10 0v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5m10 0H7" />
+                                                            </svg>
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <span className="text-white text-xs truncate w-full text-center">
-                                                    {profile.username.length > 10
-                                                        ? profile.username.slice(0, 10) + "..."
-                                                        : profile.username}
+                                                    {profile.name.length > 10
+                                                        ? profile.name.slice(0, 10) + "..."
+                                                        : profile.name}
                                                 </span>
                                             </motion.button>
                                         ))}

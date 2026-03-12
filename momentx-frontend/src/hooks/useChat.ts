@@ -50,54 +50,72 @@ export function useChat(chatId?: string) {
     }
   }, []);
 
-  const fetchMessages = useCallback(async () => {
-    if (!chatId) return;
-    try {
-      const { data } = await api.get(`/chats/${chatId}/messages`);
-      setMessages(data.data || []);
-    } catch (error) {
-      console.error('Fetch messages error', error);
-    }
-  }, [chatId]);
+    const fetchMessages = useCallback(async () => {
+        if (!chatId) return;
+        try {
+            const { data } = await api.get(`/chats/${chatId}/messages`);
+            setMessages(data.data || []);
+            // ✅ After fetching messages (which marks them as seen on backend),
+            // update the chat list to refresh unread counts globally.
+            fetchChats().then(() => {
+                window.dispatchEvent(new Event('chats_updated'));
+            });
+        } catch (error) {
+            console.error('Fetch messages error', error);
+        }
+    }, [chatId, fetchChats]);
 
-  // Socket Logic
-  useEffect(() => {
-    if (!user?._id) return;
-    if (!socketRef.current) {
-      socketRef.current = io('http://localhost:3000', {
-        transports: ['websocket'],
-        withCredentials: true,
-      });
-    }
+    // Initial Fetch
+    useEffect(() => {
+        fetchChats();
+    }, [fetchChats]);
 
-    const socket = socketRef.current;
-    const onConnect = () => socket.emit('join_user_room', user._id);
+    // ✅ Listen for cross-component updates (Syncs Sidebar & Header)
+    useEffect(() => {
+        const handleSync = () => fetchChats();
+        window.addEventListener('chats_updated', handleSync);
+        return () => window.removeEventListener('chats_updated', handleSync);
+    }, [fetchChats]);
 
-    const handleNewMessage = (newMsg: Message) => {
-      const senderId =
-        typeof newMsg.sender === 'string' ? newMsg.sender : newMsg.sender?._id;
-      if (senderId === user._id) return;
+    // Socket Logic
+    useEffect(() => {
+        if (!user?._id) return;
+        if (!socketRef.current) {
+            socketRef.current = io('http://localhost:3000', {
+                transports: ['websocket'],
+                withCredentials: true,
+            });
+        }
 
-      if (chatId && newMsg.chatId === chatId) {
-        setMessages((prev) => {
-          if (prev.some((m) => m._id === newMsg._id)) return prev;
-          return [...prev, newMsg];
-        });
-      }
+        const socket = socketRef.current;
+        const onConnect = () => socket.emit('join_user_room', user._id);
 
-      // Fetch chats to update unread count globally
-      fetchChats();
-    };
+        const handleNewMessage = (newMsg: Message) => {
+            const senderId = typeof newMsg.sender === 'string' ? newMsg.sender : newMsg.sender?._id;
+            if (senderId === user._id) return;
 
-    socket.on('connect', onConnect);
-    socket.on('newMessage', handleNewMessage);
-    if (socket.connected) onConnect();
+            if (chatId && newMsg.chatId === chatId) {
+                setMessages((prev) => {
+                    if (prev.some((m) => m._id === newMsg._id)) return prev;
+                    return [...prev, newMsg];
+                });
+            }
 
-    return () => {
-      socket.off('connect', onConnect);
-      socket.off('newMessage', handleNewMessage);
-    };
-  }, [user?._id, chatId, fetchChats]);
+            // Update chats and notify other components
+            fetchChats().then(() => {
+                window.dispatchEvent(new Event('chats_updated'));
+            });
+        };
+
+        socket.on('connect', onConnect);
+        socket.on('newMessage', handleNewMessage);
+        if (socket.connected) onConnect();
+
+        return () => {
+            socket.off('connect', onConnect);
+            socket.off('newMessage', handleNewMessage);
+        };
+    }, [user?._id, chatId, fetchChats]);
 
   // Send Message
   const sendMessage = async (

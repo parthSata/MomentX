@@ -78,6 +78,8 @@ export default function ChatListPage() {
 
         return newChatsList;
       });
+      // ✅ BROADCAST UPDATE TO SIDEBAR & HEADER
+      window.dispatchEvent(new Event('chats_updated'));
     };
 
     socketRef.current.on("newMessage", handleNewMessageList);
@@ -153,6 +155,8 @@ export default function ChatListPage() {
     setLocalChats((prev) =>
       prev.map(c => c._id === chatId ? { ...c, unreadCount: 0 } : c)
     );
+    // ✅ BROADCAST UPDATE
+    window.dispatchEvent(new Event('chats_updated'));
     navigate(`/chat/${chatId}`, { state: { user } });
   };
 
@@ -357,6 +361,11 @@ export default function ChatListPage() {
             whileHover={{ x: 4 }}
             onClick={() => {
               if (isGroup) {
+                // Optimistically clear unread count
+                setLocalChats((prev) =>
+                  prev.map(c => c._id === chat._id ? { ...c, unreadCount: 0 } : c)
+                );
+                window.dispatchEvent(new Event('chats_updated'));
                 navigate(targetPath);
               } else {
                 handleNavigateToChat(chat._id, chat.user);
