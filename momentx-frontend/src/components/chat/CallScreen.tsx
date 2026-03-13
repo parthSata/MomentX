@@ -30,19 +30,62 @@ export function CallScreen({
     const [isMuted, setIsMuted] = useState(false);
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
+    const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
 
-    // Sync state when call starts
+    // Sync state when call starts or callType changes
     useEffect(() => {
         if (isOpen) {
-            console.log("[CallScreen] Opening. Type:", callType, "User:", user.username);
+            console.log("[CallScreen] Mount/Update. type:", callType, "hasLocalStream:", !!localStream, "hasRemoteStream:", !!remoteStream);
+            setIsCameraOff(callType === "voice");
+            // Reset controls only on initial open
             setCallDuration(0);
             setIsMuted(false);
-            // Default camera to OFF only if it's literally a voice call.
-            // If it's a video call, always start with camera ON.
-            setIsCameraOff(callType === "voice");
             setIsMinimized(false);
         }
-    }, [isOpen]); // Only trigger on initial open to avoid fighting manual toggles later
+    }, [isOpen]);
+
+    // Track remote video availability
+    useEffect(() => {
+        if (!remoteStream) {
+            setHasRemoteVideo(false);
+            return;
+        }
+
+        const checkTracks = () => {
+            if (!remoteStream) {
+                setHasRemoteVideo(false);
+                return;
+            }
+            const videoTracks = remoteStream.getVideoTracks();
+            const hasVideo = videoTracks.length > 0 && videoTracks.some(t => t.enabled);
+            
+            console.log(`[CallScreen] Remote tracks: ${remoteStream.getTracks().length}, Video: ${videoTracks.length}, ActiveVideo: ${hasVideo}`);
+            
+            // Only update if state actually changed to avoid unnecessary re-renders
+            setHasRemoteVideo(hasVideo);
+        };
+
+        checkTracks();
+        
+        // Listen for track changes
+        remoteStream.onaddtrack = (e) => {
+            console.log("[CallScreen] Track added:", e.track.kind);
+            checkTracks();
+        };
+        remoteStream.onremovetrack = () => {
+            console.log("[CallScreen] Track removed");
+            checkTracks();
+        };
+
+        // More aggressive polling for 10 seconds, then slow down
+        const interval = setInterval(checkTracks, 1000);
+
+        return () => {
+            remoteStream.onaddtrack = null;
+            remoteStream.onremovetrack = null;
+            clearInterval(interval);
+        };
+    }, [remoteStream]);
 
     const myVideo = useRef<HTMLVideoElement>(null);
     const userVideo = useRef<HTMLVideoElement>(null);
@@ -61,6 +104,10 @@ export function CallScreen({
             localStream.getVideoTracks().forEach(track => {
                 track.enabled = !isCameraOff;
             });
+            // Also ensure the local video element is playing if camera is on
+            if (myVideo.current && !isCameraOff && myVideo.current.srcObject !== localStream) {
+                myVideo.current.srcObject = localStream;
+            }
         }
     }, [isCameraOff, localStream]);
 
@@ -71,22 +118,31 @@ export function CallScreen({
         const attachStreams = () => {
             if (myVideo.current && localStream) {
                 if (!isCameraOff) {
-                    console.log("[CallScreen] Attaching local stream to UI");
-                    myVideo.current.srcObject = localStream;
+                    if (myVideo.current.srcObject !== localStream) {
+                        console.log("[CallScreen] Attaching local stream");
+                        myVideo.current.srcObject = localStream;
+                    }
                 } else {
                     myVideo.current.srcObject = null;
                 }
             }
+            
             if (userVideo.current && remoteStream) {
-                console.log("[CallScreen] Attaching remote stream to UI. tracks:", remoteStream.getTracks().length);
-                userVideo.current.srcObject = remoteStream;
+                if (userVideo.current.srcObject !== remoteStream) {
+                    console.log("[CallScreen] Attaching remote stream. counts:", remoteStream.getTracks().length);
+                    userVideo.current.srcObject = remoteStream;
+                }
+                // Always try to play if remote stream exists
+                userVideo.current.play().catch(() => {
+                    // console.warn("[CallScreen] Remote play failed");
+                });
             }
         };
 
         attachStreams();
-        const timeout = setTimeout(attachStreams, 300);
+        const timeout = setTimeout(attachStreams, 500); // Slightly longer delay for stability
         return () => clearTimeout(timeout);
-    }, [localStream, remoteStream, isOpen, isMinimized, isCameraOff]);
+    }, [localStream, remoteStream, isOpen, isMinimized, isCameraOff, callType]);
 
     // Timer
     useEffect(() => {
@@ -157,42 +213,39 @@ export function CallScreen({
 
                 {/* VIDEO DISPLAY AREA */}
                 <div className="relative flex-1 overflow-hidden">
-                    {/* REMOTE MEDIA (Always rendered for voice/video to ensure audio stays active) */}
-                    <div className={`absolute inset-0 transition-opacity duration-700 ${callType === "video" && remoteStream ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-                        <video 
-                            ref={userVideo} 
-                            playsInline 
-                            autoPlay 
-                            onLoadedMetadata={(e) => {
-                                console.log("[CallScreen] Remote video metadata loaded, playing...");
-                                e.currentTarget.play().catch(err => console.error("[CallScreen] Play error:", err));
-                            }}
-                            className="w-full h-full object-cover" 
-                        />
-                    </div>
+                {/* REMOTE MEDIA (Always rendered for voice/video to ensure audio stays active) */}
+                <div className={`absolute inset-0 transition-opacity duration-700 ${((callType === "video" || hasRemoteVideo) && hasRemoteVideo) ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                    <video 
+                        ref={userVideo} 
+                        playsInline 
+                        autoPlay 
+                        className="w-full h-full object-cover" 
+                    />
+                </div>
 
-                    {callType === "video" ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            {!remoteStream && (
-                                <div className="flex flex-col items-center gap-6">
-                                    <div className="relative">
-                                        <div className="absolute inset-[-15px] rounded-full border-2 border-primary/50 border-t-transparent animate-spin duration-1000" />
-                                        <div className="absolute inset-[-30px] rounded-full border border-primary/20 border-b-transparent animate-spin-reverse duration-1500" />
-                                        <AvatarRing src={user.avatar} size="xl" className="w-32 h-32" />
-                                    </div>
-                                    <div className="text-center">
-                                        <h3 className="text-2xl font-bold tracking-tight">{user.name}</h3>
-                                        <div className="flex items-center gap-2 justify-center mt-2">
-                                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-                                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce delay-100" />
-                                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce delay-200" />
-                                            <p className="text-sm font-medium text-primary ml-1 uppercase tracking-widest">
-                                                {isIncoming ? "Incoming video call" : "Connecting..."}
-                                            </p>
-                                        </div>
+                {/* SELF-HEALING VIDEO UI: Show video if tracks arrive, even if callType was 'voice' */}
+                {((callType === "video" || hasRemoteVideo)) ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        {!hasRemoteVideo && (
+                            <div className="flex flex-col items-center gap-6">
+                                <div className="relative">
+                                    <div className="absolute inset-[-15px] rounded-full border-2 border-primary/50 border-t-transparent animate-spin duration-1000" />
+                                    <div className="absolute inset-[-30px] rounded-full border border-primary/20 border-b-transparent animate-spin-reverse duration-1500" />
+                                    <AvatarRing src={user.avatar} size="xl" className="w-32 h-32" />
+                                </div>
+                                <div className="text-center">
+                                    <h3 className="text-2xl font-bold tracking-tight">{user.name}</h3>
+                                    <div className="flex items-center gap-2 justify-center mt-2">
+                                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce delay-100" />
+                                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce delay-200" />
+                                        <p className="text-sm font-medium text-primary ml-1 uppercase tracking-widest">
+                                            {isIncoming ? "Incoming video call" : !remoteStream ? "Connecting..." : "Establishing video..."}
+                                        </p>
                                     </div>
                                 </div>
-                            )}
+                            </div>
+                        )}
 
                             {/* LOCAL VIDEO PIP */}
                             <motion.div 
@@ -334,7 +387,7 @@ export function CallScreen({
                                     <PhoneOff className="w-10 h-10 transition-transform group-hover:scale-90" />
                                 </motion.button>
 
-                                {callType === "video" && (
+                                {(callType === "video" || hasRemoteVideo) && (
                                     <div className="flex flex-col items-center gap-2">
                                         <motion.button 
                                             whileHover={{ scale: 1.1 }}
@@ -355,4 +408,4 @@ export function CallScreen({
         </AnimatePresence>
     );
 }
-
+
