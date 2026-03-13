@@ -39,10 +39,12 @@ export function AvatarRing({
   size = "md",
   hasStory = false,
   isViewed = false,
-  isOnline = false,
+  isOnline = false, 
   className,
   onClick,
 }: AvatarRingProps) {
+  // Use user-provided image or default image
+  const avatarSrc = src && src !== "/default-avatar.png" ? src : "/image.png"
   const Wrapper = onClick ? motion.button : motion.div
 
   return (
@@ -67,7 +69,7 @@ export function AvatarRing({
       >
         <div className={cn("rounded-full bg-background", ringSizeClasses[size])}>
           <img
-            src={src}
+            src={avatarSrc}
             alt={alt}
             className={cn(
               "rounded-full object-cover",
@@ -76,7 +78,7 @@ export function AvatarRing({
           />
         </div>
       </div>
-      
+
       {isOnline && (
         <span
           className={cn(

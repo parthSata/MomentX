@@ -95,7 +95,7 @@ export function LikesCountDialog({ isOpen, onClose, postId, likesCount }: LikesC
                                                 className="flex items-center gap-3 cursor-pointer flex-1"
                                                 onClick={() => handleNavigate(user.username)}
                                             >
-                                                <AvatarRing src={user.profilePic || "/default-avatar.png"} alt={user.name} size="sm" />
+                                                <AvatarRing src={user.profilePic || "/image.png"} alt={user.name} size="sm" />
                                                 <div>
                                                     <p className="text-sm font-semibold text-white">{user.username}</p>
                                                     <p className="text-xs text-white/50">{user.name}</p>

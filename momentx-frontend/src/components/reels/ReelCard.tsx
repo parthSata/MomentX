@@ -206,7 +206,7 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
                     {/* ✅ FIXED: Removed the restrictive classes that were cropping the profile picture */}
                     <Link to={`/u/${reel.user?.username}`} className="mt-2 block hover:opacity-80 transition-opacity">
                         <AvatarRing
-                            src={reel.user?.avatar || reel.user?.profilePic || "/default-avatar.png"}
+                            src={reel.user?.avatar || reel.user?.profilePic || "/image.png"}
                             size="sm"
                             hasStory={false}
                         />
@@ -217,7 +217,7 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
                 <div className="absolute bottom-24 md:bottom-12 left-4 right-16 z-20 pointer-events-auto text-left">
                     <div className="flex items-center gap-2 mb-3">
                         <Link to={`/u/${reel.user?.username}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                            <AvatarRing src={reel.user?.avatar || reel.user?.profilePic || "/default-avatar.png"} size="sm" />
+                            <AvatarRing src={reel.user?.avatar || reel.user?.profilePic || "/image.png"} size="sm" />
                             <span className="text-white font-bold text-[15px] shadow-black drop-shadow-md">{reel.user?.username || "Unknown"}</span>
                             {reel.user?.isVerified && <BadgeCheck className="w-4 h-4 text-blue-400 fill-blue-400" />}
                         </Link>

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/axios';
-import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/AuthContext';
+import { useSocket } from '@/context/SocketContext';
 
 export interface ChatUser {
   _id: string;
@@ -37,7 +37,7 @@ export function useChat(chatId?: string) {
   const [loading, setLoading] = useState(true);
 
   const { user } = useAuth();
-  const socketRef = useRef<Socket | null>(null);
+  const socket = useSocket();
 
   const fetchChats = useCallback(async () => {
     try {
@@ -55,8 +55,6 @@ export function useChat(chatId?: string) {
         try {
             const { data } = await api.get(`/chats/${chatId}/messages`);
             setMessages(data.data || []);
-            // ✅ After fetching messages (which marks them as seen on backend),
-            // update the chat list to refresh unread counts globally.
             fetchChats().then(() => {
                 window.dispatchEvent(new Event('chats_updated'));
             });
@@ -65,30 +63,18 @@ export function useChat(chatId?: string) {
         }
     }, [chatId, fetchChats]);
 
-    // Initial Fetch
     useEffect(() => {
         fetchChats();
     }, [fetchChats]);
 
-    // ✅ Listen for cross-component updates (Syncs Sidebar & Header)
     useEffect(() => {
         const handleSync = () => fetchChats();
         window.addEventListener('chats_updated', handleSync);
         return () => window.removeEventListener('chats_updated', handleSync);
     }, [fetchChats]);
 
-    // Socket Logic
     useEffect(() => {
-        if (!user?._id) return;
-        if (!socketRef.current) {
-            socketRef.current = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000', {
-                transports: ['websocket'],
-                withCredentials: true,
-            });
-        }
-
-        const socket = socketRef.current;
-        const onConnect = () => socket.emit('join_user_room', user._id);
+        if (!user?._id || !socket) return;
 
         const handleNewMessage = (newMsg: Message) => {
             const senderId = typeof newMsg.sender === 'string' ? newMsg.sender : newMsg.sender?._id;
@@ -101,21 +87,16 @@ export function useChat(chatId?: string) {
                 });
             }
 
-            // Update chats and notify other components
             fetchChats().then(() => {
                 window.dispatchEvent(new Event('chats_updated'));
             });
         };
 
-        socket.on('connect', onConnect);
         socket.on('newMessage', handleNewMessage);
-        if (socket.connected) onConnect();
-
         return () => {
-            socket.off('connect', onConnect);
             socket.off('newMessage', handleNewMessage);
         };
-    }, [user?._id, chatId, fetchChats]);
+    }, [user?._id, chatId, fetchChats, socket]);
 
   // Send Message
   const sendMessage = async (
@@ -183,7 +164,7 @@ export function useChat(chatId?: string) {
     fetchMessages,
     sendMessage,
     deleteMessages,
-    socketRef,
+    socket,
     totalUnreadMessages, // ✅ EXPORT THE TOTAL
   };
 }

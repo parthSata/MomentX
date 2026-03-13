@@ -166,7 +166,7 @@ export function CreateGroupDialog({ isOpen, onClose, onCreated }: CreateGroupDia
                               layout
                               className="flex items-center gap-1.5 px-2 py-1 glass rounded-full shrink-0"
                             >
-                              <img src={user.profilePic || "/default-avatar.png"} className="w-5 h-5 rounded-full object-cover" />
+                              <img src={user.profilePic || "/image.png"} className="w-5 h-5 rounded-full object-cover" />
                               <span className="text-xs font-medium whitespace-nowrap">{user.username}</span>
                               <button
                                 onClick={() => toggleUser(user)}
@@ -318,7 +318,7 @@ export function CreateGroupDialog({ isOpen, onClose, onCreated }: CreateGroupDia
                               transition={{ delay: 0.3 + i * 0.05 }}
                               className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/40 transition-colors"
                             >
-                              <img src={user.profilePic || "/default-avatar.png"} className="w-9 h-9 rounded-full object-cover" />
+                              <img src={user.profilePic || "/image.png"} className="w-9 h-9 rounded-full object-cover" />
                               <div className="flex-1">
                                 <p className="text-sm font-semibold">{user.name}</p>
                                 <p className="text-[10px] text-muted-foreground">@{user.username}</p>

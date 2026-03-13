@@ -53,22 +53,30 @@ io.on('connection', (socket) => {
       // Mark online
       await User.findByIdAndUpdate(userId, { isOnline: true });
       socket.broadcast.emit('user_online', userId);
-
-      // ─── Call handlers (unchanged) ───
-      socket.on('callUser', ({ userToCall, signalData, from, name }) => {
-        io.to(userToCall).emit('callUser', { signal: signalData, from, name });
-      });
-
-      socket.on('answerCall', (data) => {
-        io.to(data.to).emit('callAccepted', data.signal);
-      });
-
-      socket.on('endCall', ({ to }) => {
-        io.to(to).emit('callEnded');
-      });
     } catch (e) {
       console.error('Join user room error:', e);
     }
+  });
+
+  // ─── Call handlers (Outside join_user_room to avoid duplicates) ───
+  socket.on('callUser', ({ userToCall, signalData, from, name, avatar, username, callType }) => {
+    console.log(`Forwarding ${callType} call from ${name} to ${userToCall}`);
+    io.to(userToCall).emit('callUser', { 
+        signal: signalData, 
+        from, 
+        name, 
+        avatar, 
+        username, 
+        callType 
+    });
+  });
+
+  socket.on('answerCall', (data) => {
+    io.to(data.to).emit('callAccepted', data.signal);
+  });
+
+  socket.on('endCall', ({ to }) => {
+    io.to(to).emit('callEnded');
   });
 
   // ────────────────────────────────────────────────

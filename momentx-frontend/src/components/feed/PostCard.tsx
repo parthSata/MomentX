@@ -190,7 +190,7 @@ export function PostCard({ post }: PostCardProps) {
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <Link to={`/u/${post.user.username}`}>
-              <AvatarRing src={post.user.profilePic || "/default-avatar.png"} size="sm" />
+              <AvatarRing src={post.user?.profilePic || "/image.png"} size="sm" />
             </Link>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">

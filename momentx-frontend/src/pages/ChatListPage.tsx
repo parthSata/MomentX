@@ -21,7 +21,7 @@ interface SearchUser {
 }
 
 export default function ChatListPage() {
-  const { chats, fetchChats, loading, socketRef } = useChat();
+  const { chats, fetchChats, loading, socket } = useChat();
   const { user: currentUser } = useAuth();
 
   const [localChats, setLocalChats] = useState<any[]>(chats);
@@ -46,7 +46,7 @@ export default function ChatListPage() {
 
   // REAL-TIME LISTENER: Updates Preview & Unread Count
   useEffect(() => {
-    if (!socketRef.current) return;
+    if (!socket) return;
 
     const handleNewMessageList = (newMessage: any) => {
       setLocalChats((prevChats) => {
@@ -82,12 +82,12 @@ export default function ChatListPage() {
       window.dispatchEvent(new Event('chats_updated'));
     };
 
-    socketRef.current.on("newMessage", handleNewMessageList);
+    socket.on("newMessage", handleNewMessageList);
 
     return () => {
-      socketRef.current?.off("newMessage", handleNewMessageList);
+      socket.off("newMessage", handleNewMessageList);
     };
-  }, [socketRef.current, currentUser?._id, fetchChats]);
+  }, [socket, currentUser?._id, fetchChats]);
 
   // Close context menu logic
   useEffect(() => {

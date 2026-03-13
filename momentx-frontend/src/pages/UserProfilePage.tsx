@@ -174,7 +174,7 @@ export default function UserProfilePage() {
                 <ProfileImageViewDialog
                     isOpen={isProfilePicOpen}
                     onClose={() => setIsProfilePicOpen(false)}
-                    imageUrl={profile.profilePic || "/default-avatar.png"}
+                    imageUrl={profile.profilePic || "/image.png"}
                 />
 
                 {/* --- Header Section --- */}
@@ -192,7 +192,7 @@ export default function UserProfilePage() {
                             >
                                 <div className="w-full h-full rounded-full bg-background p-1">
                                     <img
-                                        src={profile.profilePic || "/default-avatar.png"}
+                                        src={profile.profilePic || "/image.png"}
                                         alt={profile.username}
                                         className="w-full h-full rounded-full object-cover"
                                     />

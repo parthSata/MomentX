@@ -31,7 +31,7 @@ export default function GroupChatPage() {
     const { id: chatId } = useParams();
     const { user: currentUser } = useAuth();
 
-    const { messages, sendMessage: sendSocketMessage, fetchMessages } = useChat(chatId);
+    const { messages, sendMessage: sendSocketMessage, fetchMessages, socket } = useChat(chatId);
 
     const [messageText, setMessageText] = useState("");
     const [showPanel, setShowPanel] = useState(false);
@@ -95,6 +95,11 @@ export default function GroupChatPage() {
             fetchMessages();
         }
     }, [chatId]);
+
+    useEffect(() => {
+        if (!socket || !chatId) return;
+        socket.emit("join_chat", chatId);
+    }, [chatId, socket]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

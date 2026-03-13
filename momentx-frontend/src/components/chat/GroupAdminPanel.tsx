@@ -307,7 +307,7 @@ export default function GroupAdminPanel({
                                 setSearchResults([]);
                               }}
                             >
-                              <img src={user.profilePic || "/default-avatar.png"} className="w-8 h-8 rounded-full object-cover" />
+                              <img src={user.profilePic || "/image.png"} className="w-8 h-8 rounded-full object-cover" />
                               <div className="flex-1">
                                 <p className="text-sm font-medium">{user.name}</p>
                                 <p className="text-[10px] text-muted-foreground">@{user.username}</p>

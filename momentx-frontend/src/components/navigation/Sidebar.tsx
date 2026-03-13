@@ -107,7 +107,7 @@ export function Sidebar() {
           className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors"
         >
           <AvatarRing
-            src={currentUser.profilePic || "/default-avatar.png"}
+            src={currentUser.profilePic || "/image.png"}
             alt={currentUser.username}
             size="sm"
           />

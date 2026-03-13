@@ -10,10 +10,10 @@ import { AvatarRing } from "@/components/ui/avatar-ring";
 import { Input } from "@/components/ui/input";
 import { useChat, type ChatUser } from "@/hooks/useChat";
 import { useAuth } from "@/context/AuthContext";
+import { useSocket } from "@/context/SocketContext";
+import { useCall } from "@/context/CallContext";
 import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 import { api } from "@/lib/axios";
-import Peer from "simple-peer";
-import { CallScreen } from "@/components/chat/CallScreen";
 import { SharedContentBubble } from "@/components/chat/SharedContentBubble";
 import { toast } from "sonner";
 import { PostViewDialog } from "@/components/feed/PostViewDialog";
@@ -61,11 +61,13 @@ export default function ChatPage() {
     messages,
     fetchMessages,
     sendMessage,
-    socketRef,
     deleteMessages,
     chats,
     fetchChats,
   } = useChat(chatId);
+
+  const socket = useSocket();
+  const { initiateCall } = useCall();
 
   const [localMessages, setLocalMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState("");
@@ -97,13 +99,6 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [isCallActive, setIsCallActive] = useState(false);
-  const [callType, setCallType] = useState<"voice" | "video">("voice");
-  const [incomingCall, setIncomingCall] = useState<any>(null);
-  const [callAccepted, setCallAccepted] = useState(false);
-  const connectionRef = useRef<Peer.Instance | null>(null);
   const [hasInitializedUser, setHasInitializedUser] = useState(false);
 
   const [chatUser, setChatUser] = useState<ChatUser>(
@@ -162,39 +157,13 @@ export default function ChatPage() {
   }, [chatId, chatUser._id]);
 
   useEffect(() => {
-    if (socketRef.current && chatId) {
-      socketRef.current.emit("join_chat", chatId);
+    if (socket && chatId) {
+      socket.emit("join_chat", chatId);
     }
-  }, [chatId, socketRef]);
+  }, [chatId, socket]);
 
   useEffect(() => {
-    if (!socketRef.current) return;
-
-    const socket = socketRef.current;
-
-    socket.on("callUser", (data: any) => {
-      setIncomingCall({ isReceiving: true, from: data.from, signal: data.signal, name: data.name });
-      setIsCallActive(true);
-    });
-
-    socket.on("callAccepted", (signal: any) => {
-      connectionRef.current?.signal(signal);
-    });
-
-    socket.on("callEnded", () => {
-      leaveCall();
-    });
-
-    return () => {
-      socket.off("callUser");
-      socket.off("callAccepted");
-      socket.off("callEnded");
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!socketRef.current) return;
-    const socket = socketRef.current;
+    if (!socket) return;
 
     const handleNewMessage = (newMessage: any) => {
       if (!newMessage || newMessage.chatId !== chatId) return;
@@ -260,67 +229,10 @@ export default function ChatPage() {
       socket.off("typing", handleTyping);
       socket.off("stopTyping", handleStopTyping);
     };
-  }, [chatId, currentUser?._id, chatUser._id, messages]);
+  }, [chatId, currentUser?._id, chatUser._id, messages, socket]);
 
-  const initiateCall = (type: "voice" | "video") => {
-    if (!currentUser || !chatUser._id) return;
-    setCallType(type);
-    setIsCallActive(true);
-
-    navigator.mediaDevices
-      .getUserMedia({ video: type === "video", audio: true })
-      .then((currentStream) => {
-        setStream(currentStream);
-        const peer = new Peer({ initiator: true, trickle: false, stream: currentStream });
-        peer.on("signal", (data) => {
-          socketRef.current?.emit("callUser", {
-            userToCall: chatUser._id,
-            signalData: data,
-            from: currentUser._id,
-            name: currentUser.name,
-          });
-        });
-        peer.on("stream", (remote) => setRemoteStream(remote));
-        connectionRef.current = peer;
-      })
-      .catch((err) => console.error("getUserMedia error:", err));
-  };
-
-  const answerCall = () => {
-    if (!incomingCall) return;
-    setCallAccepted(true);
-
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
-      .then((currentStream) => {
-        setStream(currentStream);
-        const peer = new Peer({ initiator: false, trickle: false, stream: currentStream });
-        peer.on("signal", (data) => {
-          socketRef.current?.emit("answerCall", { signal: data, to: incomingCall.from });
-        });
-        peer.on("stream", (remote) => setRemoteStream(remote));
-        peer.signal(incomingCall.signal);
-        connectionRef.current = peer;
-      })
-      .catch((err) => console.error("answerCall media error:", err));
-  };
-
-  const leaveCall = () => {
-    setCallAccepted(false);
-    setIsCallActive(false);
-    setIncomingCall(null);
-    connectionRef.current?.destroy();
-    connectionRef.current = null;
-
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
-    }
-    setRemoteStream(null);
-
-    if (chatUser._id) {
-      socketRef.current?.emit("endCall", { to: chatUser._id });
-    }
+  const handleInitiateCall = (type: "voice" | "video") => {
+    initiateCall(chatUser, type);
   };
 
   const handleDeleteSelected = async () => {
@@ -337,7 +249,6 @@ export default function ChatPage() {
     const isNowTyping = value.trim() !== "";
     setInputText(value);
 
-    const socket = socketRef.current;
     if (!socket || !chatId || !currentUser?._id) return;
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -382,7 +293,7 @@ export default function ChatPage() {
       setLocalMessages((prev) => prev.filter((m) => m._id !== tempId));
     }
 
-    socketRef.current?.emit("stopTyping", { chatId, senderId: currentUser?._id });
+    socket?.emit("stopTyping", { chatId, senderId: currentUser?._id });
   };
 
   const toggleMessageSelection = (msgId: string) => {
@@ -513,21 +424,7 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen flex flex-col bg-background relative overflow-hidden">
-      <CallScreen
-        isOpen={isCallActive}
-        onClose={() => setIsCallActive(false)}
-        callType={callType}
-        user={{
-          name: chatUser.name || "User",
-          avatar: chatUser.profilePic,
-          username: chatUser.username,
-        }}
-        localStream={stream}
-        remoteStream={remoteStream}
-        endCall={leaveCall}
-        isIncoming={!!incomingCall && !callAccepted}
-        answerCall={answerCall}
-      />
+
 
       <AnimatePresence>
         {fullScreenImage && (
@@ -695,11 +592,11 @@ export default function ChatPage() {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
-              <button onClick={() => initiateCall("voice")} className="p-2 glass rounded-full">
-                <Phone className="w-5 h-5" />
+              <button onClick={() => handleInitiateCall("voice")} className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors">
+                <Phone className="w-5 h-5 text-primary" />
               </button>
-              <button onClick={() => initiateCall("video")} className="p-2 glass rounded-full">
-                <Video className="w-5 h-5" />
+              <button onClick={() => handleInitiateCall("video")} className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors">
+                <Video className="w-5 h-5 text-primary" />
               </button>
               <div className="relative">
                 <button onClick={() => setShowMenu(!showMenu)} className="p-2 glass rounded-full">

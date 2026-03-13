@@ -129,7 +129,7 @@ export function EditProfileDialog({ isOpen, onClose, user, onProfileUpdate }: Ed
                     <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 rounded-full bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink p-1">
                       <div className="w-full h-full rounded-full bg-background p-1">
                         <img
-                          src={previewImage || "/default-avatar.png"}
+                          src={previewImage || "/image.png"}
                           alt={displayName}
                           className="w-full h-full rounded-full object-cover"
                         />

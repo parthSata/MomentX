@@ -207,7 +207,7 @@ export function StoryViewer({
             <div className="absolute top-8 left-4 right-4 flex items-center justify-between z-20 text-white">
               <div className="flex items-center gap-3">
                 <AvatarRing
-                  src={(storyUser?.avatar || storyUser?.profilePic) || "/default-avatar.png"}
+                  src={(storyUser?.avatar || storyUser?.profilePic) || "/image.png"}
                   alt={storyUser?.username || "User"}
                   size="sm"
                   hasStory={false}

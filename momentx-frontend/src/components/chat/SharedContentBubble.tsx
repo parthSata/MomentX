@@ -46,7 +46,7 @@ export function SharedContentBubble({ content, onClick }: SharedContentBubblePro
 
                 {/* User info overlay */}
                 <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                    <AvatarRing src={content.userAvatar || "/default-avatar.png"} size="sm" />
+                    <AvatarRing src={content.userAvatar || "/image.png"} size="sm" />
                     <span className="text-white text-xs font-semibold drop-shadow-lg">
                         {content.username}
                     </span>

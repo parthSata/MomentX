@@ -74,7 +74,7 @@ export default function SettingsPage() {
         bio: (authUser as any).bio || "",
         website: (authUser as any).website || "",
       });
-      setPreviewImage(authUser.profilePic || "/default-avatar.png");
+      setPreviewImage(authUser.profilePic || "/image.png");
     }
   }, [authUser]);
 
@@ -182,7 +182,7 @@ export default function SettingsPage() {
           <form onSubmit={handleProfileSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             <div className="flex flex-col items-center gap-4 p-6 glass-strong rounded-2xl">
               <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                <AvatarRing src={previewImage || "/default-avatar.png"} size="xl" />
+                <AvatarRing src={previewImage || "/image.png"} size="xl" />
                 <button type="button" className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <Camera className="w-6 h-6 text-white" />
                 </button>
@@ -363,7 +363,7 @@ export default function SettingsPage() {
             className="glass-strong p-5 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-colors"
             onClick={() => setActiveView("profile")}
           >
-            <AvatarRing src={authUser?.profilePic || "/default-avatar.png"} size="lg" />
+            <AvatarRing src={authUser?.profilePic || "/image.png"} size="lg" />
             <div className="flex-1 overflow-hidden">
               <h3 className="text-lg font-semibold truncate">{authUser?.name || "User"}</h3>
               <p className="text-muted-foreground text-sm truncate">@{authUser?.username}</p>

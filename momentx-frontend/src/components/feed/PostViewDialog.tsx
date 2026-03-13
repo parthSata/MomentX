@@ -409,7 +409,7 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-linear-to-tr from-yellow-400 to-purple-600 p-0.5">
                                                 <img
-                                                    src={normalizedPost.user.profilePic || "/default-avatar.png"}
+                                                    src={normalizedPost.user.profilePic || "/image.png"}
                                                     alt={normalizedPost.user.username}
                                                     className="w-full h-full rounded-full object-cover bg-background border-2 border-background"
                                                 />
@@ -462,7 +462,7 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                                                 return (
                                                     <div key={comment._id} className="flex gap-3 group">
                                                         <div className="shrink-0 w-8 h-8">
-                                                            <img src={cUser.profilePic || "/default-avatar.png"} className="w-8 h-8 rounded-full object-cover border border-border" />
+                                                            <img src={cUser.profilePic || "/image.png"} className="w-8 h-8 rounded-full object-cover border border-border" />
                                                         </div>
                                                         <div className="flex-1">
                                                             <div className="flex justify-between items-start">

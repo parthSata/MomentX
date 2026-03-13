@@ -86,7 +86,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
             const mappedUsers: ShareableTarget[] = fetchedUsers.map(u => ({
                 _id: u._id,
                 name: u.username || u.name || "Unknown",
-                profilePic: u.profilePic || "/default-avatar.png",
+                profilePic: u.profilePic || "/image.png",
                 isGroup: false
             }));
 

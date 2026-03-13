@@ -227,7 +227,7 @@ export default function ProfilePage() {
         <ProfileImageViewDialog
           isOpen={isProfilePicOpen}
           onClose={() => setIsProfilePicOpen(false)}
-          imageUrl={profileData.profilePic || "/default-avatar.png"}
+          imageUrl={profileData.profilePic || "/image.png"}
         />
 
         {/* --- Header Section --- */}
@@ -244,7 +244,7 @@ export default function ProfilePage() {
               >
                 <div className="w-full h-full rounded-full bg-background p-1">
                   <img
-                    src={profileData.profilePic || "/default-avatar.png"}
+                    src={profileData.profilePic || "/image.png"}
                     alt={profileData.username}
                     className="w-full h-full rounded-full object-cover"
                   />

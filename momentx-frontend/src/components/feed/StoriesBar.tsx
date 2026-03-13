@@ -37,7 +37,7 @@ export function StoriesBar({
   }
 
   const getUserAvatar = (user: any) => {
-    return user?.avatar || user?.profilePic || "/default-avatar.png";
+    return user?.avatar || user?.profilePic || "/image.png";
   }
 
   // ✅ New helper to safely extract username without TS errors
