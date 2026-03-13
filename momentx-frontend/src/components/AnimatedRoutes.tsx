@@ -26,6 +26,7 @@ import ActivityPage from "@/pages/ActivityPage";
 import SettingsPage from "@/pages/SettingsPage";
 import { SplashScreen } from "@/components/SplashScreen"; // ✅ IMPORT SPLASH SCREEN
 import GroupChatPage from "@/pages/GroupChatPage";
+import { ProtectedRoute } from "./auth/ProtectedRoute";
 
 // Admin route protection
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -66,34 +67,42 @@ export function AnimatedRoutes() {
             <Route
               path="/"
               element={
-                <PageTransition>
-                  <HomePage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <HomePage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/profile"
               element={
-                <PageTransition>
-                  <ProfilePage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <ProfilePage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/group-chat/:id"
               element={
-                <PageTransition>
-                  <GroupChatPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <GroupChatPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
 
             <Route
               path="/explore"
               element={
-                <PageTransition>
-                  <ExplorePage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <ExplorePage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
             <Route
@@ -126,36 +135,44 @@ export function AnimatedRoutes() {
             <Route
               path="/reels/create"
               element={
-                <PageTransition>
-                  <CreateReelPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <CreateReelPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
 
             <Route
               path="/settings"
               element={
-                <PageTransition>
-                  <SettingsPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <SettingsPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
 
             <Route
               path="/create-reel"
               element={
-                <PageTransition>
-                  <CreateReelPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <CreateReelPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
 
             <Route
               path="/activity"
               element={
-                <PageTransition>
-                  <ActivityPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <ActivityPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
 
@@ -171,50 +188,62 @@ export function AnimatedRoutes() {
             <Route
               path="/u/:username"
               element={
-                <PageTransition>
-                  <UserProfilePage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <UserProfilePage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
 
             <Route
               path="/chat"
               element={
-                <PageTransition>
-                  <ChatListPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <ChatListPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/chat/:id"
               element={
-                <PageTransition>
-                  <ChatPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <ChatPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/reels"
               element={
-                <PageTransition>
-                  <ReelsPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <ReelsPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/notifications"
               element={
-                <PageTransition>
-                  <NotificationsPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <NotificationsPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/search"
               element={
-                <PageTransition>
-                  <SearchPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <SearchPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
             <Route
@@ -238,9 +267,11 @@ export function AnimatedRoutes() {
             <Route
               path="/create"
               element={
-                <PageTransition>
-                  <CreatePostPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <CreatePostPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
 
@@ -251,9 +282,11 @@ export function AnimatedRoutes() {
             <Route
               path="/followers/:type"
               element={
-                <PageTransition>
-                  <FollowersPage />
-                </PageTransition>
+                <ProtectedRoute>
+                  <PageTransition>
+                    <FollowersPage />
+                  </PageTransition>
+                </ProtectedRoute>
               }
             />
             <Route

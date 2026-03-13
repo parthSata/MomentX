@@ -100,11 +100,13 @@ api.interceptors.response.use(
         processQueue(null);
         return api(originalRequest);
       } catch (refreshError) {
-        // ✅ ADDED TOAST HERE
-        toast.error('Session Expired', {
-          description: 'Session Expire Re-login.',
-          duration: 3000,
-        });
+        // ✅ ONLY SHOW TOAST IF USER WAS PREVIOUSLY LOGGED IN
+        if (localStorage.getItem('momentx_user')) {
+          toast.error('Session Expired', {
+            description: 'Session Expire Re-login.',
+            duration: 3000,
+          });
+        }
 
         processQueue(refreshError, null);
         localStorage.removeItem('momentx_user');
