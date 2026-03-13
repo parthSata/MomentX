@@ -34,12 +34,15 @@ export function CallScreen({
     // Sync state when call starts
     useEffect(() => {
         if (isOpen) {
+            console.log("[CallScreen] Opening. Type:", callType, "User:", user.username);
             setCallDuration(0);
             setIsMuted(false);
+            // Default camera to OFF only if it's literally a voice call.
+            // If it's a video call, always start with camera ON.
             setIsCameraOff(callType === "voice");
             setIsMinimized(false);
         }
-    }, [isOpen, callType]);
+    }, [isOpen]); // Only trigger on initial open to avoid fighting manual toggles later
 
     const myVideo = useRef<HTMLVideoElement>(null);
     const userVideo = useRef<HTMLVideoElement>(null);
@@ -66,18 +69,21 @@ export function CallScreen({
         if (!isOpen) return;
 
         const attachStreams = () => {
-            if (myVideo.current && localStream && !isCameraOff) {
-                myVideo.current.srcObject = localStream;
+            if (myVideo.current && localStream) {
+                if (!isCameraOff) {
+                    console.log("[CallScreen] Attaching local stream to UI");
+                    myVideo.current.srcObject = localStream;
+                } else {
+                    myVideo.current.srcObject = null;
+                }
             }
             if (userVideo.current && remoteStream) {
+                console.log("[CallScreen] Attaching remote stream to UI. tracks:", remoteStream.getTracks().length);
                 userVideo.current.srcObject = remoteStream;
             }
         };
 
-        // Aggressive attachment attempt
         attachStreams();
-        
-        // Retry for cases where refs might not be ready
         const timeout = setTimeout(attachStreams, 300);
         return () => clearTimeout(timeout);
     }, [localStream, remoteStream, isOpen, isMinimized, isCameraOff]);
@@ -157,6 +163,10 @@ export function CallScreen({
                             ref={userVideo} 
                             playsInline 
                             autoPlay 
+                            onLoadedMetadata={(e) => {
+                                console.log("[CallScreen] Remote video metadata loaded, playing...");
+                                e.currentTarget.play().catch(err => console.error("[CallScreen] Play error:", err));
+                            }}
                             className="w-full h-full object-cover" 
                         />
                     </div>

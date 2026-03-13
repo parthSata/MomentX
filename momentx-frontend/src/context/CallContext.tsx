@@ -45,9 +45,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!socket) return;
 
         socket.on("callUser", (data: any) => {
-            console.log("Incoming call received:", data.callType);
+            console.log("[Call] incoming call request:", data.callType, "from:", data.name);
             const type = data.callType || "voice";
-            setCallType(type);
+            
+            // Batch updates or at least ensure order
             setChatUser({
                 _id: data.from,
                 name: data.name,
@@ -59,8 +60,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 from: data.from, 
                 signal: data.signal, 
                 name: data.name,
-                callType: type // Store it here too
+                callType: type 
             });
+            setCallType(type);
             setIsCallActive(true);
         });
 
@@ -86,19 +88,25 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setChatUser(target);
         setIsCallActive(true);
 
+        console.log("[Call] Initiating", type, "call to", target.name);
+
         navigator.mediaDevices
             .getUserMedia({ video: type === "video", audio: true })
             .then((currentStream) => {
+                console.log("[Call] Local stream for initiation obtained. Video tracks:", currentStream.getVideoTracks().length);
                 setStream(currentStream);
+                
                 const peer = new Peer({ initiator: true, trickle: false, stream: currentStream });
+                
                 peer.on("signal", (data) => {
+                    console.log("[Call] Sending initiation signal to", target._id);
                     socket?.emit("callUser", {
                         userToCall: target._id,
                         signalData: data,
                         from: currentUser._id,
                         name: currentUser.name,
                         avatar: currentUser.profilePic,
-                        username: currentUser.username, // Added username
+                        username: currentUser.username,
                         callType: type
                     });
                 });
@@ -117,24 +125,31 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const answerCall = () => {
         if (!incomingCall) return;
+        
+        const actualCallType = incomingCall.callType || "video";
+        console.log("[Call] Answering as:", actualCallType);
+        
         setCallAccepted(true);
-
-        const actualCallType = incomingCall.callType || callType;
-        console.log("Answering call as:", actualCallType);
         setCallType(actualCallType);
         
         navigator.mediaDevices
             .getUserMedia({ video: actualCallType === "video", audio: true })
             .then((currentStream) => {
+                console.log("[Call] Local stream obtained for answering. Video tracks:", currentStream.getVideoTracks().length);
                 setStream(currentStream);
+                
                 const peer = new Peer({ initiator: false, trickle: false, stream: currentStream });
+                
                 peer.on("signal", (data) => {
+                    console.log("[Call] Sending answer signal to", incomingCall.from);
                     socket?.emit("answerCall", { signal: data, to: incomingCall.from });
                 });
+                
                 peer.on("stream", (remote) => {
-                    console.log("Remote stream received in answerCall");
+                    console.log("[Call] Remote stream arrived (Receiver side). Video tracks:", remote.getVideoTracks().length);
                     setRemoteStream(remote);
                 });
+                
                 peer.signal(incomingCall.signal);
                 connectionRef.current = peer;
             })
