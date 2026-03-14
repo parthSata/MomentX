@@ -110,7 +110,7 @@ const sendRegistrationOTP = asyncHandler(async (req, res) => {
   const isSent = await sendEmail(email, 'Verify your MomentX Account', message);
 
   if (!isSent) {
-    throw new ApiError(500, 'Failed to send verification email. Please check your Resend API configuration.');
+    throw new ApiError(500, 'Failed to send verification email. Please check your Email configuration.');
   }
 
   // Securely store OTP in the database

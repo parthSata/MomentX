@@ -60,7 +60,6 @@ io.on('connection', (socket) => {
 
   // ─── Call handlers (Outside join_user_room to avoid duplicates) ───
   socket.on('callUser', ({ userToCall, signalData, from, name, avatar, username, callType }) => {
-    console.log(`Forwarding ${callType} call from ${name} to ${userToCall}`);
     io.to(userToCall).emit('callUser', { 
         signal: signalData, 
         from, 

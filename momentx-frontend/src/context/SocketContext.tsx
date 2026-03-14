@@ -13,7 +13,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     useEffect(() => {
         if (!user?._id) {
             if (socket) {
-                console.log("[Socket] Disconnecting - No User");
                 socket.disconnect();
                 setSocket(null);
             }
@@ -22,7 +21,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         // Only create if not exists
         if (!socket) {
-            console.log("[Socket] Creating new connection for", user.username);
             const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000', {
                 transports: ['websocket'],
                 withCredentials: true,
@@ -31,7 +29,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
 
             newSocket.on('connect', () => {
-                console.log("[Socket] Connected! Joining user room:", user._id);
                 newSocket.emit('join_user_room', user._id);
             });
 

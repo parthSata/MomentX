@@ -35,7 +35,6 @@ export function CallScreen({
     // Sync state when call starts or callType changes
     useEffect(() => {
         if (isOpen) {
-            console.log("[CallScreen] Mount/Update. type:", callType, "hasLocalStream:", !!localStream, "hasRemoteStream:", !!remoteStream);
             setIsCameraOff(callType === "voice");
             // Reset controls only on initial open
             setCallDuration(0);
@@ -58,22 +57,18 @@ export function CallScreen({
             }
             const videoTracks = remoteStream.getVideoTracks();
             const hasVideo = videoTracks.length > 0 && videoTracks.some(t => t.enabled);
-            
-            console.log(`[CallScreen] Remote tracks: ${remoteStream.getTracks().length}, Video: ${videoTracks.length}, ActiveVideo: ${hasVideo}`);
-            
+
             // Only update if state actually changed to avoid unnecessary re-renders
             setHasRemoteVideo(hasVideo);
         };
 
         checkTracks();
-        
+
         // Listen for track changes
-        remoteStream.onaddtrack = (e) => {
-            console.log("[CallScreen] Track added:", e.track.kind);
+        remoteStream.onaddtrack = () => {
             checkTracks();
         };
         remoteStream.onremovetrack = () => {
-            console.log("[CallScreen] Track removed");
             checkTracks();
         };
 
@@ -119,17 +114,15 @@ export function CallScreen({
             if (myVideo.current && localStream) {
                 if (!isCameraOff) {
                     if (myVideo.current.srcObject !== localStream) {
-                        console.log("[CallScreen] Attaching local stream");
                         myVideo.current.srcObject = localStream;
                     }
                 } else {
                     myVideo.current.srcObject = null;
                 }
             }
-            
+
             if (userVideo.current && remoteStream) {
                 if (userVideo.current.srcObject !== remoteStream) {
-                    console.log("[CallScreen] Attaching remote stream. counts:", remoteStream.getTracks().length);
                     userVideo.current.srcObject = remoteStream;
                 }
                 // Always try to play if remote stream exists
@@ -162,16 +155,16 @@ export function CallScreen({
     // Mini View
     if (isMinimized) {
         return (
-            <motion.div 
-                drag 
-                dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }} 
+            <motion.div
+                drag
+                dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
                 initial={{ scale: 0.8, opacity: 0, y: 50 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 className="fixed bottom-24 right-4 z-50 group"
             >
                 <div className="relative p-1 rounded-2xl bg-gradient-to-tr from-primary via-purple-500 to-pink-500 animate-gradient-xy">
-                    <motion.div 
-                        onClick={() => setIsMinimized(false)} 
+                    <motion.div
+                        onClick={() => setIsMinimized(false)}
                         className="bg-[#1a1a1a] backdrop-blur-xl p-3 rounded-2xl shadow-2xl cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-3 pr-5"
                     >
                         <div className="relative">
@@ -199,10 +192,10 @@ export function CallScreen({
 
     return (
         <AnimatePresence>
-            <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }} 
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="fixed inset-0 z-50 bg-[#050505] text-white flex flex-col overflow-hidden"
             >
                 {/* Background Decoration */}
@@ -213,50 +206,50 @@ export function CallScreen({
 
                 {/* VIDEO DISPLAY AREA */}
                 <div className="relative flex-1 overflow-hidden">
-                {/* REMOTE MEDIA (Always rendered for voice/video to ensure audio stays active) */}
-                <div className={`absolute inset-0 transition-opacity duration-700 ${((callType === "video" || hasRemoteVideo) && hasRemoteVideo) ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-                    <video 
-                        ref={userVideo} 
-                        playsInline 
-                        autoPlay 
-                        className="w-full h-full object-cover" 
-                    />
-                </div>
+                    {/* REMOTE MEDIA (Always rendered for voice/video to ensure audio stays active) */}
+                    <div className={`absolute inset-0 transition-opacity duration-700 ${((callType === "video" || hasRemoteVideo) && hasRemoteVideo) ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                        <video
+                            ref={userVideo}
+                            playsInline
+                            autoPlay
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
 
-                {/* SELF-HEALING VIDEO UI: Show video if tracks arrive, even if callType was 'voice' */}
-                {((callType === "video" || hasRemoteVideo)) ? (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        {!hasRemoteVideo && (
-                            <div className="flex flex-col items-center gap-6">
-                                <div className="relative">
-                                    <div className="absolute inset-[-15px] rounded-full border-2 border-primary/50 border-t-transparent animate-spin duration-1000" />
-                                    <div className="absolute inset-[-30px] rounded-full border border-primary/20 border-b-transparent animate-spin-reverse duration-1500" />
-                                    <AvatarRing src={user.avatar} size="xl" className="w-32 h-32" />
-                                </div>
-                                <div className="text-center">
-                                    <h3 className="text-2xl font-bold tracking-tight">{user.name}</h3>
-                                    <div className="flex items-center gap-2 justify-center mt-2">
-                                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-                                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce delay-100" />
-                                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce delay-200" />
-                                        <p className="text-sm font-medium text-primary ml-1 uppercase tracking-widest">
-                                            {isIncoming ? "Incoming video call" : !remoteStream ? "Connecting..." : "Establishing video..."}
-                                        </p>
+                    {/* SELF-HEALING VIDEO UI: Show video if tracks arrive, even if callType was 'voice' */}
+                    {((callType === "video" || hasRemoteVideo)) ? (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            {!hasRemoteVideo && (
+                                <div className="flex flex-col items-center gap-6">
+                                    <div className="relative">
+                                        <div className="absolute inset-[-15px] rounded-full border-2 border-primary/50 border-t-transparent animate-spin duration-1000" />
+                                        <div className="absolute inset-[-30px] rounded-full border border-primary/20 border-b-transparent animate-spin-reverse duration-1500" />
+                                        <AvatarRing src={user.avatar} size="xl" className="w-32 h-32" />
+                                    </div>
+                                    <div className="text-center">
+                                        <h3 className="text-2xl font-bold tracking-tight">{user.name}</h3>
+                                        <div className="flex items-center gap-2 justify-center mt-2">
+                                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce delay-100" />
+                                            <span className="w-2 h-2 bg-primary rounded-full animate-bounce delay-200" />
+                                            <p className="text-sm font-medium text-primary ml-1 uppercase tracking-widest">
+                                                {isIncoming ? "Incoming video call" : !remoteStream ? "Connecting..." : "Establishing video..."}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
                             {/* LOCAL VIDEO PIP */}
-                            <motion.div 
-                                drag 
+                            <motion.div
+                                drag
                                 dragConstraints={{ left: -300, right: 0, top: 0, bottom: 500 }}
                                 initial={{ x: 20, y: 20 }}
                                 className="absolute top-8 right-8 w-32 md:w-48 aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-50 glass-strong group"
                             >
                                 <AnimatePresence mode="wait">
                                     {isCameraOff ? (
-                                        <motion.div 
+                                        <motion.div
                                             key="camera-off"
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
@@ -269,16 +262,16 @@ export function CallScreen({
                                             <span className="text-[10px] text-white/30 uppercase tracking-tighter">Camera Off</span>
                                         </motion.div>
                                     ) : (
-                                        <motion.video 
+                                        <motion.video
                                             key="camera-on"
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             exit={{ opacity: 0 }}
-                                            ref={myVideo} 
-                                            playsInline 
-                                            muted 
-                                            autoPlay 
-                                            className="w-full h-full object-cover transform scale-x-[-1]" 
+                                            ref={myVideo}
+                                            playsInline
+                                            muted
+                                            autoPlay
+                                            className="w-full h-full object-cover transform scale-x-[-1]"
                                         />
                                     )}
                                 </AnimatePresence>
@@ -287,10 +280,10 @@ export function CallScreen({
                     ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <div className="relative mb-8 group">
-                                <motion.div 
+                                <motion.div
                                     animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
                                     transition={{ repeat: Infinity, duration: 4 }}
-                                    className="absolute inset-[-40px] rounded-full bg-primary/10 blur-3xl" 
+                                    className="absolute inset-[-40px] rounded-full bg-primary/10 blur-3xl"
                                 />
                                 <AvatarRing src={user.avatar} size="xl" className="w-44 h-44 shadow-2xl border-4 border-white/5" />
                                 {remoteStream && (
@@ -316,16 +309,16 @@ export function CallScreen({
 
                     {/* Top Controls */}
                     <div className="absolute top-8 left-8 z-50 flex items-center gap-4">
-                        <motion.button 
+                        <motion.button
                             whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.1)" }}
                             whileTap={{ scale: 0.9 }}
-                            onClick={() => { setIsMinimized(true); }} 
+                            onClick={() => { setIsMinimized(true); }}
                             className="p-3.5 glass rounded-2xl text-white/80 hover:text-white transition-colors flex items-center gap-2"
                         >
                             <Minimize2 className="w-5 h-5" />
                             <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Minimize</span>
                         </motion.button>
-                        
+
                         {/* ✅ Fix Lint: Optionally use onClose here if we wanted a separate 'back' button, 
                             but since minimize exists, let's just use it to avoid redundancy. */}
                     </div>
@@ -333,7 +326,7 @@ export function CallScreen({
 
                 {/* BOTTOM ACTION BAR */}
                 <div className="h-40 bg-gradient-to-t from-black via-black/90 to-transparent flex items-center justify-center px-6">
-                    <motion.div 
+                    <motion.div
                         initial={{ y: 50, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         className="glass-strong rounded-[40px] p-5 flex items-center gap-6 sm:gap-10 shadow-3xl border border-white/5"
@@ -341,22 +334,22 @@ export function CallScreen({
                         {isIncoming && !remoteStream ? (
                             <div className="flex items-center gap-14 px-8">
                                 <div className="flex flex-col items-center gap-3">
-                                    <motion.button 
+                                    <motion.button
                                         whileHover={{ scale: 1.1 }}
                                         whileTap={{ scale: 0.9 }}
-                                        onClick={endCall} 
+                                        onClick={endCall}
                                         className="p-7 rounded-3xl bg-red-500 shadow-2xl shadow-red-500/40 text-white"
                                     >
                                         <PhoneOff className="w-9 h-9" />
                                     </motion.button>
                                     <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Decline</span>
                                 </div>
-                                
+
                                 <div className="flex flex-col items-center gap-3">
-                                    <motion.button 
+                                    <motion.button
                                         whileHover={{ scale: 1.1 }}
                                         whileTap={{ scale: 0.9 }}
-                                        onClick={answerCall} 
+                                        onClick={answerCall}
                                         className="p-7 rounded-3xl bg-green-500 shadow-2xl shadow-green-500/40 text-white animate-pulse"
                                     >
                                         <Phone className="w-9 h-9" />
@@ -367,10 +360,10 @@ export function CallScreen({
                         ) : (
                             <>
                                 <div className="flex flex-col items-center gap-2">
-                                    <motion.button 
+                                    <motion.button
                                         whileHover={{ scale: 1.1 }}
                                         whileTap={{ scale: 0.9 }}
-                                        onClick={() => setIsMuted(!isMuted)} 
+                                        onClick={() => setIsMuted(!isMuted)}
                                         className={`p-5 rounded-2xl transition-all duration-300 ${isMuted ? "bg-red-500 text-white shadow-xl shadow-red-500/30" : "bg-white/10 hover:bg-white/20"}`}
                                     >
                                         {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
@@ -378,10 +371,10 @@ export function CallScreen({
                                     <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">{isMuted ? "Muted" : "Mute"}</span>
                                 </div>
 
-                                <motion.button 
+                                <motion.button
                                     whileHover={{ scale: 1.1, rotate: 135 }}
                                     whileTap={{ scale: 0.9 }}
-                                    onClick={endCall} 
+                                    onClick={endCall}
                                     className="p-7 rounded-[32px] bg-red-600 shadow-2xl shadow-red-600/50 text-white border border-white/10 group"
                                 >
                                     <PhoneOff className="w-10 h-10 transition-transform group-hover:scale-90" />
@@ -389,10 +382,10 @@ export function CallScreen({
 
                                 {(callType === "video" || hasRemoteVideo) && (
                                     <div className="flex flex-col items-center gap-2">
-                                        <motion.button 
+                                        <motion.button
                                             whileHover={{ scale: 1.1 }}
                                             whileTap={{ scale: 0.9 }}
-                                            onClick={() => setIsCameraOff(!isCameraOff)} 
+                                            onClick={() => setIsCameraOff(!isCameraOff)}
                                             className={`p-5 rounded-2xl transition-all duration-300 ${isCameraOff ? "bg-neutral-700 text-white shadow-xl" : "bg-white/10 hover:bg-white/20"}`}
                                         >
                                             {isCameraOff ? <VideoOff className="w-6 h-6" /> : <VideoIcon className="w-6 h-6" />}

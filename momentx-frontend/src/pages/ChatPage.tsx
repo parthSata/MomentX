@@ -193,14 +193,12 @@ export default function ChatPage() {
     };
 
     const handleOnline = (userId: string) => {
-      console.log("[Chat] Socket event: user_online", userId);
       if (String(userId) === String(chatUser._id)) {
         setChatUser((prev) => ({ ...prev, isOnline: true }));
       }
     };
 
     const handleOffline = (userId: string) => {
-      console.log("[Chat] Socket event: user_offline", userId);
       if (String(userId) === String(chatUser._id)) {
         setChatUser((prev) => ({ ...prev, isOnline: false }));
       }

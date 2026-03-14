@@ -1,16 +1,17 @@
-import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import nodemailer from 'nodemailer';
 
 const sendEmail = async (email, subject, message) => {
   try {
-    if (!process.env.RESEND_API_KEY) {
-      console.error("❌ RESEND_API_KEY is missing in environment variables");
-      return false;
-    }
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
 
-    const { data, error } = await resend.emails.send({
-      from: 'MomentX <onboarding@resend.dev>', // If you have a verified domain, change this to 'MomentX <noreply@yourdomain.com>'
+    const mailOptions = {
+      from: `MomentX <${process.env.EMAIL_USER}>`,
       to: email,
       subject: subject,
       html: `
@@ -21,14 +22,9 @@ const sendEmail = async (email, subject, message) => {
           <p style="font-size: 12px; color: #666;">This is an automated message from MomentX. Please do not reply.</p>
         </div>
       `,
-    });
+    };
 
-    if (error) {
-      console.error("❌ Resend Error:", error.message);
-      return false;
-    }
-
-    console.log("✅ Email sent successfully via Resend:", data.id);
+    const info = await transporter.sendMail(mailOptions);
     return true;
   } catch (error) {
     console.error("❌ Email Send Error:", error.message);

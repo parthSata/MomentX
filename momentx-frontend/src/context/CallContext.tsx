@@ -29,33 +29,31 @@ export const useCall = () => {
 export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const socket = useSocket();
     const { user: currentUser } = useAuth();
-    
+
     const [isCallActive, setIsCallActive] = useState(false);
     const [callType, setCallType] = useState<"voice" | "video">("voice");
     const [incomingCall, setIncomingCall] = useState<any>(null);
     const [callAccepted, setCallAccepted] = useState(false);
     const [chatUser, setChatUser] = useState<any>(null);
-    
+
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-    
+
     const connectionRef = useRef<Peer.Instance | null>(null);
 
     useEffect(() => {
         if (!socket) return;
 
         socket.on("callUser", (data: any) => {
-            console.log("[Call] incoming call request data keys:", Object.keys(data || {}));
-            console.log("[Call] incoming call request stringified:", JSON.stringify(data));
-            
+
+
             if (!data) return;
 
             // Robustly extract callType from possible keys
             // check top level, type, or nested in signalData (original simple-peer structure)
             const incomingType = data.callType || data.type || (data.signalData?.callType) || "voice";
             const type = String(incomingType).toLowerCase() === "video" ? "video" : "voice";
-            
-            console.log("[Call] Resolved incoming type:", type);
+
 
             setChatUser({
                 _id: data.from,
@@ -63,30 +61,27 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 profilePic: data.avatar || "/image.png",
                 username: data.username || "user"
             });
-            setIncomingCall({ 
-                isReceiving: true, 
-                from: data.from, 
-                signal: data.signal || data.signalData, 
+            setIncomingCall({
+                isReceiving: true,
+                from: data.from,
+                signal: data.signal || data.signalData,
                 name: data.name,
-                callType: type 
+                callType: type
             });
             setCallType(type);
             setIsCallActive(true);
         });
 
         socket.on("callAccepted", (signal: any) => {
-            console.log("[Call] Call accepted by remote side. Signalling peer...");
             setCallAccepted(true);
             connectionRef.current?.signal(signal);
         });
 
         socket.on("callEnded", () => {
-            console.log("[Call] Call ended event received");
             leaveCall();
         });
 
         return () => {
-            console.log("[Call] Cleaning up socket listeners");
             socket.off("callUser");
             socket.off("callAccepted");
             socket.off("callEnded");
@@ -95,8 +90,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initiateCall = (target: any, type: "voice" | "video") => {
         if (!currentUser || !target._id) return;
-        
-        console.log("[Call] initiateCall start. type:", type, "target:", target.name);
+
         setCallType(type);
         setChatUser(target);
         setIsCallActive(true);
@@ -104,18 +98,16 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         navigator.mediaDevices
             .getUserMedia({ video: type === "video", audio: true })
             .then((currentStream) => {
-                console.log("[Call] Local stream obtained. Video tracks:", currentStream.getVideoTracks().length);
                 setStream(currentStream);
-                
-                const peer = new Peer({ 
-                    initiator: true, 
-                    trickle: false, 
+
+                const peer = new Peer({
+                    initiator: true,
+                    trickle: false,
                     stream: currentStream,
-                    config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } 
+                    config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
                 });
-                
+
                 peer.on("signal", (data) => {
-                    console.log("[Call] Sending initiation signal. type:", type);
                     socket?.emit("callUser", {
                         userToCall: target._id,
                         signalData: data,
@@ -127,7 +119,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     });
                 });
                 peer.on("stream", (remote) => {
-                    console.log("[Call] Remote stream arrived (Caller). Tracks:", remote.getTracks().length);
                     setRemoteStream(remote);
                 });
                 peer.on("error", (err) => {
@@ -146,33 +137,29 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const answerCall = () => {
         if (!incomingCall) return;
-        
+
         const actualCallType = incomingCall.callType || "voice";
-        console.log("[Call] answerCall. type:", actualCallType);
-        
+
         setCallAccepted(true);
         setCallType(actualCallType);
-        
+
         navigator.mediaDevices
             .getUserMedia({ video: actualCallType === "video", audio: true })
             .then((currentStream) => {
-                console.log("[Call] Local stream obtained. Video tracks:", currentStream.getVideoTracks().length);
                 setStream(currentStream);
-                
-                const peer = new Peer({ 
-                    initiator: false, 
-                    trickle: false, 
+
+                const peer = new Peer({
+                    initiator: false,
+                    trickle: false,
                     stream: currentStream,
                     config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
                 });
-                
+
                 peer.on("signal", (data) => {
-                    console.log("[Call] Sending answer signal to", incomingCall.from);
                     socket?.emit("answerCall", { signal: data, to: incomingCall.from });
                 });
-                
+
                 peer.on("stream", (remote) => {
-                    console.log("[Call] Remote stream arrived (Receiver). Tracks:", remote.getTracks().length);
                     setRemoteStream(remote);
                 });
 
@@ -181,7 +168,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     toast.error("Connection error");
                     leaveCall();
                 });
-                
+
                 peer.signal(incomingCall.signal);
                 connectionRef.current = peer;
             })
@@ -197,7 +184,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsCallActive(false);
         setIncomingCall(null);
         setCallType("voice");
-        
+
         connectionRef.current?.destroy();
         connectionRef.current = null;
 
