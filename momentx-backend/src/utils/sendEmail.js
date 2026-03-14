@@ -1,31 +1,40 @@
-import nodemailer from "nodemailer";
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async (email, subject, message) => {
   try {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    if (!process.env.RESEND_API_KEY) {
+      console.error("❌ RESEND_API_KEY is missing in environment variables");
+      return false;
+    }
 
-    // Validating connection before sending (Optional but good for debugging)
-    await transporter.verify();
-
-    await transporter.sendMail({
-      from: `"MomentX Support" <${process.env.EMAIL_USER}>`,
+    const { data, error } = await resend.emails.send({
+      from: 'MomentX <onboarding@resend.dev>', // If you have a verified domain, change this to 'MomentX <noreply@yourdomain.com>'
       to: email,
       subject: subject,
-      text: message,
-      html: `<b>${message}</b>`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #6366f1;">MomentX</h2>
+          <p style="font-size: 16px;">${message}</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #666;">This is an automated message from MomentX. Please do not reply.</p>
+        </div>
+      `,
     });
 
-    return true; // Success
+    if (error) {
+      console.error("❌ Resend Error:", error.message);
+      return false;
+    }
+
+    console.log("✅ Email sent successfully via Resend:", data.id);
+    return true;
   } catch (error) {
     console.error("❌ Email Send Error:", error.message);
-    return false; // Failed
+    return false;
   }
 };
 
 export { sendEmail };
+

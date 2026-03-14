@@ -87,77 +87,93 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const sendRegistrationOTP = asyncHandler(async (req, res) => {
-  // Step 1 only sends email and username usually
   const { email, username } = req.body;
 
   if (!email || !username) {
-    throw new ApiError(400, 'Email and Username are required to send OTP');
+    throw new ApiError(400, 'Email and Username are required');
   }
 
-  // Check if email or username already exists
+  // Check if user already exists AND is verified
   const existingUser = await User.findOne({
-    $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }],
+    $or: [{ email: email.toLowerCase().trim() }, { username: username.toLowerCase().trim() }],
   });
 
-  if (existingUser) {
-    throw new ApiError(400, 'User with this email or username already exists');
+  if (existingUser && existingUser.isVerified) {
+    throw new ApiError(400, 'User with this email or username already exists and is already verified.');
   }
 
   // Generate 6-digit OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-  // Store OTP in a global/temporary way or just send it
-  // Note: For a robust fix, store this OTP in your User model or a Temp collection
-  // For now, we will send it to the email.
-
-  const message = `Welcome to MomentX! Your verification code is: ${otp}. It expires in 10 minutes.`;
+  const message = `Welcome to MomentX! Your verification code is: ${otp}. It expires in 15 minutes.`;
   const isSent = await sendEmail(email, 'Verify your MomentX Account', message);
 
   if (!isSent) {
-    throw new ApiError(500, 'Failed to send verification email');
+    throw new ApiError(500, 'Failed to send verification email. Please check your Resend API configuration.');
   }
 
-  // IMPORTANT: Return the OTP or a hash if you aren't storing it in the DB yet
-  // so Step 2 can verify it. Best practice is to save it to the DB in a 'temp' field.
+  // Securely store OTP in the database
+  if (existingUser) {
+    existingUser.emailOTP = otp;
+    existingUser.emailOTPExpires = otpExpiry;
+    await existingUser.save({ validateBeforeSave: false });
+  } else {
+    // Create a temporary unverified user
+    await User.create({
+      username: username.toLowerCase().trim(),
+      email: email.toLowerCase().trim(),
+      password: "TEMP_PWD_" + Math.random().toString(36).slice(-8), // Placeholder
+      emailOTP: otp,
+      emailOTPExpires: otpExpiry,
+      isVerified: false,
+      name: username
+    });
+  }
+
   return res
     .status(200)
-    .json(new ApiResponse(200, { otp }, 'OTP sent to your email'));
+    .json(new ApiResponse(200, {}, 'OTP sent to your email. Check your inbox.'));
 });
 
 // --- 2. VERIFY & REGISTER (Step 2) ---
 const verifyOTPAndRegister = asyncHandler(async (req, res) => {
   const { name, username, email, password, otp, phone } = req.body;
 
-  if (!otp) throw new ApiError(400, 'OTP is required');
+  if (!otp || !email) throw new ApiError(400, 'OTP and Email are required');
 
-  // In a real production app, you might store the OTP in Redis or a Temp collection.
-  // For this bug fix, we expect the frontend to pass back the original data + OTP.
+  // Verify OTP from database
+  const user = await User.findOne({
+    email: email.toLowerCase().trim(),
+    emailOTP: otp,
+    emailOTPExpires: { $gt: Date.now() }
+  });
 
-  // Check if the user is trying to register again while waiting
-  // (Verification logic is usually handled by checking a 'temp' storage)
+  if (!user) {
+    throw new ApiError(400, 'Invalid or expired OTP');
+  }
 
-  // Final Registration
-  const userData = {
-    name,
-    username: username.toLowerCase(),
-    email,
-    password,
-    phone,
-    isVerified: true, // User is now verified
-  };
+  // Finalize Registration
+  user.name = name;
+  user.username = username.toLowerCase().trim();
+  user.password = password; // Will be hashed by pre-save hook
+  user.phone = phone;
+  user.isVerified = true;
+  user.emailOTP = undefined;
+  user.emailOTPExpires = undefined;
 
   if (req.files?.profilePic?.length > 0) {
     const uploadResult = await uploadInCloudinary(req.files.profilePic[0].path);
-    if (uploadResult) userData.profilePic = uploadResult.secure_url;
+    if (uploadResult) user.profilePic = uploadResult.secure_url;
   }
 
-  const newUser = await User.create(userData);
+  await user.save();
 
   const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
-    newUser._id,
+    user._id,
   );
 
-  const loggedInUser = await User.findById(newUser._id).select(
+  const loggedInUser = await User.findById(user._id).select(
     '-password -refreshToken',
   );
 
@@ -179,7 +195,12 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!email || !password)
     throw new ApiError(400, 'Email and password required');
 
-  const user = await User.findOne({ email }).select('+password');
+  // Support login via email or username
+  const sanitizedInput = email.toLowerCase().trim();
+  const user = await User.findOne({ 
+    $or: [{ email: sanitizedInput }, { username: sanitizedInput }]
+  }).select('+password');
+
   if (!user || !(await user.isPasswordCorrect(password))) {
     throw new ApiError(401, 'Invalid credentials');
   }
