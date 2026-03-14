@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 
 const sendEmail = async (email, subject, message) => {
   try {
+    console.log(`📧 Setting up transporter for: ${email}`);
     
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -12,11 +13,28 @@ const sendEmail = async (email, subject, message) => {
         clientSecret: process.env.GMAIL_CLIENT_SECRET,
         refreshToken: process.env.GMAIL_REFRESH_TOKEN,
       },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+
+    // Verify connection configuration
+    console.log("🔍 Verifying transporter configuration...");
+    await new Promise((resolve, reject) => {
+      transporter.verify(function (error, success) {
+        if (error) {
+          console.error("❌ Transporter Verification Error:", error.message);
+          reject(error);
+        } else {
+          console.log("✅ Transporter is ready to take our messages");
+          resolve(success);
+        }
+      });
     });
 
     const mailOptions = {
       from: `"MomentX" <${process.env.EMAIL_USER}>`,
-      to: email,
+      to: email.trim(),
       subject: subject,
       html: `
         <div style="font-family: sans-serif; padding: 20px; color: #333; background-color: #f9f9f9; border-radius: 10px;">
@@ -28,10 +46,12 @@ const sendEmail = async (email, subject, message) => {
       `,
     };
 
+    console.log("📤 Sending email...");
     const info = await transporter.sendMail(mailOptions);
+    console.log("✅ Email sent successfully:", info.messageId);
     return true;
   } catch (error) {
-    console.error("❌ Gmail API (OAuth2) Error:", error.message);
+    console.error("❌ Detailed Error in sendEmail.js:", error);
     return false;
   }
 };
