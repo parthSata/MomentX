@@ -93,42 +93,35 @@ const sendRegistrationOTP = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Email and Username are required');
   }
 
-  // Check if user already exists AND is verified
   const existingUser = await User.findOne({
     $or: [{ email: email.toLowerCase().trim() }, { username: username.toLowerCase().trim() }],
   });
 
   if (existingUser && existingUser.isVerified) {
-    throw new ApiError(400, 'User with this email or username already exists and is already verified.');
+    throw new ApiError(400, 'User already exists and is verified.');
   }
 
-  console.log(`📩 OTP Request for Email: ${email}`);
-  // Generate 6-digit OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
 
   const message = `Welcome to MomentX! Your verification code is: ${otp}. It expires in 15 minutes.`;
-  console.log(`🔢 Generated OTP: ${otp} for ${email}`);
   
-  const isSent = await sendEmail(email, 'Verify your MomentX Account', message);
-  console.log(`📤 Email sending success status: ${isSent}`);
+  // ✅ Attempt sending email BEFORE committing major DB changes to prevent orphan records on timeout
+  const isSent = await sendEmail(email.trim(), 'Verify your MomentX Account', message);
 
   if (!isSent) {
-    console.error(`❌ Failed to send OTP email to ${email}`);
-    throw new ApiError(500, 'Failed to send verification email. Please check your Email configuration.');
+    throw new ApiError(500, 'Email service unreachable. Please try again in a few minutes.');
   }
 
-  // Securely store OTP in the database
   if (existingUser) {
     existingUser.emailOTP = otp;
     existingUser.emailOTPExpires = otpExpiry;
     await existingUser.save({ validateBeforeSave: false });
   } else {
-    // Create a temporary unverified user
     await User.create({
       username: username.toLowerCase().trim(),
       email: email.toLowerCase().trim(),
-      password: "TEMP_PWD_" + Math.random().toString(36).slice(-8), // Placeholder
+      password: "TEMP_PWD_" + Math.random().toString(36).slice(-8),
       emailOTP: otp,
       emailOTPExpires: otpExpiry,
       isVerified: false,
@@ -136,9 +129,7 @@ const sendRegistrationOTP = asyncHandler(async (req, res) => {
     });
   }
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, {}, 'OTP sent to your email. Check your inbox.'));
+  return res.status(200).json(new ApiResponse(200, {}, 'OTP sent successfully.'));
 });
 
 // --- 2. VERIFY & REGISTER (Step 2) ---
