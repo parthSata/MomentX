@@ -5,20 +5,20 @@ const sendEmail = async (email, subject, message) => {
     console.log(`📧 Attempting to send email to: ${email}`);
     
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
       host: 'smtp.gmail.com',
-      port: 465,
-      secure: true, // Use SSL
-      pool: true,   // ✅ FIX: Keeps connection alive to prevent timeouts on Render
+      port: 587,
+      secure: false, // Use STARTTLS for Port 587
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, // Must be a 16-character App Password
+        pass: process.env.EMAIL_PASS, // 16-character App Password
       },
       tls: {
-        // ✅ FIX: Prevents "unreachable" errors by trusting the handshake
+        // Essential for Render/Vercel to bypass certificate issues
         rejectUnauthorized: false,
-        servername: 'smtp.gmail.com'
-      }
+        minVersion: 'TLSv1.2'
+      },
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,
     });
 
     const mailOptions = {
@@ -26,11 +26,11 @@ const sendEmail = async (email, subject, message) => {
       to: email,
       subject: subject,
       html: `
-        <div style="font-family: sans-serif; padding: 20px; color: #333; background-color: #f4f4f4; border-radius: 10px;">
+        <div style="font-family: sans-serif; padding: 20px; color: #333; background-color: #f9f9f9; border-radius: 10px;">
           <h2 style="color: #6366f1;">MomentX</h2>
-          <p style="font-size: 16px; line-height: 1.5;">${message}</p>
+          <p style="font-size: 16px;">${message}</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="font-size: 12px; color: #666;">This is an automated message from MomentX. Please do not reply.</p>
+          <p style="font-size: 12px; color: #666;">This is an automated message. Please do not reply.</p>
         </div>
       `,
     };
