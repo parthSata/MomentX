@@ -284,9 +284,12 @@ const sendUserWarning = asyncHandler(async (req, res) => {
     </div>
   `;
 
+  console.log(`⚠️ Sending User Warning Email to: ${user.email}`);
   try {
-    await sendEmail(user.email, emailSubject, emailContent);
+    const isSent = await sendEmail(user.email, emailSubject, emailContent);
+    console.log(`📤 Warning Email sent success status: ${isSent}`);
   } catch (error) {
+    console.error(`❌ Failed to send Warning Email to ${user.email}:`, error.message);
     throw new ApiError(500, 'Failed to send email');
   }
 

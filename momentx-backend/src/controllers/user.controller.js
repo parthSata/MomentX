@@ -102,14 +102,19 @@ const sendRegistrationOTP = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'User with this email or username already exists and is already verified.');
   }
 
+  console.log(`📩 OTP Request for Email: ${email}`);
   // Generate 6-digit OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
   const message = `Welcome to MomentX! Your verification code is: ${otp}. It expires in 15 minutes.`;
+  console.log(`🔢 Generated OTP: ${otp} for ${email}`);
+  
   const isSent = await sendEmail(email, 'Verify your MomentX Account', message);
+  console.log(`📤 Email sending success status: ${isSent}`);
 
   if (!isSent) {
+    console.error(`❌ Failed to send OTP email to ${email}`);
     throw new ApiError(500, 'Failed to send verification email. Please check your Email configuration.');
   }
 
@@ -472,6 +477,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Account does not exist. Please Sign up.');
   }
 
+  console.log(`🔑 Forgot Password Request for Email: ${email}`);
   // 3. Generate OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -482,6 +488,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   // 5. CHECK: Does the email address actually exist / can receive mail?
   const message = `Your Password Reset OTP is: ${otp}. It expires in 15 minutes.`;
+  console.log(`🔢 Generated Reset OTP: ${otp} for ${email}`);
 
   try {
     const isSent = await sendEmail(
@@ -489,6 +496,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
       'Password Reset Request',
       message,
     );
+    console.log(`📤 Password Reset Email sending success status: ${isSent}`);
 
     if (!isSent) {
       // If sendEmail returned false (internal logic)

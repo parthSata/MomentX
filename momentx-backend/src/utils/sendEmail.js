@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 
 const sendEmail = async (email, subject, message) => {
   try {
+    console.log(`📧 Attempting to send email to: ${email}`);
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -25,9 +26,13 @@ const sendEmail = async (email, subject, message) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
+    console.log("✅ Email sent successfully via Nodemailer:", info.messageId);
     return true;
   } catch (error) {
     console.error("❌ Email Send Error:", error.message);
+    if (error.code === 'EAUTH') {
+      console.error("🔑 Authentication failed. Check EMAIL_USER and EMAIL_PASS (App Password).");
+    }
     return false;
   }
 };
