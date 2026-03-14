@@ -2,23 +2,16 @@ import nodemailer from 'nodemailer';
 
 const sendEmail = async (email, subject, message) => {
   try {
-    console.log(`📧 Attempting to send email to: ${email}`);
     
     const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false, // Use STARTTLS for Port 587
+      service: 'gmail',
       auth: {
+        type: 'OAuth2',
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, // 16-character App Password
+        clientId: process.env.GMAIL_CLIENT_ID,
+        clientSecret: process.env.GMAIL_CLIENT_SECRET,
+        refreshToken: process.env.GMAIL_REFRESH_TOKEN,
       },
-      tls: {
-        // Essential for Render/Vercel to bypass certificate issues
-        rejectUnauthorized: false,
-        minVersion: 'TLSv1.2'
-      },
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000,
     });
 
     const mailOptions = {
@@ -36,10 +29,9 @@ const sendEmail = async (email, subject, message) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log("✅ Email sent successfully:", info.messageId);
     return true;
   } catch (error) {
-    console.error("❌ Nodemailer Error:", error.message);
+    console.error("❌ Gmail API (OAuth2) Error:", error.message);
     return false;
   }
 };
