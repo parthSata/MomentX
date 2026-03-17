@@ -7,6 +7,7 @@ const navItems = [
     { id: "users", label: "Users", icon: Users },
     { id: "posts", label: "Posts", icon: FileText },
     { id: "reports", label: "Reports", icon: Flag },
+    { id: "visitors", label: "Visitors", icon: BarChart3 },
 ];
 
 interface SidebarProps {

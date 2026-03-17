@@ -4,6 +4,7 @@ import { Comment } from '../models/comment.model.js';
 import { Reel } from '../models/reel.model.js';
 import ApiResponse from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { VisitLog } from '../models/visitLog.model.js';
 
 // --- GET ACTIVITY STATS ---
 export const getActivityStats = asyncHandler(async (req, res) => {
@@ -93,4 +94,39 @@ export const getActivityStats = asyncHandler(async (req, res) => {
       'Activity stats fetched',
     ),
   );
+});
+
+// ✅ NEW: Track Visitor (Called by Frontend on App Mount)
+export const trackVisit = asyncHandler(async (req, res) => {
+  const user = req.user;
+  
+  // ⛔ Skip if no user OR if it's the Static SuperAdmin (prevents CastError on 'static-admin-id')
+  if (!user || user.isStaticAdmin) {
+    return res.status(200).json(new ApiResponse(200, {}, 'No-op'));
+  }
+
+  // Optional: Only log once every 30 minutes per user path to avoid spam
+  const lastLog = await VisitLog.findOne({ 
+    user: user._id, 
+    path: req.body.path || '/' 
+  }).sort({ createdAt: -1 });
+
+  if (lastLog && (Date.now() - new Date(lastLog.createdAt).getTime() < 30 * 60 * 1000)) {
+     return res.status(200).json(new ApiResponse(200, {}, 'Already logged recently'));
+  }
+
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  let device = 'Desktop';
+  if (/mobile/i.test(userAgent)) device = 'Mobile';
+  else if (/tablet/i.test(userAgent)) device = 'Tablet';
+
+  const log = await VisitLog.create({
+    user: user._id, 
+    ip: req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+    userAgent,
+    device,
+    path: req.body.path || '/'
+  });
+
+  return res.status(200).json(new ApiResponse(200, log, 'Visit tracked'));
 });

@@ -8,6 +8,7 @@ import { ApiError } from '../utils/ApiError.js';
 import jwt from 'jsonwebtoken';
 import { Report } from '../models/report.model.js';
 import { sendEmail } from '../utils/sendEmail.js';
+import { VisitLog } from '../models/visitLog.model.js';
 
 /* ===================== 1. ADMIN LOGIN ===================== */
 
@@ -526,6 +527,33 @@ const updateReportStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, report, `Report marked as ${status}`));
 });
 
+// ✅ NEW: Get Visitor Logs for Admin
+const getVisitorLogs = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 50 } = req.query;
+  const skip = (page - 1) * limit;
+
+  const logs = await VisitLog.find()
+    .sort({ createdAt: -1 })
+    .skip(parseInt(skip))
+    .limit(parseInt(limit))
+    .populate('user', 'username name email profilePic');
+
+  const total = await VisitLog.countDocuments();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        logs,
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit),
+      },
+      'Visitor logs fetched',
+    ),
+  );
+});
+
 /* ===================== EXPORTS ===================== */
 
 export {
@@ -542,4 +570,5 @@ export {
   toggleHideContent,
   getAllReportsAdmin,
   updateReportStatus,
+  getVisitorLogs,
 };

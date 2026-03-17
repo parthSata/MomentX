@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { PageTransition } from "./PageTransition";
+import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/axios";
 
 import HomePage from "@/pages/HomePage";
 import ProfilePage from "@/pages/ProfilePage";
@@ -42,6 +44,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export function AnimatedRoutes() {
   const location = useLocation();
   const [showSplash, setShowSplash] = useState(false);
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     // Check if the user has already seen the splash screen this session
@@ -52,6 +55,15 @@ export function AnimatedRoutes() {
       sessionStorage.setItem("hasSeenSplash", "true");
     }
   }, []);
+
+  // ✅ NEW: Track Visitor Activity
+  useEffect(() => {
+    if (isAuthenticated && user) {
+        // Track the visit - UPDATED: Point to activity routes to avoid strict Admin URLs
+        api.post("/activity/track-visit", { path: location.pathname })
+           .catch(() => {}); // SILENT FAIL
+    }
+  }, [location.pathname, isAuthenticated, user]);
 
   return (
     <>

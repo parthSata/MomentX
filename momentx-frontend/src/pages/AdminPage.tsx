@@ -9,6 +9,7 @@ import { OverviewTab } from "@/components/admin/OverviewTab";
 import { UsersTab } from "@/components/admin/UsersTab";
 import { ReportsTab } from "@/components/admin/ReportsTab";
 import { PostsTab } from "@/components/admin/PostsTab";
+import { VisitorLogTab } from "@/components/admin/VisitorLogTab";
 // import { SettingsTab } from "@/components/admin/SettingsTab";
 
 export default function AdminPage() {
@@ -29,6 +30,8 @@ export default function AdminPage() {
         return <ReportsTab />;
       case "posts":
         return <PostsTab searchQuery={searchQuery} />;
+      case "visitors":
+        return <VisitorLogTab />;
       // case "settings":
       //   return <SettingsTab />;
       default:
