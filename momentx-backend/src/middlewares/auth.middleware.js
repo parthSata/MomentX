@@ -35,6 +35,7 @@ export const verifyJWT = asyncHandler(async (req, _, next) => {
         username: 'Parth@MomentX',
         email: 'Parth@MomentX',
         role: 'superadmin',
+        isStaticAdmin: true,
       };
       return next();
     }

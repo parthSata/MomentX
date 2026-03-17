@@ -122,83 +122,124 @@ export function ReportsTab() {
                 </div>
             </div>
 
-            {/* Reports List */}
-            <div className="space-y-3">
-                {reports.length === 0 ? (
-                    <div className="text-center p-12 text-muted-foreground">No {filterStatus} reports found.</div>
-                ) : (
-                    reports.map((report, index) => (
-                        <motion.div
-                            key={report._id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="glass-strong p-4 rounded-xl border border-white/5 hover:border-white/10 transition-colors flex flex-col md:flex-row gap-4 justify-between"
-                        >
-                            {/* Left: Report Info */}
-                            <div className="flex gap-4">
-                                <div className={`p-3 rounded-xl h-fit shrink-0 ${getReasonColor(report.reason)}`}>
-                                    <AlertTriangle className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="font-bold capitalize text-white">{report.reason}</span>
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground uppercase tracking-wider">
-                                            {report.targetType}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-gray-300 line-clamp-1">
-                                        {report.description || "No description provided."}
-                                    </p>
-                                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                                        <div className="flex items-center gap-1">
-                                            <UserIcon className="w-3 h-3" />
-                                            Reported by <span className="text-white hover:underline cursor-pointer">{report.reportedBy?.username || "Unknown"}</span>
-                                        </div>
-                                        <span>•</span>
-                                        <div className="flex items-center gap-1">
-                                            <Calendar className="w-3 h-3" />
-                                            {new Date(report.createdAt).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Right: Actions */}
-                            <div className="flex items-center gap-2 self-end md:self-center">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-transparent border-white/10 hover:bg-white/5 text-xs"
-                                    onClick={() => openDetails(report)}
-                                >
-                                    <FileText className="w-3 h-3 mr-2" /> View Details
-                                </Button>
-
-                                {filterStatus === "pending" && (
-                                    <>
-                                        <Button
-                                            size="icon"
-                                            className="h-8 w-8 bg-green-500/20 text-green-500 hover:bg-green-500/30 border border-green-500/50"
-                                            onClick={() => handleAction(report._id, "resolved")}
-                                            title="Resolve (Take Action)"
-                                        >
-                                            <Check className="w-4 h-4" />
-                                        </Button>
-                                        <Button
-                                            size="icon"
-                                            className="h-8 w-8 bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/50"
-                                            onClick={() => handleAction(report._id, "rejected")}
-                                            title="Reject (Dismiss)"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        </motion.div>
-                    ))
-                )}
+            {/* Reports List - Table View */}
+            <div className="glass-strong rounded-2xl overflow-hidden border border-white/5">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-white/10 bg-white/5">
+                                <th className="p-4 text-xs font-semibold uppercase text-muted-foreground whitespace-nowrap">Report Details</th>
+                                <th className="p-4 text-xs font-semibold uppercase text-muted-foreground whitespace-nowrap">Target</th>
+                                <th className="p-4 text-xs font-semibold uppercase text-muted-foreground whitespace-nowrap">Reporter</th>
+                                <th className="p-4 text-xs font-semibold uppercase text-muted-foreground whitespace-nowrap">Date & Status</th>
+                                <th className="p-4 text-xs font-semibold uppercase text-muted-foreground whitespace-nowrap text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-sm">
+                            {reports.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="p-12 text-center text-muted-foreground">
+                                        No {filterStatus} reports found.
+                                    </td>
+                                </tr>
+                            ) : (
+                                reports.map((report, index) => (
+                                    <motion.tr
+                                        key={report._id}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: index * 0.03 }}
+                                        className="hover:bg-white/[0.02] transition-colors"
+                                    >
+                                        <td className="p-4 align-top">
+                                            <div className="flex gap-3">
+                                                <div className={`p-2 rounded-lg h-fit ${getReasonColor(report.reason)}`}>
+                                                    <AlertTriangle className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-semibold text-white capitalize">{report.reason}</div>
+                                                    <div className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                                                        {report.description || "No description provided."}
+                                                    </div>
+                                                    {report.adminNote && (
+                                                        <div className="text-[10px] text-primary italic mt-1 line-clamp-1">
+                                                            Note: {report.adminNote}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 align-top">
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground uppercase tracking-widest block w-fit mb-1">
+                                                {report.targetType}
+                                            </span>
+                                            <div className="text-xs text-gray-300 truncate max-w-[150px]">
+                                                {report.targetContent?.caption || report.targetContent?.name || "Content Info"}
+                                            </div>
+                                        </td>
+                                        <td className="p-4 align-top">
+                                            <div className="flex items-center gap-2">
+                                                <UserIcon className="w-3 h-3 text-primary" />
+                                                <span className="font-medium text-white">{report.reportedBy?.username || "Unknown"}</span>
+                                            </div>
+                                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                                                {report.reportedBy?.email || "No email"}
+                                            </div>
+                                        </td>
+                                        <td className="p-4 align-top">
+                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                <Calendar className="w-3 h-3" />
+                                                {new Date(report.createdAt).toLocaleDateString()}
+                                            </div>
+                                            <div className={`mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                                report.status === 'resolved' ? 'bg-green-500/20 text-green-500' :
+                                                report.status === 'rejected' ? 'bg-red-500/20 text-red-500' :
+                                                'bg-yellow-500/20 text-yellow-500'
+                                            }`}>
+                                                {report.status}
+                                            </div>
+                                        </td>
+                                        <td className="p-4 align-top text-right space-x-1">
+                                            <div className="flex justify-end gap-1">
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 hover:bg-white/10"
+                                                    onClick={() => openDetails(report)}
+                                                    title="View Full Details"
+                                                >
+                                                    <FileText className="w-4 h-4" />
+                                                </Button>
+                                                {filterStatus === "pending" && (
+                                                    <>
+                                                        <Button
+                                                            size="icon"
+                                                            className="h-8 w-8 bg-green-500/20 text-green-500 hover:bg-green-500/30 border border-green-500/50"
+                                                            onClick={() => handleAction(report._id, "resolved")}
+                                                            disabled={processingId === report._id}
+                                                            title="Resolve"
+                                                        >
+                                                            {processingId === report._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                                        </Button>
+                                                        <Button
+                                                            size="icon"
+                                                            className="h-8 w-8 bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/50"
+                                                            onClick={() => handleAction(report._id, "rejected")}
+                                                            disabled={processingId === report._id}
+                                                            title="Reject"
+                                                        >
+                                                            {processingId === report._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </motion.tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Details Dialog */}

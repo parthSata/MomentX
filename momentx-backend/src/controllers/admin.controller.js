@@ -417,7 +417,7 @@ const getAllReportsAdmin = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .skip(parseInt(skip))
     .limit(parseInt(limit))
-    .populate('reportedBy', 'username name profilePic'); // Populate Reporter
+    .populate('reportedBy', 'username name profilePic email'); // Populate Reporter
 
   // 2. Manually populate the 'target' based on targetType
   // (Since Mongoose 'refPath' wasn't set up in the schema provided, we do this manually)
@@ -473,14 +473,53 @@ const updateReportStatus = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid status');
   }
 
-  const report = await Report.findById(reportId);
+  const report = await Report.findById(reportId).populate(
+    'reportedBy',
+    'email name username',
+  );
   if (!report) throw new ApiError(404, 'Report not found');
 
   report.status = status;
   report.adminNote = adminNote || report.adminNote;
-  report.reviewedBy = req.user._id; // Track which admin reviewed it
+
+  // Handle Static Admin ID (If admin._id is 'static-admin-id', don't store it in ObjectId field)
+  if (!req.user.isStaticAdmin) {
+    report.reviewedBy = req.user._id;
+  }
 
   await report.save();
+
+  // 📧 Send Email to the Reporter
+  if (report.reportedBy && report.reportedBy.email) {
+    const emailSubject = `Update on your Report #${report._id.toString().slice(-6)}`;
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+        <h2 style="color: ${status === 'resolved' ? '#28a745' : '#dc3545'};">Report ${status === 'resolved' ? 'Resolved' : 'Rejected'}</h2>
+        <p>Hello <strong>${report.reportedBy.name || report.reportedBy.username}</strong>,</p>
+        <p>We have reviewed your report regarding a <strong>${report.targetType}</strong>.</p>
+        <div style="background: #f4f4f4; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p><strong>Status:</strong> <span style="text-transform: capitalize;">${status}</span></p>
+          ${adminNote ? `<p><strong>Admin Note:</strong> ${adminNote}</p>` : ''}
+          <p><strong>Reason reported:</strong> ${report.reason}</p>
+        </div>
+        <p>${
+          status === 'resolved'
+            ? 'We have taken the necessary actions based on our community guidelines. Thank you for helping us keep MomentX safe.'
+            : 'After careful review, we found that the reported content does not violate our community guidelines at this time. However, we appreciate you bringing this to our attention.'
+        }</p>
+        <p>Regards,<br/>MomentX Moderation Team</p>
+      </div>
+    `;
+
+    try {
+      await sendEmail(report.reportedBy.email, emailSubject, emailContent);
+    } catch (error) {
+      console.error(
+        `❌ Failed to send Report Status Email to ${report.reportedBy.email}:`,
+        error.message,
+      );
+    }
+  }
 
   return res
     .status(200)
