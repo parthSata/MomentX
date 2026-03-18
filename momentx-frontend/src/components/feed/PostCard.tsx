@@ -98,10 +98,6 @@ export function PostCard({ post }: PostCardProps) {
     }
   };
 
-  const handleEditPost = () => {
-    toast.info("Edit mode coming soon!");
-  };
-
   const rawVideoUrl = (post as any).videoUrl;
   const hasVideo = typeof rawVideoUrl === 'string' && rawVideoUrl.trim().length > 0;
 
@@ -266,7 +262,6 @@ export function PostCard({ post }: PostCardProps) {
         postId={post._id}
         isOwnPost={post.user._id === authUser?._id}
         onDelete={handleDeletePost}
-        onEdit={handleEditPost}
       />
 
       <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={post._id} likesCount={likes} />

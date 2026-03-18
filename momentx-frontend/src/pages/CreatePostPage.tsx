@@ -214,6 +214,10 @@ export default function CreatePostPage() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Image size must be less than 10MB");
+        return;
+      }
       setImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {

@@ -432,6 +432,7 @@ export default function ProfilePage() {
           setSelectedPost(null); // ✅ THIS IS THE FIX: Clear the state on close
         }}
         post={selectedPost}
+        showEditOption={!!isOwnProfile}
       />
 
     </MainLayout>

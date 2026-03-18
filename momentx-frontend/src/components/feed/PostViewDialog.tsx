@@ -30,6 +30,7 @@ interface PostViewDialogProps {
     isOpen: boolean;
     onClose: () => void;
     post: Post | null;
+    showEditOption?: boolean;
 }
 
 interface Comment {
@@ -44,7 +45,7 @@ interface Comment {
     createdAt: string;
 }
 
-export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
+export function PostViewDialog({ isOpen, onClose, post, showEditOption }: PostViewDialogProps) {
     const { user: currentUser } = useAuth();
 
     const [comments, setComments] = useState<Comment[]>([]);
@@ -544,7 +545,7 @@ export function PostViewDialog({ isOpen, onClose, post }: PostViewDialogProps) {
                         postId={normalizedPost._id}
                         isOwnPost={currentUser?._id === normalizedPost.user._id}
                         onDelete={handleDeletePost}
-                        onEdit={() => setIsEditOpen(true)}
+                        {...(showEditOption ? { onEdit: () => setIsEditOpen(true) } : {})}
                     />
                     <EditPostDialog
                         isOpen={isEditOpen}

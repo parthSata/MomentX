@@ -55,6 +55,16 @@ export function StoriesBar({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      const isVideo = file.type.startsWith("video");
+      if (isVideo && file.size > 100 * 1024 * 1024) {
+        toast.error("Video size must be less than 100MB");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      } else if (!isVideo && file.size > 10 * 1024 * 1024) {
+        toast.error("Image size must be less than 10MB");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
       setSelectedFile(file)
       setIsDialogOpen(true)
       if (fileInputRef.current) fileInputRef.current.value = "";

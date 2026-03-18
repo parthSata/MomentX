@@ -39,14 +39,9 @@ export function FeedPostOptionsDialog({ isOpen, onClose, postId, isOwnPost, onDe
         onClose();
     }
 
-    const handleEditClick = () => {
-        if (onEdit) onEdit();
-        onClose();
-    }
-
     const options = isOwnPost
         ? [
-            { label: "Edit", action: handleEditClick },
+            ...(onEdit ? [{ label: "Edit", action: () => { onEdit(); onClose(); } }] : []),
             { label: "Delete", action: handleDeleteClick, destructive: true },
             { label: "Copy link", action: handleCopyLink },
             { label: "Cancel", action: onClose },

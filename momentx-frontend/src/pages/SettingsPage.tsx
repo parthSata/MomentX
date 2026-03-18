@@ -20,16 +20,16 @@ const settingsSections = [
   {
     title: "Account",
     items: [
-      { id: "profile", label: "Edit Profile", icon: User, description: "Update your personal information" },
-      { id: "saved", label: "Saved Content", icon: Bookmark, description: "View your saved posts and reels" },
-      { id: "privacy", label: "Privacy", icon: Lock, description: "Control who can see your content" },
-      { id: "security", label: "Security", icon: Shield, description: "Password and two-factor authentication" },
+      { id: "profile", label: "Edit Profile", icon: User, description: "Update your personal information", color: "from-blue-500 to-cyan-500" },
+      { id: "saved", label: "Saved Content", icon: Bookmark, description: "View your saved posts and reels", color: "from-purple-500 to-indigo-500" },
+      { id: "privacy", label: "Privacy", icon: Lock, description: "Control who can see your content", color: "from-emerald-500 to-teal-500" },
+      { id: "security", label: "Security", icon: Shield, description: "Password and two-factor authentication", color: "from-orange-500 to-red-500" },
     ],
   },
   {
     title: "Preferences",
     items: [
-      { id: "appearance", label: "Appearance", icon: Palette, description: "Theme and display settings" },
+      { id: "appearance", label: "Appearance", icon: Palette, description: "Theme and display settings", color: "from-pink-500 to-rose-500" },
     ],
   }
 ];
@@ -100,6 +100,10 @@ export default function SettingsPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Image size must be less than 10MB");
+        return;
+      }
       setSelectedImage(file);
       const reader = new FileReader();
       reader.onloadend = () => setPreviewImage(reader.result as string);
@@ -360,12 +364,12 @@ export default function SettingsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-strong p-5 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-colors"
+            className="glass-strong p-5 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-muted/50 transition-colors shadow-sm"
             onClick={() => setActiveView("profile")}
           >
             <AvatarRing src={authUser?.profilePic || "/image.png"} size="lg" />
             <div className="flex-1 overflow-hidden">
-              <h3 className="text-lg font-semibold truncate">{authUser?.name || "User"}</h3>
+              <h3 className="text-lg font-bold truncate text-foreground">{authUser?.name || "User"}</h3>
               <p className="text-muted-foreground text-sm truncate">@{authUser?.username}</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -374,16 +378,21 @@ export default function SettingsPage() {
           {settingsSections.map((section, sectionIndex) => (
             <motion.div key={section.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + sectionIndex * 0.1 }}>
               <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 px-2">{section.title}</h3>
-              <div className="glass-strong rounded-2xl overflow-hidden">
+              <div className="glass-strong rounded-2xl overflow-hidden shadow-sm">
                 {section.items.map((item, index) => (
                   <button
                     key={item.id}
                     onClick={() => setActiveView(item.id)}
-                    className={`w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors ${activeView === item.id ? "bg-white/10" : ""} ${index !== section.items.length - 1 ? "border-b border-border/50" : ""}`}
+                    className={`w-full flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors ${activeView === item.id ? "bg-muted" : ""} ${index !== section.items.length - 1 ? "border-b border-border/50" : ""}`}
                   >
-                    <div className="p-2 bg-secondary rounded-xl"><item.icon className="w-5 h-5 text-primary" /></div>
-                    <div className="flex-1 text-left"><p className="font-medium text-sm text-foreground">{item.label}</p></div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground opacity-50" />
+                    <div className={`p-2.5 rounded-xl bg-gradient-to-br ${item.color} shadow-sm flex items-center justify-center shrink-0`}>
+                      <item.icon className="w-5 h-5 text-white drop-shadow-sm" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-sm text-foreground">{item.label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{item.description}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground opacity-40 shrink-0" />
                   </button>
                 ))}
               </div>
@@ -393,10 +402,10 @@ export default function SettingsPage() {
           <motion.button
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 p-4 glass-strong rounded-2xl text-red-500 hover:bg-red-500/10 transition-colors mt-8"
+            className="w-full flex items-center justify-center gap-2 p-4 glass-strong rounded-2xl text-red-500 hover:bg-red-500/10 transition-colors mt-8 font-bold shadow-sm"
           >
             <LogOut className="w-5 h-5" />
-            <span className="font-medium">Log Out</span>
+            <span>Log Out</span>
           </motion.button>
         </div>
       </div>

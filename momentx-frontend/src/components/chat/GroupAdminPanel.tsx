@@ -96,6 +96,10 @@ export default function GroupAdminPanel({
       toast.error("Please select an image file");
       return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image size must be less than 10MB");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       onGroupAvatarChange(file, ev.target?.result as string);

@@ -76,7 +76,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
             api.get("/users/all").catch(() => ({ data: [] })),
             api.get("/chats").catch(() => ({ data: { data: [] } }))
         ]).then(([usersRes, chatsRes]) => {
-            const usersPayload = usersRes.data?.message || usersRes.data?.users || usersRes.data?.docs || usersRes.data;
+            const usersPayload = usersRes.data?.data || usersRes.data?.users || usersRes.data?.docs || usersRes.data;
             const fetchedUsers = Array.isArray(usersPayload) ? usersPayload : [];
 
             const chatsPayload = chatsRes.data?.data || [];

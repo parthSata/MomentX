@@ -69,8 +69,8 @@ export default function CreateReelPage() {
                 toast.error("Please select a valid video file.");
                 return;
             }
-            if (file.size > 50 * 1024 * 1024) {
-                toast.error("Video size should be less than 50MB.");
+            if (file.size > 100 * 1024 * 1024) {
+                toast.error("Video size should be less than 100MB.");
                 return;
             }
 

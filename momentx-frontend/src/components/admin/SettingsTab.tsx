@@ -17,7 +17,7 @@ function Switch({ checked, onCheckedChange, disabled = false }: { checked: boole
         <button
             disabled={disabled}
             onClick={() => onCheckedChange(!checked)}
-            className={`w-11 h-6 rounded-full relative transition-colors duration-300 ${checked ? "bg-primary" : "bg-white/10"
+            className={`w-11 h-6 rounded-full relative transition-colors duration-300 ${checked ? "bg-primary" : "bg-muted"
                 } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
         >
             <motion.div
@@ -99,29 +99,29 @@ export function SettingsTab() {
             {/* 1. System Controls */}
             <motion.div
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                className="glass-strong rounded-2xl p-6 border border-white/5"
+                className="glass-strong rounded-2xl p-6 border border-border/50 shadow-sm bg-card/50"
             >
                 <h4 className="font-semibold flex items-center gap-2 mb-4 text-primary">
                     <Server className="w-5 h-5" /> System Controls
                 </h4>
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-xl">
                         <div>
-                            <p className="font-medium">Maintenance Mode</p>
+                            <p className="font-medium text-foreground">Maintenance Mode</p>
                             <p className="text-xs text-muted-foreground">Disable access for non-admin users.</p>
                         </div>
                         <Switch checked={config.maintenanceMode} onCheckedChange={() => handleToggle("maintenanceMode")} />
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-xl">
                         <div>
-                            <p className="font-medium">Allow New Registrations</p>
+                            <p className="font-medium text-foreground">Allow New Registrations</p>
                             <p className="text-xs text-muted-foreground">Let new users sign up to the platform.</p>
                         </div>
                         <Switch checked={config.allowRegistrations} onCheckedChange={() => handleToggle("allowRegistrations")} />
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-xl">
                         <div>
-                            <p className="font-medium">AI Auto-Moderation</p>
+                            <p className="font-medium text-foreground">AI Auto-Moderation</p>
                             <p className="text-xs text-muted-foreground">Automatically flag inappropriate content.</p>
                         </div>
                         <Switch checked={config.autoModeration} onCheckedChange={() => handleToggle("autoModeration")} />
@@ -133,7 +133,7 @@ export function SettingsTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <motion.div
                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                    className="glass-strong rounded-2xl p-6 border border-white/5"
+                    className="glass-strong rounded-2xl p-6 border border-border/50 shadow-sm bg-card/50"
                 >
                     <h4 className="font-semibold flex items-center gap-2 mb-4 text-primary">
                         <Bell className="w-5 h-5" /> Alerts
@@ -152,7 +152,7 @@ export function SettingsTab() {
 
                 <motion.div
                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-                    className="glass-strong rounded-2xl p-6 border border-white/5"
+                    className="glass-strong rounded-2xl p-6 border border-border/50 shadow-sm bg-card/50"
                 >
                     <h4 className="font-semibold flex items-center gap-2 mb-4 text-primary">
                         <Mail className="w-5 h-5" /> Contact Config
@@ -181,14 +181,14 @@ export function SettingsTab() {
             {/* 3. Danger Zone */}
             <motion.div
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-                className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6"
+                className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6"
             >
-                <h4 className="font-semibold flex items-center gap-2 mb-4 text-red-400">
+                <h4 className="font-semibold flex items-center gap-2 mb-4 text-red-500">
                     <Shield className="w-5 h-5" /> Danger Zone
                 </h4>
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
-                        <p className="font-medium text-white">Clear System Cache</p>
+                        <p className="font-medium text-foreground">Clear System Cache</p>
                         <p className="text-xs text-muted-foreground">Force refresh all cached data. Might slow down the site temporarily.</p>
                     </div>
                     <button
