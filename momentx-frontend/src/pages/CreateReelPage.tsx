@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"; // ✅ Removed 'useCallback'
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Video, Hash, X, Loader2, UserPlus, ChevronRight, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -228,7 +228,7 @@ export default function CreateReelPage() {
                                 {showUserTagInput && (
                                     <div className="bg-white/5 p-4 rounded-2xl space-y-4 border border-white/5">
                                         <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 z-10" />
                                             <Input
                                                 value={userSearchQuery}
                                                 onChange={(e) => setUserSearchQuery(e.target.value)}

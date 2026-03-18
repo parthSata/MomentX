@@ -3,6 +3,7 @@ export interface User {
   username: string;
   name: string;
   profilePic: string; // Backend sends profilePic
+  profilePicThumbnail: string; // Backend sends profilePicThumbnail
   isVerified: boolean;
   following: string[]; // Array of user IDs
 }
@@ -12,6 +13,7 @@ export interface Post {
   user: User;
   caption: string;
   images: string[]; // Array of URLs
+  thumbnails: string[]; // Array of compressed URLs
   location: string;
   likes: number;
   comments: number;

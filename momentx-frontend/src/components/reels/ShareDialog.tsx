@@ -198,7 +198,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
 
                         <div className="px-4 pb-4 shrink-0">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50 z-10" />
                                 <input
                                     type="text"
                                     placeholder="Search"

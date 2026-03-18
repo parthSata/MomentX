@@ -394,15 +394,19 @@ export default function ProfilePage() {
                   )}
                 >
                   {activeTab === 'reels' || (post as any).videoUrl ? (
-                    <video
-                      src={(post as any).videoUrl}
-                      className="w-full h-full object-cover pointer-events-none"
-                      muted
-                      playsInline
-                    />
+                    <div className="w-full h-full relative">
+                      <img
+                        src={(post as any).thumbnailUrl || "/placeholder-image.jpg"}
+                        alt={post.caption || "Reel"}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                        <Film className="w-6 h-6 text-white/50" />
+                      </div>
+                    </div>
                   ) : (
                     <img
-                      src={post.images?.[0] || "/placeholder-image.jpg"}
+                      src={post.thumbnails?.[0] || post.images?.[0] || "/placeholder-image.jpg"}
                       alt={post.caption || "Post"}
                       className="w-full h-full object-cover"
                     />

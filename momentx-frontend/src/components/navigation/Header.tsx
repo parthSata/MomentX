@@ -52,9 +52,9 @@ export function Header({ onMenuClick, showSearch = true }: HeaderProps) {
         </div>
 
         {showSearch && (
-          <Link to="/search" className="hidden md:flex flex-1 max-w-md mx-8">
+          <Link to="/explore" className="hidden md:flex flex-1 max-w-md mx-8">
             <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
               <div className="w-full h-10 pl-10 pr-4 rounded-xl bg-muted/50 border border-border/50 text-sm text-muted-foreground flex items-center cursor-pointer hover:border-primary hover:shadow-neon transition-all">
                 Search MomentX...
               </div>

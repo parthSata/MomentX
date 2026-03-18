@@ -51,6 +51,7 @@ export function StoryViewer({
       setIsViewersOpen(false)
       setMessage("")
       setIsInputFocused(false)
+      setIsDeleting(false)
 
       // Robust Like Check (Handle both string IDs and Object populated users)
       if (currentUserId && (currentStory as any).likes) {
@@ -126,14 +127,36 @@ export function StoryViewer({
     return () => clearInterval(interval)
   }, [isOpen, isActuallyPaused, currentStory, handleNext])
 
-  const handleDelete = async () => {
-    if (!currentStory || !onDeleteStory) return;
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentStory || !onDeleteStory || isDeleting) return;
     if (!window.confirm("Are you sure you want to delete this story?")) return;
 
     setIsDeleting(true);
+    const storyIdToDelete = currentStory._id;
+
     try {
-      await onDeleteStory(currentStory._id);
-      if (stories.length <= 1) onClose();
+      // 1. Determine next index BEFORE we delete
+      const isLastOne = stories.length <= 1;
+      let nextIndex = currentStoryIndex;
+
+      // If we're deleting the last item in the array, we must move back by 1
+      if (currentStoryIndex === stories.length - 1 && stories.length > 1) {
+        nextIndex = currentStoryIndex - 1;
+      }
+
+      // 2. Execute deletion (Optimistic in the hook)
+      await onDeleteStory(storyIdToDelete);
+
+      // 3. UI Update Flow
+      if (isLastOne) {
+        onClose();
+      } else {
+        // Move to next (or previous) immediately
+        setCurrentStoryIndex(nextIndex);
+        setProgress(0);
+        setIsDeleting(false);
+      }
     } catch (error) {
       console.error("Delete failed", error);
       setIsDeleting(false);
@@ -404,10 +427,13 @@ export function StoryViewer({
                           <p>No views yet</p>
                         </div>
                       ) : (
-                        viewersList.map((viewer: any, idx: number) => {
+                          viewersList.map((viewer: any, idx: number) => {
+                          const viewerUser = viewer.user || {};
+                          const viewerId = viewerUser._id?.toString();
+                          const viewerUsername = viewerUser.username || "User";
+                          const viewerDisplayName = viewerUser.displayName || viewerUser.name || "";
+                          const viewerAvatar = viewerUser.avatar || viewerUser.profilePic || "/image.png";
 
-                          // ✅ 1. CHECK IF THIS VIEWER HAS LIKED THE STORY
-                          const viewerId = viewer.user?._id?.toString();
                           const viewerHasLiked = currentStory.likes?.some((like: any) => {
                             const likeId = typeof like === 'object' ? like._id?.toString() : like?.toString();
                             return likeId === viewerId;
@@ -420,9 +446,9 @@ export function StoryViewer({
                                 {/* ✅ 2. WRAP AVATAR IN RELATIVE CONTAINER TO ADD HEART BADGE */}
                                 <div className="relative">
                                   <AvatarRing
-                                    src={viewer.user?.avatar || viewer.user?.profilePic}
+                                    src={viewerAvatar}
                                     size="sm"
-                                    alt={viewer.user?.username}
+                                    alt={viewerUsername}
                                     hasStory={false}
                                   />
                                   {viewerHasLiked && (
@@ -433,8 +459,8 @@ export function StoryViewer({
                                 </div>
 
                                 <div className="flex flex-col">
-                                  <span className="text-white text-sm font-medium">{viewer.user?.username || "Unknown User"}</span>
-                                  <span className="text-white/50 text-xs">{viewer.user?.displayName}</span>
+                                  <span className="text-white text-sm font-medium">{viewerUsername}</span>
+                                  <span className="text-white/50 text-xs">{viewerDisplayName}</span>
                                 </div>
                               </div>
                               <span className="text-white/30 text-[10px] font-medium">

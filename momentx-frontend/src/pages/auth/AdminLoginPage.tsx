@@ -95,8 +95,7 @@ export default function AdminLoginPage() {
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-4">
               {/* Username */}
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <div className="relative group">
                 <Input
                   variant="glass"
                   placeholder="Admin Username"
@@ -105,11 +104,11 @@ export default function AdminLoginPage() {
                   className="pl-12 h-14 text-lg"
                   required
                 />
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
               </div>
 
               {/* Password */}
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <div className="relative group">
                 <Input
                   variant="glass"
                   type={showPassword ? "text" : "password"}
@@ -119,10 +118,11 @@ export default function AdminLoginPage() {
                   className="pl-12 pr-12 h-14 text-lg"
                   required
                 />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20"
                 >
                   {showPassword ? (
                     <EyeOff className="w-5 h-5" />

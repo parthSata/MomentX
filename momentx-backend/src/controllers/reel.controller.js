@@ -38,7 +38,9 @@ export const createReel = asyncHandler(async (req, res) => {
   const newReel = await Reel.create({
     user: userId,
     videoUrl: cloudResponse.secure_url,
-    thumbnailUrl: cloudResponse.secure_url.replace(/\.[^/.]+$/, '.jpg'),
+    thumbnailUrl: cloudResponse.secure_url
+      .replace(/\.[^/.]+$/, '.jpg')
+      .replace('/upload/', '/upload/c_fill,g_auto,w_500,h_888,q_auto,f_auto/'),
     caption,
     hashtags: parsedHashtags,
     taggedUsers: parsedTags, // Store tags in Reel

@@ -147,11 +147,15 @@ export function useStories() {
   };
 
   const deleteStory = async (storyId: string) => {
+    // 🚀 OPTIMISTIC UPDATE: Remove story before API call
+    setStories((prev) => prev.filter((s) => s._id !== storyId));
+
     try {
       await api.delete(`/stories/${storyId}`);
-      setStories((prev) => prev.filter((s) => s._id !== storyId));
     } catch (error) {
       console.error('Failed to delete story', error);
+      // Wait a moment and then fetch from source to recover consistency
+      fetchStories();
     }
   };
 

@@ -70,8 +70,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             {/* Email Field */}
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <div className="relative group">
               <Input
                 type="email"
                 placeholder="Email address"
@@ -80,11 +79,11 @@ export default function LoginPage() {
                 className="pl-11"
                 required
               />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none group-focus-within:text-primary transition-colors" />
             </div>
 
             {/* Password Field */}
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <div className="relative group">
               <Input
                 type={showPassword ? "text" : "password"}
                 placeholder="Password"
@@ -93,10 +92,11 @@ export default function LoginPage() {
                 className="pl-11 pr-11"
                 required
               />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none group-focus-within:text-primary transition-colors" />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20"
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>

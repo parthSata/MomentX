@@ -30,6 +30,7 @@ const userSchema = new mongoose.Schema(
     },
     bio: { type: String, default: '' },
     profilePic: { type: String, default: '' },
+    profilePicThumbnail: { type: String, default: '' },
     website: { type: String, default: '' },
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
@@ -56,14 +57,15 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
     savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
-
+    refreshToken: {
+      type: String,
+    },
     lastActive: { type: Date, default: Date.now },
   },
   { timestamps: true },
 );
 
 // --- 🛠️ FIX IS HERE ---
-// Removed 'next' parameter. Because it is 'async', Mongoose waits for it automatically.
 userSchema.pre('save', async function () {
   if (!this.isModified('password')) return;
 

@@ -14,7 +14,11 @@ const postSchema = new mongoose.Schema(
     },
 
     images: [
-      { type: String }, // Array of image URLs
+      { type: String }, // Array of original image URLs
+    ],
+
+    thumbnails: [
+      { type: String }, // Array of compressed (thumbnail) image URLs
     ],
 
     video: {

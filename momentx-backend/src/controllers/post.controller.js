@@ -41,6 +41,18 @@ const formatPosts = async (posts, currentUserId) => {
         },
         videoUrl: postObj.videoUrl || '',
         thumbnailUrl: postObj.thumbnailUrl || '',
+
+        // ✅ FALLBACK: If old posts don't have thumbnails, we can generate them dynamically
+        thumbnails:
+          postObj.thumbnails?.length > 0
+            ? postObj.thumbnails
+            : postObj.images?.map((url) =>
+                url.replace(
+                  '/upload/',
+                  '/upload/c_fill,g_auto,w_500,h_500,q_auto,f_auto/',
+                ),
+              ) || [],
+
         images:
           postObj.images?.length > 0
             ? postObj.images
@@ -71,9 +83,25 @@ const createPost = asyncHandler(async (req, res) => {
 
   const imagesLocalPaths = req.files.images.map((file) => file.path);
   const imageUrls = [];
+  const thumbnailUrls = [];
+
   for (const path of imagesLocalPaths) {
     const uploaded = await uploadInCloudinary(path);
-    if (uploaded) imageUrls.push(uploaded.secure_url);
+    if (uploaded) {
+      // ✅ Original URL
+      imageUrls.push(uploaded.secure_url);
+
+      // ✅ Store 2nd Image version: Compressed Thumbnail
+      // - c_fill: Crop & fill
+      // - g_auto: Automagically focus on the subject
+      // - w_500,h_500: Square 500x500
+      // - q_auto: Optimal compression
+      const thumbUrl = uploaded.secure_url.replace(
+        '/upload/',
+        '/upload/c_fill,g_auto,w_500,h_500,q_auto,f_auto/',
+      );
+      thumbnailUrls.push(thumbUrl);
+    }
   }
 
   const hashtags = caption.match(/#[a-z0-9_]+/gi) || [];
@@ -91,6 +119,7 @@ const createPost = asyncHandler(async (req, res) => {
     user: userId,
     caption,
     images: imageUrls,
+    thumbnails: thumbnailUrls, // ✅ STORE COMPRESSED THUMBNAILS
     location,
     hashtags,
     taggedUsers: parsedTags,

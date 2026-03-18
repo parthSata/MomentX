@@ -22,7 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { refreshUser } = useAuth();
 
   // UI State
   const [step, setStep] = useState<1 | 2>(1); // 1: Registration, 2: OTP Verification
@@ -41,6 +41,7 @@ export default function SignupPage() {
     password: "",
   });
   const [otp, setOtp] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,13 +56,19 @@ export default function SignupPage() {
   // Step 1: Request OTP
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
     setIsLoading(true);
 
     try {
-      // We call the endpoint to check existence and send mail
+      // Local check before sending
+      if (formData.username.includes(' ')) {
+        const err = { username: "Username cannot contain spaces" };
+        setErrors(err);
+        return setIsLoading(false);
+      }
+
       await api.post("/users/register-otp", {
-        email: formData.email,
-        username: formData.username
+        ...formData
       });
 
       toast.success("Verification Code Sent", {
@@ -69,9 +76,15 @@ export default function SignupPage() {
       });
       setStep(2);
     } catch (error: any) {
+      const serverError = error.response?.data?.message || "Something went wrong";
       toast.error("Registration Error", {
-        description: error.response?.data?.message || "Something went wrong",
+        description: serverError,
       });
+
+      // Try to map server error back to fields for better UX
+      if (serverError.toLowerCase().includes('username')) setErrors({ username: serverError });
+      else if (serverError.toLowerCase().includes('email')) setErrors({ email: serverError });
+      else if (serverError.toLowerCase().includes('password')) setErrors({ password: serverError });
     } finally {
       setIsLoading(false);
     }
@@ -97,13 +110,13 @@ export default function SignupPage() {
         data.append("profilePic", avatarFile);
       }
 
-      const response = await api.post("/users/register-verify", data, {
+      await api.post("/users/register-verify", data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      if (response.data?.data) {
-        login(response.data.data);
-      }
+      // ✅ FIX: Instead of calling the Login API again (which might fail or crash),
+      // we just refresh the local state since the back-end already set the cookies.
+      await refreshUser();
 
       toast.success("Account Verified!", {
         description: "Welcome to MomentX.",
@@ -163,32 +176,45 @@ export default function SignupPage() {
                 </div>
 
                 <form onSubmit={handleRequestOTP} className="space-y-4">
-                  <div className="relative">
-                    <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input placeholder="Full Name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="pl-11" required />
+                  <div className="space-y-1">
+                    <div className="relative group">
+                      <Input placeholder="Full Name" value={formData.name} onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setErrors({}); }} className="pl-11 text-white" required />
+                      <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
+                    </div>
                   </div>
 
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input placeholder="Username" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} className="pl-11" required />
+                  <div className="space-y-1">
+                    <div className="relative group">
+                      <Input placeholder="Username" value={formData.username} onChange={(e) => { setFormData({ ...formData, username: e.target.value.toLowerCase() }); setErrors({}); }} className={`pl-11 text-white ${errors.username ? 'border-red-500' : ''}`} required />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
+                    </div>
+                    {errors.username && <p className="text-[10px] text-red-500 ml-1">{errors.username}</p>}
                   </div>
 
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input type="email" placeholder="Email address" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="pl-11" required />
+                  <div className="space-y-1">
+                    <div className="relative group">
+                      <Input type="email" placeholder="Email address" value={formData.email} onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setErrors({}); }} className={`pl-11 text-white ${errors.email ? 'border-red-500' : ''}`} required />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
+                    </div>
+                    {errors.email && <p className="text-[10px] text-red-500 ml-1">{errors.email}</p>}
                   </div>
 
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input type="tel" placeholder="Phone number" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="pl-11" />
+                  <div className="space-y-1">
+                    <div className="relative group">
+                      <Input type="tel" placeholder="Phone number" value={formData.phone} onChange={(e) => { setFormData({ ...formData, phone: e.target.value }); setErrors({}); }} className="pl-11 text-white" />
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
+                    </div>
                   </div>
 
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input type={showPassword ? "text" : "password"} placeholder="Password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="pl-11 pr-11" required />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
+                  <div className="space-y-1">
+                    <div className="relative group">
+                      <Input type={showPassword ? "text" : "password"} placeholder="Password" value={formData.password} onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setErrors({}); }} className={`pl-11 pr-11 text-white ${errors.password ? 'border-red-500' : ''}`} required />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground z-20 hover:text-white transition-colors">
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    {errors.password && <p className="text-[10px] text-red-500 ml-1">{errors.password}</p>}
                   </div>
 
                   <Button type="submit" className="w-full" disabled={isLoading}>

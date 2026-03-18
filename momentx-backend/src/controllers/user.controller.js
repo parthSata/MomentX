@@ -23,12 +23,15 @@ const generateAccessAndRefereshTokens = async (userId) => {
     const accessToken = user.generateAccessToken();
     const refreshToken = user.generateRefreshToken();
 
-    // We return the user instance too, so we can save it later in the controller
+    // We only attach the token here, caller MUST save
+    user.refreshToken = refreshToken;
+
     return { accessToken, refreshToken, user };
   } catch (error) {
+    console.error('❌ Token Generation Error:', error);
     throw new ApiError(
       500,
-      'Something went wrong while generating refresh and access token',
+      `Token generation failed: ${error.message}`,
     );
   }
 };
@@ -60,15 +63,23 @@ const registerUser = asyncHandler(async (req, res) => {
 
   if (req.files?.profilePic?.length > 0) {
     const uploadResult = await uploadInCloudinary(req.files.profilePic[0].path);
-    if (uploadResult) userData.profilePic = uploadResult.secure_url;
+    if (uploadResult) {
+      userData.profilePic = uploadResult.secure_url;
+      // Generate 2nd version: 150x150 Compressed Avatar
+      userData.profilePicThumbnail = uploadResult.secure_url.replace(
+        '/upload/',
+        '/upload/c_fill,g_face,w_150,h_150,q_auto,f_auto/',
+      );
+    }
   }
 
   const newUser = new User(userData);
   await newUser.save();
 
-  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
+  const { accessToken, refreshToken, user: userToSave } = await generateAccessAndRefereshTokens(
     newUser._id,
   );
+  await userToSave.save({ validateBeforeSave: false });
 
   const loggedInUser = await User.findById(newUser._id).select(
     '-password -refreshToken',
@@ -79,28 +90,40 @@ const registerUser = asyncHandler(async (req, res) => {
     .cookie('accessToken', accessToken, cookieOptions)
     .cookie('refreshToken', refreshToken, cookieOptions)
     .json(
-      new ApiResponse(201, 'User registered successfully', {
+      new ApiResponse(201, {
         user: loggedInUser,
         accessToken,
-      }),
+      }, 'User registered successfully'),
     );
 });
 
 const sendRegistrationOTP = asyncHandler(async (req, res) => {
-  const { email, username } = req.body;
+  const { name, username, email, password, phone } = req.body;
 
-  if (!email || !username) {
-    throw new ApiError(400, 'Email and Username are required');
+  // --- 📝 1. FIELD VALIDATION ---
+  if (!name?.trim()) throw new ApiError(400, 'Full Name is required.');
+  if (!username?.trim()) throw new ApiError(400, 'Username is required.');
+  if (username.includes(' ')) throw new ApiError(400, 'Username cannot contain spaces.');
+  if (!/^[a-zA-Z0-9_\.]+$/.test(username)) {
+    throw new ApiError(400, 'Username can only contain letters, numbers, dots, and underscores.');
+  }
+  if (!email?.trim()) throw new ApiError(400, 'Email address is required.');
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new ApiError(400, 'Please enter a valid email address.');
+  if (!password || password.length < 6) {
+    throw new ApiError(400, 'Password must be at least 6 characters long.');
   }
 
-  const existingUser = await User.findOne({
-    $or: [{ email: email.toLowerCase().trim() }, { username: username.toLowerCase().trim() }],
-  });
-
-  if (existingUser && existingUser.isVerified) {
-    throw new ApiError(400, 'User already exists and is verified.');
+  const existingEmail = await User.findOne({ email: email.toLowerCase().trim() });
+  if (existingEmail && existingEmail.isVerified) {
+    throw new ApiError(400, 'An account with this email already exists.');
   }
 
+  const existingUsername = await User.findOne({ username: username.toLowerCase().trim() });
+  if (existingUsername && existingUsername.isVerified && existingUsername.email !== email.toLowerCase().trim()) {
+    throw new ApiError(400, 'This username is already taken. Please choose another one.');
+  }
+
+  // --- 📧 2. PREPARE OTP ---
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
 
@@ -113,23 +136,28 @@ const sendRegistrationOTP = asyncHandler(async (req, res) => {
     throw new ApiError(500, 'Email service unreachable. Please try again in a few minutes.');
   }
 
-  if (existingUser) {
-    existingUser.emailOTP = otp;
-    existingUser.emailOTPExpires = otpExpiry;
-    await existingUser.save({ validateBeforeSave: false });
+  // Use existing record if they are re-trying the same email, otherwise create
+  let user = existingEmail;
+  if (user) {
+    user.username = username.toLowerCase().trim();
+    user.name = name.trim();
+    user.emailOTP = otp;
+    user.emailOTPExpires = otpExpiry;
+    await user.save({ validateBeforeSave: false });
   } else {
     await User.create({
       username: username.toLowerCase().trim(),
       email: email.toLowerCase().trim(),
-      password: "TEMP_PWD_" + Math.random().toString(36).slice(-8),
+      password: "TEMP_PWD_" + Math.random().toString(36).slice(-8), // Placeholder
       emailOTP: otp,
       emailOTPExpires: otpExpiry,
       isVerified: false,
-      name: username
+      name: name.trim(),
+      phone: phone || ''
     });
   }
 
-  return res.status(200).json(new ApiResponse(200, {}, 'OTP sent successfully.'));
+  return res.status(200).json(new ApiResponse(200, {}, 'OTP sent successfully. Check your email.'));
 });
 
 // --- 2. VERIFY & REGISTER (Step 2) ---
@@ -160,14 +188,22 @@ const verifyOTPAndRegister = asyncHandler(async (req, res) => {
 
   if (req.files?.profilePic?.length > 0) {
     const uploadResult = await uploadInCloudinary(req.files.profilePic[0].path);
-    if (uploadResult) user.profilePic = uploadResult.secure_url;
+    if (uploadResult) {
+      user.profilePic = uploadResult.secure_url;
+      // Generate 2nd version: 150x150 Compressed Avatar
+      user.profilePicThumbnail = uploadResult.secure_url.replace(
+        '/upload/',
+        '/upload/c_fill,g_face,w_150,h_150,q_auto,f_auto/',
+      );
+    }
   }
 
   await user.save();
 
-  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
+  const { accessToken, refreshToken, user: userToSave } = await generateAccessAndRefereshTokens(
     user._id,
   );
+  await userToSave.save({ validateBeforeSave: false });
 
   const loggedInUser = await User.findById(user._id).select(
     '-password -refreshToken',
@@ -178,10 +214,10 @@ const verifyOTPAndRegister = asyncHandler(async (req, res) => {
     .cookie('accessToken', accessToken, cookieOptions)
     .cookie('refreshToken', refreshToken, cookieOptions)
     .json(
-      new ApiResponse(201, 'User verified and registered successfully', {
+      new ApiResponse(201, {
         user: loggedInUser,
         accessToken,
-      }),
+      }, 'User verified and registered successfully'),
     );
 });
 
@@ -201,12 +237,12 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(401, 'Invalid credentials');
   }
 
-  const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
+  const { accessToken, refreshToken, user: userToSave } = await generateAccessAndRefereshTokens(
     user._id,
   );
 
-  user.isOnline = true;
-  await user.save({ validateBeforeSave: false });
+  userToSave.isOnline = true;
+  await userToSave.save({ validateBeforeSave: false });
 
   const loggedInUser = await User.findById(user._id).select(
     '-password -refreshToken',
@@ -217,10 +253,10 @@ const loginUser = asyncHandler(async (req, res) => {
     .cookie('accessToken', accessToken, cookieOptions)
     .cookie('refreshToken', refreshToken, cookieOptions)
     .json(
-      new ApiResponse(200, 'Login successful', {
+      new ApiResponse(200, {
         user: loggedInUser,
         accessToken,
-      }),
+      }, 'Login successful'),
     );
 });
 
@@ -240,7 +276,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     .status(200)
     .clearCookie('accessToken', cookieOptions)
     .clearCookie('refreshToken', cookieOptions)
-    .json(new ApiResponse(200, 'Logged out successfully', {}));
+    .json(new ApiResponse(200, {}, 'Logged out successfully'));
 });
 
 const refreshToken = asyncHandler(async (req, res) => {
@@ -287,10 +323,10 @@ const refreshToken = asyncHandler(async (req, res) => {
         maxAge: 30 * 24 * 60 * 60 * 1000,
       }) // 30 Days
       .json(
-        new ApiResponse(200, 'Access token refreshed', {
+        new ApiResponse(200, {
           accessToken,
           refreshToken: newRefreshToken,
-        }),
+        }, 'Access token refreshed'),
       );
   } catch (error) {
     throw new ApiError(401, error?.message || 'Invalid refresh token');
@@ -430,7 +466,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(
-      new ApiResponse(200, 'User fetched successfully', { user: userResponse }),
+      new ApiResponse(200, { user: userResponse }, 'User fetched successfully'),
     );
 });
 
@@ -448,7 +484,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, 'Users fetched successfully', formattedUsers));
+    .json(new ApiResponse(200, formattedUsers, 'Users fetched successfully'));
 });
 
 const forgotPassword = asyncHandler(async (req, res) => {
@@ -509,7 +545,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
   // 6. Success
   return res
     .status(200)
-    .json(new ApiResponse(200, 'OTP sent successfully. Check your inbox.', {}));
+    .json(new ApiResponse(200, {}, 'OTP sent successfully. Check your inbox.'));
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
@@ -544,8 +580,8 @@ const resetPassword = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         200,
-        'Password reset successfully. You can now login.',
         {},
+        'Password reset successfully. You can now login.',
       ),
     );
 });
@@ -590,6 +626,11 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     }
 
     updateData.profilePic = avatar.secure_url;
+    // Generate 2nd version: 150x150 Compressed Avatar
+    updateData.profilePicThumbnail = avatar.secure_url.replace(
+      '/upload/',
+      '/upload/c_fill,g_face,w_150,h_150,q_auto,f_auto/',
+    );
   }
 
   // 6. Update Database

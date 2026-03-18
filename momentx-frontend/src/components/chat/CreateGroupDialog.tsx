@@ -135,7 +135,7 @@ export function CreateGroupDialog({ isOpen, onClose, onCreated }: CreateGroupDia
                   {/* Search */}
                   <div className="p-4">
                     <div className="relative">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                       <Input
                         variant="glass"
                         placeholder="Search people..."

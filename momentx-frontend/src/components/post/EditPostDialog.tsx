@@ -140,7 +140,7 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
                                 {showUserTagInput && (
                                     <div className="space-y-3 bg-secondary/20 p-3 rounded-xl border border-border/50">
                                         <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                                             <Input
                                                 value={userSearchQuery}
                                                 onChange={(e) => setUserSearchQuery(e.target.value)}

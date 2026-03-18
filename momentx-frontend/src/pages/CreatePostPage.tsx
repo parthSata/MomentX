@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Image, Camera, MapPin, Hash,
+  ArrowLeft, Image, Camera, MapPin, Hash, Search,
   ChevronRight, Upload, Loader2, X, Film, RefreshCcw, Navigation, UserPlus
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -376,7 +376,8 @@ export default function CreatePostPage() {
                     {showUserTagInput && (
                       <div className="space-y-3 bg-secondary/20 p-4 rounded-xl">
                         <div className="relative">
-                          <Input value={userSearchQuery} onChange={(e) => setUserSearchQuery(e.target.value)} placeholder="Search users to tag..." />
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
+                          <Input value={userSearchQuery} onChange={(e) => setUserSearchQuery(e.target.value)} placeholder="Search users to tag..." className="pl-10" />
                           {isSearchingUsers && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
                           {userSuggestions.length > 0 && (
                             <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-xl overflow-hidden max-h-48 overflow-y-auto">

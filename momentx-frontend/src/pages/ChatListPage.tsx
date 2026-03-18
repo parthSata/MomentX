@@ -107,7 +107,7 @@ export default function ChatListPage() {
           endpoint = `/users/search?username=${searchQuery}`;
         }
         const { data } = await api.get(endpoint);
-        setSearchResults(Array.isArray(data.message) ? data.message : []);
+        setSearchResults(Array.isArray(data.data) ? data.data : []);
       } catch (error) {
         setSearchResults([]);
       } finally {
@@ -185,8 +185,8 @@ export default function ChatListPage() {
     if (c.isGroupChat) {
       return c.groupName?.toLowerCase().includes(query.toLowerCase());
     }
-    return c.user?.name?.toLowerCase().includes(query.toLowerCase()) || 
-           c.user?.username?.toLowerCase().includes(query.toLowerCase());
+    return c.user?.name?.toLowerCase().includes(query.toLowerCase()) ||
+      c.user?.username?.toLowerCase().includes(query.toLowerCase());
   });
 
   const handleGroupCreated = async (groupData: any) => {
@@ -250,7 +250,7 @@ export default function ChatListPage() {
 
               <div className="p-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                   <Input autoFocus placeholder="Search people..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 bg-white/5 border-white/10 focus:border-primary/50" />
                 </div>
               </div>
@@ -319,7 +319,7 @@ export default function ChatListPage() {
         </div>
 
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
           <Input variant="glass" placeholder="Search messages..." value={query} onChange={(e) => setQuery(e.target.value)} className="pl-12" />
         </div>
       </motion.div>
@@ -353,69 +353,69 @@ export default function ChatListPage() {
           const targetPath = isGroup ? `/group-chat/${chat._id}` : `/chat/${chat._id}`;
 
           return (
-          <motion.div
-            key={chat._id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05 }}
-            whileHover={{ x: 4 }}
-            onClick={() => {
-              if (isGroup) {
-                // Optimistically clear unread count
-                setLocalChats((prev) =>
-                  prev.map(c => c._id === chat._id ? { ...c, unreadCount: 0 } : c)
-                );
-                window.dispatchEvent(new Event('chats_updated'));
-                navigate(targetPath);
-              } else {
-                handleNavigateToChat(chat._id, chat.user);
-              }
-            }}
-            onContextMenu={(e) => handleContextMenu(e, chat._id)}
-            className="flex items-center gap-3 p-3 glass rounded-2xl cursor-pointer hover:bg-white/10 transition-all group relative"
-          >
-            {isGroup && !avatarUrl ? (
-                <div className="w-12 h-12 shrink-0 rounded-full bg-primary/20 flex items-center justify-center">
-                   <Users className="w-6 h-6 text-primary" />
-                </div>
-            ) : (
-                <AvatarRing src={avatarUrl} isOnline={isOnline} size="md" />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <h4 className="font-semibold truncate text-foreground flex items-center gap-1.5">
-                  {isGroup && <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-                  {displayName}
-                </h4>
-                <span className="text-xs text-muted-foreground">{chat.lastMessageAt ? formatDistanceToNowStrict(new Date(chat.lastMessageAt), { addSuffix: true }) : ""}</span>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <p
-                  className={`text-sm truncate ${chat.unreadCount > 0
-                    ? "text-foreground font-bold"
-                    : "text-muted-foreground"
-                    }`}
-                >
-                  {decryptMessage(chat.lastMessage)}
-                </p>
-
-                {chat.unreadCount > 0 && (
-                  <span className="ml-2 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    {chat.unreadCount}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <motion.button
-              initial={{ opacity: 0 }}
-              whileHover={{ opacity: 1 }}
-              onClick={(e) => { e.stopPropagation(); handleContextMenu(e, chat._id); }}
-              className="p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            <motion.div
+              key={chat._id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.05 }}
+              whileHover={{ x: 4 }}
+              onClick={() => {
+                if (isGroup) {
+                  // Optimistically clear unread count
+                  setLocalChats((prev) =>
+                    prev.map(c => c._id === chat._id ? { ...c, unreadCount: 0 } : c)
+                  );
+                  window.dispatchEvent(new Event('chats_updated'));
+                  navigate(targetPath);
+                } else {
+                  handleNavigateToChat(chat._id, chat.user);
+                }
+              }}
+              onContextMenu={(e) => handleContextMenu(e, chat._id)}
+              className="flex items-center gap-3 p-3 glass rounded-2xl cursor-pointer hover:bg-white/10 transition-all group relative"
             >
-              <MoreHorizontal className="w-5 h-5 text-muted-foreground hover:text-foreground" />
-            </motion.button>
-          </motion.div>
+              {isGroup && !avatarUrl ? (
+                <div className="w-12 h-12 shrink-0 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-primary" />
+                </div>
+              ) : (
+                <AvatarRing src={avatarUrl} isOnline={isOnline} size="md" />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold truncate text-foreground flex items-center gap-1.5">
+                    {isGroup && <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                    {displayName}
+                  </h4>
+                  <span className="text-xs text-muted-foreground">{chat.lastMessageAt ? formatDistanceToNowStrict(new Date(chat.lastMessageAt), { addSuffix: true }) : ""}</span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <p
+                    className={`text-sm truncate ${chat.unreadCount > 0
+                      ? "text-foreground font-bold"
+                      : "text-muted-foreground"
+                      }`}
+                  >
+                    {decryptMessage(chat.lastMessage)}
+                  </p>
+
+                  {chat.unreadCount > 0 && (
+                    <span className="ml-2 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {chat.unreadCount}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <motion.button
+                initial={{ opacity: 0 }}
+                whileHover={{ opacity: 1 }}
+                onClick={(e) => { e.stopPropagation(); handleContextMenu(e, chat._id); }}
+                className="p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <MoreHorizontal className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+              </motion.button>
+            </motion.div>
           );
         })}
       </div>

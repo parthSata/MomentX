@@ -322,23 +322,22 @@ export default function UserProfilePage() {
                                     )}
                                 >
                                     {activeTab === 'reels' || (post as any).videoUrl ? (
-                                        <video
-                                            src={(post as any).videoUrl}
-                                            className="w-full h-full object-cover pointer-events-none"
-                                            muted
-                                        />
+                                        <div className="w-full h-full relative">
+                                            <img
+                                                src={(post as any).thumbnailUrl || "/placeholder-image.jpg"}
+                                                alt={post.caption}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                                                <Film className="w-6 h-6 text-white/50" />
+                                            </div>
+                                        </div>
                                     ) : (
                                         <img
-                                            src={post.images?.[0] || "/placeholder-image.jpg"}
+                                            src={post.thumbnails?.[0] || post.images?.[0] || "/placeholder-image.jpg"}
                                             alt={post.caption}
                                             className="w-full h-full object-cover"
                                         />
-                                    )}
-                                    {/* Overlay for Reels */}
-                                    {(activeTab === 'reels' || (post as any).videoUrl) && (
-                                        <div className="absolute top-2 right-2 text-white drop-shadow-md">
-                                            <Film className="w-4 h-4 fill-white/50" />
-                                        </div>
                                     )}
                                 </motion.div>
                             ))

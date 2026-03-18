@@ -47,7 +47,7 @@ export const createStory = async (req, res) => {
     if (successfulStories.length > 0) {
       await Story.populate(successfulStories, {
         path: 'user',
-        select: 'username avatar displayName',
+        select: 'username profilePic name',
       });
     }
 
@@ -77,17 +77,38 @@ export const getStories = async (req, res) => {
       expiresAt: { $gt: new Date() },
       user: { $in: validUserIds },
     })
-      .populate('user', 'username avatar displayName profilePic')
-      .populate('viewers.user', 'username avatar displayName profilePic')
+      .populate('user', 'username profilePic name')
+      .populate('viewers.user', 'username profilePic name')
       .sort({ createdAt: -1 });
 
     const formattedStories = stories.map((story) => {
       const storyObj = story.toObject();
+      
+      // Ensure user has displayName
+      if (storyObj.user && storyObj.user.name && !storyObj.user.displayName) {
+        storyObj.user.displayName = storyObj.user.name;
+      }
+      
+      // Ensure ALL viewers have displayName and profilePic/avatar consistently
+      const formattedViewers = (storyObj.viewers || []).map((v) => {
+        if (v.user) {
+          return {
+            ...v,
+            user: {
+              ...v.user,
+              displayName: v.user.name || v.user.displayName || 'User',
+              avatar: v.user.profilePic || v.user.avatar || '/image.png',
+            }
+          };
+        }
+        return v;
+      });
+
       return {
         ...storyObj,
         isViewed: currentUserId
           ? storyObj.viewers.some(
-              (v) => v.user?._id?.toString() === currentUserId.toString(),
+              (v) => (v.user?._id || v.user)?.toString() === currentUserId.toString(),
             )
           : false,
         isLiked: currentUserId
@@ -95,7 +116,7 @@ export const getStories = async (req, res) => {
               (id) => id.toString() === currentUserId.toString(),
             )
           : false,
-        viewers: storyObj.viewers,
+        viewers: formattedViewers,
         likes: storyObj.likes || [],
       };
     });
@@ -131,9 +152,9 @@ export const viewStory = async (req, res) => {
         user: {
           _id: req.user._id.toString(),
           username: req.user.username,
-          displayName: req.user.displayName,
-          avatar: req.user.avatar || req.user.profilePic || '',
-          profilePic: req.user.avatar || req.user.profilePic || '',
+          displayName: req.user.name || req.user.displayName || '',
+          avatar: req.user.profilePic || req.user.avatar || '',
+          profilePic: req.user.profilePic || req.user.avatar || '',
         },
         viewedAt: newViewerEntry.viewedAt,
       };
@@ -257,15 +278,26 @@ export const deleteStory = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    if (story.publicId) {
-      await deleteFromCloudinary(story.publicId, story.type);
-    }
+    const { publicId, type } = story;
 
+    // Delete from DB first
     await story.deleteOne();
 
-    res.status(200).json({ success: true, message: 'Story deleted' });
+    // Respond immediately to be "fast"
+    res.status(200).json({ success: true, message: 'Story deleted from database' });
+
+    // Cleanup Cloudinary in the "background" (no await on the final response)
+    if (publicId) {
+      try {
+        await deleteFromCloudinary(publicId, type);
+      } catch (cloudinaryError) {
+        console.error('Cloudinary Cleanup Error:', cloudinaryError);
+      }
+    }
   } catch (error) {
     console.error('Delete Error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: error.message });
+    }
   }
 };
