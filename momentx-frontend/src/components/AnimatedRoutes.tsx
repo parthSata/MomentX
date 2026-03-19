@@ -60,23 +60,23 @@ export function AnimatedRoutes() {
   // ✅ NEW: Track Visitor Activity
   useEffect(() => {
     if (isAuthenticated && user) {
-        // Track the visit - UPDATED: Point to activity routes to avoid strict Admin URLs
-        api.post("/activity/track-visit", { path: location.pathname })
-           .catch(() => {}); // SILENT FAIL
+      // Track the visit - UPDATED: Point to activity routes to avoid strict Admin URLs
+      api.post("/activity/track-visit", { path: location.pathname })
+        .catch(() => { }); // SILENT FAIL
     }
   }, [location.pathname, isAuthenticated, user]);
 
   return (
     <>
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {showSplash && (
           <SplashScreen onComplete={() => setShowSplash(false)} />
         )}
       </AnimatePresence>
 
       <div className={showSplash ? "hidden" : "block"}>
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname.startsWith('/chat') || location.pathname.startsWith('/group-chat') ? 'chat-area' : location.pathname}>
+        <AnimatePresence initial={false} key={location.pathname}>
+          <Routes location={location}>
             <Route
               path="/"
               element={
@@ -215,9 +215,7 @@ export function AnimatedRoutes() {
               path="/chat"
               element={
                 <ProtectedRoute>
-                  <PageTransition>
-                    <ChatLayout />
-                  </PageTransition>
+                  <ChatLayout />
                 </ProtectedRoute>
               }
             >

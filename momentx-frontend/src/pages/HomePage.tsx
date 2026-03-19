@@ -42,14 +42,19 @@ export default function HomePage() {
     setIsLoading(true);
     try {
       const { data } = await api.get(`/posts/feed?page=${page}&limit=5`);
-      setPosts((prev) => {
-        const existingIds = new Set(prev.map((p) => p._id));
-        const uniqueNewPosts = data.data.posts.filter((p: Post) => !existingIds.has(p._id));
-        return [...prev, ...uniqueNewPosts];
-      });
-      setHasMore(data.data.hasMore);
+      if (data?.data?.posts) {
+        setPosts((prev) => {
+          const existingIds = new Set(prev.map((p) => p._id));
+          const uniqueNewPosts = data.data.posts.filter((p: Post) => !existingIds.has(p._id));
+          return [...prev, ...uniqueNewPosts];
+        });
+        setHasMore(data.data.hasMore);
+      } else {
+        setHasMore(false);
+      }
     } catch (error) {
       console.error("Failed to fetch feed", error);
+      setHasMore(false);
     } finally {
       setIsLoading(false);
     }
@@ -178,26 +183,26 @@ export default function HomePage() {
             ))
           ) : (
             !isLoading && (
-              <div className="space-y-8">
-                {/* Show suggestions if no posts exist */}
+              <div className="space-y-8 px-4">
+                {/* Show suggestions if they exist */}
                 {suggestions.length > 0 && <SuggestionsRow />}
 
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex flex-col items-center justify-center py-16 px-8 text-center glass rounded-3xl mx-4 border border-white/10"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center justify-center py-20 px-8 text-center glass rounded-3xl border border-white/10"
                 >
                   <div className="w-20 h-20 bg-linear-to-tr from-amber-500/10 to-emerald-500/10 rounded-full flex items-center justify-center mb-6">
                     <UserPlus className="w-10 h-10 text-muted-foreground" />
                   </div>
-                  <h3 className="text-xl font-bold mb-3 font-display">Feed is Quiet</h3>
+                  <h3 className="text-2xl font-bold mb-3 font-display text-foreground">Your Feed is Quiet</h3>
                   <p className="text-muted-foreground text-sm max-w-62.5 mb-8">
-                    Follow people from the suggestions above to fill your feed with moments.
+                    Follow more people or explore trending content to fill your feed with moments.
                   </p>
                   <Button
                     onClick={() => navigate("/search")}
                     variant="secondary"
-                    className="rounded-full px-10 h-12"
+                    className="rounded-full px-10 h-12 font-bold shadow-lg"
                   >
                     Find Friends
                   </Button>
