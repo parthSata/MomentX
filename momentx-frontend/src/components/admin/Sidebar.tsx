@@ -43,8 +43,8 @@ export function Sidebar({ activeNav, setActiveNav, isOpen, onClose }: SidebarPro
                             onClose(); // Close sidebar on mobile when clicked
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeNav === item.id
-                            ? "bg-gradient-primary text-white"
-                            : "hover:bg-white/10"
+                            ? "bg-gradient-primary text-primary-foreground shadow-lg shadow-primary/20"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                             }`}
                     >
                         <item.icon className="w-5 h-5" />
@@ -57,7 +57,7 @@ export function Sidebar({ activeNav, setActiveNav, isOpen, onClose }: SidebarPro
                 <div className="flex items-center gap-3 px-4 py-3">
                     <AvatarRing src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150" size="sm" />
                     <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate text-left">Admin User</p>
+                        <p className="font-medium truncate text-left text-foreground">Admin User</p>
                         <p className="text-xs text-muted-foreground text-left">Super Admin</p>
                     </div>
                 </div>
@@ -95,7 +95,7 @@ export function Sidebar({ activeNav, setActiveNav, isOpen, onClose }: SidebarPro
                             animate={{ x: 0 }}
                             exit={{ x: "-100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed inset-y-0 left-0 z-50 w-72 bg-[#0a0a0a] border-r border-white/10 flex flex-col p-4 lg:hidden shadow-2xl"
+                            className="fixed inset-y-0 left-0 z-50 w-72 bg-background border-r border-border flex flex-col p-4 lg:hidden shadow-2xl"
                         >
                             <NavContent />
                         </motion.aside>

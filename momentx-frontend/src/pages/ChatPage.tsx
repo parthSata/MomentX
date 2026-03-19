@@ -389,7 +389,7 @@ export default function ChatPage() {
   const allMessages = messages;
 
   return (
-    <div className="h-full flex flex-col bg-background dark:bg-[#0b141a] relative overflow-hidden w-full">
+    <div className="h-full flex flex-col bg-background relative overflow-hidden w-full">
 
 
       <AnimatePresence>
@@ -491,7 +491,7 @@ export default function ChatPage() {
               <button
                 onClick={confirmSendMedia}
                 disabled={uploading}
-                className="flex-1 bg-linear-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="flex-1 bg-linear-to-r from-amber-500 to-emerald-500 text-black font-semibold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {uploading ? (
                   <>
@@ -540,7 +540,7 @@ export default function ChatPage() {
         ) : (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <motion.button onClick={() => navigate("/chat")} className="p-2 glass dark:hover:bg-white/5 rounded-full md:hidden transition-colors">
+              <motion.button onClick={() => navigate("/chat")} className="p-2 glass rounded-full md:hidden transition-colors">
                 <ArrowLeft className="w-5 h-5" />
               </motion.button>
               <AvatarRing src={chatUser.profilePic} isOnline={chatUser.isOnline} size="sm" />
@@ -558,10 +558,10 @@ export default function ChatPage() {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
-              <button onClick={() => handleInitiateCall("voice")} className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors">
+              <button onClick={() => handleInitiateCall("voice")} className="p-2 hover:bg-muted rounded-full transition-colors">
                 <Phone className="w-5 h-5 text-primary" />
               </button>
-              <button onClick={() => handleInitiateCall("video")} className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors">
+              <button onClick={() => handleInitiateCall("video")} className="p-2 hover:bg-muted rounded-full transition-colors">
                 <Video className="w-5 h-5 text-primary" />
               </button>
               <div className="relative">
@@ -646,9 +646,9 @@ export default function ChatPage() {
                       relative
                       ${msg.sharedPost
                         ? "p-0 bg-transparent shadow-none border-none"
-                        : `p-3 rounded-2xl shadow-sm dark:shadow-none ${isMe
-                          ? "bg-blue-100 dark:bg-linear-to-r dark:from-blue-600 dark:to-indigo-500 text-gray-900 dark:text-white rounded-br-none"
-                          : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-none"}`
+                        : `p-3 rounded-2xl shadow-sm ${isMe
+                          ? "bg-linear-to-r from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-500 text-gray-900 border border-amber-400/20 rounded-br-none font-medium"
+                          : "bg-secondary/10 dark:bg-muted/80 text-foreground border border-border/50 rounded-bl-none"}`
                       }
                       ${msg.isOptimistic ? "opacity-70" : "opacity-100"}
                       ${isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}
@@ -742,7 +742,11 @@ export default function ChatPage() {
                 exit={{ opacity: 0, y: 50 }}
                 className="absolute bottom-20 left-4 z-50"
               >
-                <EmojiPicker onEmojiClick={onEmojiClick} theme={Theme.DARK} searchDisabled />
+                <EmojiPicker 
+                  onEmojiClick={onEmojiClick} 
+                  theme={document.documentElement.classList.contains("light") ? Theme.LIGHT : Theme.DARK} 
+                  searchDisabled 
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -812,7 +816,7 @@ export default function ChatPage() {
               onClick={inputText.trim() ? handleSend : isRecording ? stopRecording : startRecording}
               className={`p-3 rounded-full shrink-0 transition-colors ${isRecording
                 ? "bg-red-500 shadow-lg shadow-red-500/20"
-                : "bg-linear-to-r from-blue-600 to-indigo-600"
+                : "bg-linear-to-r from-amber-500 to-emerald-500"
                 }`}
             >
               {inputText.trim() ? (

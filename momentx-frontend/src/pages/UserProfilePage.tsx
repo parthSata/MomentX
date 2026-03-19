@@ -186,7 +186,7 @@ export default function UserProfilePage() {
                     <div className="flex flex-col md:flex-row items-center gap-6">
                         <div className="relative">
                             <div
-                                className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-linear-to-tr from-yellow-400 to-purple-600 p-1 cursor-pointer transition-transform hover:scale-105"
+                                className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-linear-to-tr from-amber-400 to-emerald-500 p-1 cursor-pointer transition-transform hover:scale-105"
                                 // ✅ Open Image Viewer when clicked
                                 onClick={() => setIsProfilePicOpen(true)}
                             >

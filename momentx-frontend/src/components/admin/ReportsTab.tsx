@@ -101,19 +101,19 @@ export function ReportsTab() {
             {/* Header & Filters */}
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center glass-strong p-4 rounded-2xl">
                 <div>
-                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <h3 className="font-semibold text-lg flex items-center gap-2 text-foreground">
                         <Flag className="w-5 h-5 text-primary" /> Reports Center
                     </h3>
                     <p className="text-sm text-muted-foreground">Review and moderate user reports</p>
                 </div>
-                <div className="flex bg-white/5 p-1 rounded-lg">
+                <div className="flex bg-muted p-1 rounded-lg border border-border/50">
                     {["pending", "resolved", "rejected"].map((status) => (
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status as any)}
                             className={`px-4 py-1.5 rounded-md text-sm font-medium capitalize transition-all ${filterStatus === status
-                                ? "bg-primary text-white shadow-lg"
-                                : "text-muted-foreground hover:text-white"
+                                ? "bg-primary text-primary-foreground shadow-lg"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 }`}
                         >
                             {status}
@@ -135,7 +135,7 @@ export function ReportsTab() {
                                 <th className="p-4 text-xs font-semibold uppercase text-muted-foreground whitespace-nowrap text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5 text-sm">
+                        <tbody className="divide-y divide-border/50 text-sm">
                             {reports.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="p-12 text-center text-muted-foreground">
@@ -149,7 +149,7 @@ export function ReportsTab() {
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         transition={{ delay: index * 0.03 }}
-                                        className="hover:bg-white/[0.02] transition-colors"
+                                        className="hover:bg-muted/20 transition-colors"
                                     >
                                         <td className="p-4 align-top">
                                             <div className="flex gap-3">
@@ -157,7 +157,7 @@ export function ReportsTab() {
                                                     <AlertTriangle className="w-4 h-4" />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="font-semibold text-white capitalize">{report.reason}</div>
+                                                    <div className="font-semibold text-foreground capitalize">{report.reason}</div>
                                                     <div className="text-xs text-muted-foreground line-clamp-1 mt-1">
                                                         {report.description || "No description provided."}
                                                     </div>
@@ -170,7 +170,7 @@ export function ReportsTab() {
                                             </div>
                                         </td>
                                         <td className="p-4 align-top">
-                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground uppercase tracking-widest block w-fit mb-1">
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted border border-border/50 text-muted-foreground uppercase tracking-widest block w-fit mb-1">
                                                 {report.targetType}
                                             </span>
                                             <div className="text-xs text-gray-300 truncate max-w-[150px]">
@@ -180,7 +180,7 @@ export function ReportsTab() {
                                         <td className="p-4 align-top">
                                             <div className="flex items-center gap-2">
                                                 <UserIcon className="w-3 h-3 text-primary" />
-                                                <span className="font-medium text-white">{report.reportedBy?.username || "Unknown"}</span>
+                                                <span className="font-medium text-foreground">{report.reportedBy?.username || "Unknown"}</span>
                                             </div>
                                             <div className="text-[10px] text-muted-foreground mt-0.5">
                                                 {report.reportedBy?.email || "No email"}
@@ -244,7 +244,7 @@ export function ReportsTab() {
 
             {/* Details Dialog */}
             <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                <DialogContent className="glass-strong border-white/10 text-white sm:max-w-lg">
+                <DialogContent className="glass-strong border-border text-foreground sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Report Details</DialogTitle>
                         <DialogDescription>Review the content and take action.</DialogDescription>

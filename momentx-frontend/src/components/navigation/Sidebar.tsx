@@ -48,8 +48,8 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-4 px-4 py-3 rounded-xl transition-all",
                   isActive
-                    ? "bg-linear-to-r from-neon-indigo/20 via-neon-violet/20 to-neon-pink/20 text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
                 )}
               >
                 <div className="relative">
@@ -88,8 +88,8 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-4 px-4 py-3 rounded-xl transition-all",
                   isActive
-                    ? "bg-linear-to-r from-neon-indigo/20 via-neon-violet/20 to-neon-pink/20 text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
                 )}
               >
                 <Icon className={cn("w-5 h-5", isActive && "text-primary")} />

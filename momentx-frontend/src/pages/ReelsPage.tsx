@@ -126,7 +126,7 @@ export default function ReelsPage() {
         <div className="hidden lg:block absolute top-6 right-10 z-40 pointer-events-auto">
           <button
             onClick={() => navigate("/reels/create")}
-            className="p-3 bg-linear-to-r from-pink-500 to-violet-500 rounded-full shadow-lg hover:shadow-pink-500/20 transition-shadow"
+            className="p-3 bg-linear-to-r from-amber-500 to-emerald-500 rounded-full shadow-lg hover:shadow-amber-500/20 transition-shadow"
           >
             <Plus className="w-6 h-6 text-white" />
           </button>

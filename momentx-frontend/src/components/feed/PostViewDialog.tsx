@@ -408,7 +408,7 @@ export function PostViewDialog({ isOpen, onClose, post, showEditOption }: PostVi
                                 <div className="flex-1 flex flex-col h-full bg-background min-h-0">
                                     <div className="p-3 border-b border-border flex items-center justify-between shrink-0">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-linear-to-tr from-yellow-400 to-purple-600 p-0.5">
+                                            <div className="w-8 h-8 rounded-full bg-linear-to-tr from-amber-400 to-emerald-500 p-0.5">
                                                 <img
                                                     src={normalizedPost.user.profilePic || "/image.png"}
                                                     alt={normalizedPost.user.username}
@@ -526,7 +526,7 @@ export function PostViewDialog({ isOpen, onClose, post, showEditOption }: PostVi
                                                 onChange={(e) => setNewComment(e.target.value)}
                                             />
                                             {newComment.trim().length > 0 && (
-                                                <button type="submit" className="text-blue-500 font-semibold text-sm hover:text-blue-400 transition-colors ml-2">Post</button>
+                                                <button type="submit" className="text-primary font-semibold text-sm hover:opacity-70 transition-opacity ml-2">Post</button>
                                             )}
                                         </form>
                                     </div>

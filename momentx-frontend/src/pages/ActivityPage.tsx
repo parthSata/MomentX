@@ -83,12 +83,12 @@ export default function ActivityPage() {
   const maxActivity = Math.max(...weeklyData.map((d) => (d.likes || 0) + (d.comments || 0)), 10);
 
   const stats = [
-    { label: "Total Posts", value: formatNumber(statsData.posts), icon: Eye, color: "from-blue-500 to-cyan-500" },
-    { label: "Total Likes", value: formatNumber(statsData.likes), icon: Heart, color: "from-red-500 to-pink-500" },
-    { label: "Comments", value: formatNumber(statsData.comments), icon: MessageCircle, color: "from-purple-500 to-violet-500" },
+    { label: "Total Posts", value: formatNumber(statsData.posts), icon: Eye, color: "from-amber-500 to-yellow-400" },
+    { label: "Total Likes", value: formatNumber(statsData.likes), icon: Heart, color: "from-red-500 to-orange-500" },
+    { label: "Comments", value: formatNumber(statsData.comments), icon: MessageCircle, color: "from-emerald-500 to-teal-500" },
     { label: "Followers", value: formatNumber(statsData.followers), icon: Users, color: "from-green-500 to-emerald-500" },
     { label: "Shares", value: formatNumber(statsData.shares), icon: Share2, color: "from-orange-500 to-amber-500" },
-    { label: "Saves", value: formatNumber(statsData.saves), icon: Bookmark, color: "from-indigo-500 to-purple-500" },
+    { label: "Saves", value: formatNumber(statsData.saves), icon: Bookmark, color: "from-amber-600 to-yellow-500" },
   ];
 
   return (
@@ -111,7 +111,7 @@ export default function ActivityPage() {
             <ArrowLeft className="w-6 h-6 text-foreground" />
           </button>
           <div>
-            <h1 className="text-xl font-display font-bold bg-linear-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">
+            <h1 className="text-xl font-display font-bold bg-linear-to-r from-amber-400 to-emerald-400 bg-clip-text text-transparent">
               Activity & Insights
             </h1>
             <p className="text-xs text-muted-foreground">Your performance overview</p>
@@ -195,7 +195,7 @@ export default function ActivityPage() {
                             initial={{ height: 0 }}
                             animate={{ height: `${heightPercent}%` }}
                             transition={{ delay: index * 0.1, duration: 0.8, type: "spring" }}
-                            className="w-full bg-linear-to-t from-primary/50 to-primary rounded-t-lg relative min-h-1 group-hover:from-primary group-hover:to-purple-400 transition-all"
+                            className="w-full bg-linear-to-t from-primary/50 to-primary rounded-t-lg relative min-h-1 group-hover:from-primary group-hover:to-amber-400 transition-all"
                           >
                             {/* Tooltip */}
                             <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-gray-800 border border-white/10 text-white text-[10px] px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-xl z-10">

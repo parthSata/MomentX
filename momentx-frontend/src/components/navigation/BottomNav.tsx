@@ -50,7 +50,7 @@ export function BottomNav() {
                 whileTap={{ scale: 0.9 }}
                 className={cn(
                   "p-2 rounded-xl transition-colors",
-                  isActive && "bg-linear-to-r from-neon-indigo/20 via-neon-violet/20 to-neon-pink/20"
+                  isActive && "bg-primary/10 text-primary border border-primary/20"
                 )}
               >
                 <Icon

@@ -208,7 +208,7 @@ export function UsersTab({ searchQuery }: UsersTabProps) {
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="border-b border-border/50 bg-white/5">
+                            <tr className="border-b border-border/50 bg-muted/30">
                                 <th className="text-left p-4 font-medium pl-6">User</th>
                                 <th className="text-left p-4 font-medium hidden md:table-cell">Email</th>
                                 <th className="text-left p-4 font-medium hidden sm:table-cell">Joined</th> {/* Added Joined Date */}
@@ -231,13 +231,13 @@ export function UsersTab({ searchQuery }: UsersTabProps) {
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: index * 0.05 }}
-                                        className="border-b border-border/50 hover:bg-white/5 transition-colors group"
+                                        className="border-b border-border/50 hover:bg-muted/30 transition-colors group"
                                     >
                                         <td className="p-4 pl-6">
                                             <div className="flex items-center gap-3">
                                                 <AvatarRing src={user.profilePic} size="sm" />
                                                 <div>
-                                                    <p className="font-medium text-white flex items-center gap-1">
+                                                    <p className="font-medium text-foreground flex items-center gap-1">
                                                         {user.name}
                                                         {user.isVerified && <CheckCircle className="w-3 h-3 text-blue-400 fill-blue-400/20" />}
                                                     </p>
@@ -268,11 +268,11 @@ export function UsersTab({ searchQuery }: UsersTabProps) {
                                         <td className="p-4 hidden lg:table-cell text-sm text-muted-foreground">
                                             <div className="flex items-center gap-4">
                                                 <div className="text-center">
-                                                    <span className="block font-bold text-white">{user.postsCount || 0}</span>
+                                                    <span className="block font-bold text-foreground">{user.postsCount || 0}</span>
                                                     <span className="text-[10px] uppercase">Posts</span>
                                                 </div>
                                                 <div className="text-center">
-                                                    <span className="block font-bold text-white">{user.followersCount || 0}</span>
+                                                    <span className="block font-bold text-foreground">{user.followersCount || 0}</span>
                                                     <span className="text-[10px] uppercase">Followers</span>
                                                 </div>
                                             </div>
@@ -295,9 +295,9 @@ export function UsersTab({ searchQuery }: UsersTabProps) {
                                                             <MoreHorizontal className="w-4 h-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48 bg-black/90 border-white/10 backdrop-blur-xl">
+                                                    <DropdownMenuContent align="end" className="w-48 bg-background border-border shadow-xl">
                                                         <DropdownMenuLabel>Manage User</DropdownMenuLabel>
-                                                        <DropdownMenuSeparator className="bg-white/10" />
+                                                        <DropdownMenuSeparator className="border-border/50" />
 
                                                         <DropdownMenuItem onClick={() => handleViewActivity(user._id)} className="cursor-pointer">
                                                             <FileText className="w-4 h-4 mr-2" /> View Logs
@@ -337,7 +337,7 @@ export function UsersTab({ searchQuery }: UsersTabProps) {
 
             {/* Warning Dialog */}
             <Dialog open={isWarningOpen} onOpenChange={setIsWarningOpen}>
-                <DialogContent className="glass-strong border-white/10 text-white sm:max-w-md">
+                <DialogContent className="glass-strong border-border text-foreground sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Send Warning to {selectedUser?.name}</DialogTitle>
                         <DialogDescription>

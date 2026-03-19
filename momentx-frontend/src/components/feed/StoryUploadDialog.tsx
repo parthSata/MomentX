@@ -77,7 +77,7 @@ export function StoryUploadDialog({
 
                             {/* File Info Overlay */}
                             <div className="absolute bottom-4 left-4 right-4 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 flex items-center gap-3 pointer-events-none">
-                                <div className="p-2 rounded-full bg-indigo-500/20 text-indigo-400">
+                                <div className="p-2 rounded-full bg-amber-500/20 text-amber-400">
                                     {file.type.startsWith("video") ? <Film className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
                                 </div>
                                 <div className="flex-1 overflow-hidden">
@@ -99,7 +99,7 @@ export function StoryUploadDialog({
                                     </div>
                                     <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
                                         <motion.div
-                                            className="h-full bg-linear-to-r from-indigo-500 to-pink-500"
+                                            className="h-full bg-linear-to-r from-amber-500 to-emerald-500"
                                             initial={{ width: 0 }}
                                             animate={{ width: `${uploadProgress}%` }}
                                             transition={{ type: "spring", stiffness: 50 }}
@@ -111,7 +111,7 @@ export function StoryUploadDialog({
                             <button
                                 onClick={onConfirm}
                                 disabled={isUploading}
-                                className="w-full py-3 rounded-xl bg-linear-to-r from-indigo-500 to-pink-500 text-white font-semibold shadow-lg shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full py-3 rounded-xl bg-linear-to-r from-amber-500 to-emerald-500 text-black font-semibold shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isUploading ? (
                                     <>

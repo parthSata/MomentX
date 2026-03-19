@@ -75,8 +75,8 @@ export default function ResetPasswordPage() {
     return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
             <div className="absolute inset-0 bg-background">
-                <div className="absolute top-1/3 right-1/3 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute bottom-1/3 left-1/3 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+                <div className="absolute top-1/3 right-1/3 w-96 h-96 bg-amber-500/20 rounded-full blur-3xl animate-pulse" />
+                <div className="absolute bottom-1/3 left-1/3 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
             </div>
 
             <motion.div
@@ -106,7 +106,7 @@ export default function ResetPasswordPage() {
                                         value={digit}
                                         onChange={(e) => handleOtpChange(index, e.target.value)}
                                         onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                                        className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold rounded-xl bg-zinc-800/50 border-2 border-zinc-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all text-white"
+                                        className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold rounded-xl bg-zinc-800/50 border-2 border-zinc-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-white"
                                     />
                                 ))}
                             </div>
@@ -132,7 +132,7 @@ export default function ResetPasswordPage() {
 
                             <Button
                                 type="submit"
-                                className="w-full bg-linear-to-r from-indigo-600 to-pink-600 hover:from-indigo-700 hover:to-pink-700 text-white font-semibold py-6 rounded-xl"
+                                className="w-full bg-linear-to-r from-amber-500 to-emerald-500 hover:from-amber-600 hover:to-emerald-600 text-black font-semibold py-6 rounded-xl"
                                 disabled={isLoading || otp.some((d) => !d) || !newPassword}
                             >
                                 {isLoading ? (

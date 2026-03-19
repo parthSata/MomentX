@@ -131,7 +131,7 @@ export default function GroupAdminPanel({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 w-[85%] max-w-sm z-50 glass-strong flex flex-col"
+            className="fixed right-0 top-0 bottom-0 w-[85%] max-w-sm z-50 glass-strong flex flex-col border-l border-border/50 shadow-2xl"
           >
             {/* Hidden file input */}
             <input
@@ -176,7 +176,7 @@ export default function GroupAdminPanel({
                     <motion.button
                       whileTap={{ scale: 0.9 }}
                       onClick={() => fileInputRef.current?.click()}
-                      className="absolute -bottom-1 -right-1 p-2.5 bg-gradient-primary rounded-full ring-3 ring-background shadow-lg"
+                      className="absolute -bottom-1 -right-1 p-2.5 bg-gradient-primary rounded-full ring-3 ring-background shadow-lg text-primary-foreground"
                     >
                       <Camera className="w-4 h-4 text-primary-foreground" />
                     </motion.button>
@@ -453,10 +453,9 @@ export default function GroupAdminPanel({
             {/* Settings Tab */}
             {activeTab === "settings" && (
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                <div className="space-y-4">
                   <div>
                     <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Group Identity</h4>
-                    <div className="glass-strong p-4 rounded-2xl border border-white/5 space-y-4">
+                    <div className="glass-strong p-4 rounded-2xl border border-border/50 space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Group Photo</span>
                         <button 
@@ -480,7 +479,7 @@ export default function GroupAdminPanel({
 
                   <div>
                     <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Permissions</h4>
-                    <div className="glass-strong p-4 rounded-2xl border border-white/5 space-y-4">
+                    <div className="glass-strong p-4 rounded-2xl border border-border/50 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
                           <p className="text-sm font-medium">Only Admins can Edit</p>
@@ -490,7 +489,6 @@ export default function GroupAdminPanel({
                       </div>
                     </div>
                   </div>
-                </div>
               </div>
             )}
 

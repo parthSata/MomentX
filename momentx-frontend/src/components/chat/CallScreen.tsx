@@ -162,7 +162,7 @@ export function CallScreen({
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 className="fixed bottom-24 right-4 z-50 group"
             >
-                <div className="relative p-1 rounded-2xl bg-gradient-to-tr from-primary via-purple-500 to-pink-500 animate-gradient-xy">
+                <div className="relative p-1 rounded-2xl bg-gradient-to-tr from-amber-500 via-amber-400 to-emerald-400 animate-gradient-xy">
                     <motion.div
                         onClick={() => setIsMinimized(false)}
                         className="bg-[#1a1a1a] backdrop-blur-xl p-3 rounded-2xl shadow-2xl cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-3 pr-5"
@@ -201,7 +201,7 @@ export function CallScreen({
                 {/* Background Decoration */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
                     <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/20 blur-[120px] rounded-full animate-blob" />
-                    <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 blur-[120px] rounded-full animate-blob animation-delay-2000" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/20 blur-[120px] rounded-full animate-blob animation-delay-2000" />
                 </div>
 
                 {/* VIDEO DISPLAY AREA */}

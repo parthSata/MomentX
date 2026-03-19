@@ -72,12 +72,20 @@ export default function HomePage() {
     }
   };
 
+  // Filter out own story — viewer only shows other people's stories
+  const viewerStories = stories.filter((s) => {
+    const sUserId = typeof s.user === 'object' ? (s.user as any)._id?.toString() : s.user?.toString();
+    return sUserId !== currentUser?._id?.toString();
+  });
+
   const handleStoryClick = (storyId: string) => {
-    const index = stories.findIndex((s) => s._id === storyId);
+    // Only open viewer for other people's stories
+    const index = viewerStories.findIndex((s) => s._id === storyId);
     if (index !== -1) {
       setSelectedStoryIndex(index);
       setStoryViewerOpen(true);
     }
+    // If it's the user's own story, do nothing (StoriesBar handles upload)
   };
 
   const observer = useRef<IntersectionObserver | null>(null);
@@ -179,7 +187,7 @@ export default function HomePage() {
                   animate={{ opacity: 1 }}
                   className="flex flex-col items-center justify-center py-16 px-8 text-center glass rounded-3xl mx-4 border border-white/10"
                 >
-                  <div className="w-20 h-20 bg-linear-to-tr from-indigo-500/10 to-pink-500/10 rounded-full flex items-center justify-center mb-6">
+                  <div className="w-20 h-20 bg-linear-to-tr from-amber-500/10 to-emerald-500/10 rounded-full flex items-center justify-center mb-6">
                     <UserPlus className="w-10 h-10 text-muted-foreground" />
                   </div>
                   <h3 className="text-xl font-bold mb-3 font-display">Feed is Quiet</h3>
@@ -220,7 +228,7 @@ export default function HomePage() {
           isOpen={storyViewerOpen}
           onClose={() => setStoryViewerOpen(false)}
           initialIndex={selectedStoryIndex}
-          stories={stories}
+          stories={viewerStories}
           onViewStory={markAsViewed}
           onDeleteStory={deleteStory}
           onReplyStory={async (id, msg) => {

@@ -159,7 +159,7 @@ export default function FollowersPage() {
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${activeTab === tab
-                ? "bg-linear-to-r from-indigo-500 to-purple-600 text-white"
+                ? "bg-linear-to-r from-amber-500 to-emerald-500 text-black"
                 : "glass hover:bg-white/10"
                 }`}
             >
@@ -257,7 +257,7 @@ export default function FollowersPage() {
                         }}
                         className={`px-4 py-2 rounded-full text-sm font-medium transition-all ml-2 shrink-0 ${isFollowing
                           ? "bg-secondary text-foreground border border-border"
-                          : "bg-linear-to-r from-indigo-500 to-purple-600 text-white"
+                          : "bg-linear-to-r from-amber-500 to-emerald-500 text-black"
                           }`}
                       >
                         <span className="flex items-center gap-1">

@@ -17,6 +17,7 @@ import { useChat } from "@/hooks/useChat";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/axios";
 import { decryptMessage, encryptMessage } from "@/lib/cryptoUtils";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 interface GroupMember {
     id: string;
@@ -31,6 +32,7 @@ export default function GroupChatPage() {
     const navigate = useNavigate();
     const { id: chatId } = useParams();
     const { user: currentUser } = useAuth();
+    const { theme } = useTheme();
 
     const { messages, sendMessage: sendSocketMessage, fetchMessages, socket } = useChat(chatId);
 
@@ -335,7 +337,7 @@ export default function GroupChatPage() {
     const memberWithRole = (senderId: string) => members.find(m => m.id === senderId);
 
     return (
-        <div className="h-full flex flex-col bg-background dark:bg-[#0b141a] relative overflow-hidden w-full">
+        <div className="h-full flex flex-col bg-background relative overflow-hidden w-full">
             <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -389,7 +391,7 @@ export default function GroupChatPage() {
                                     initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                    className="absolute right-0 mt-2 w-48 glass-strong rounded-2xl shadow-xl border border-white/10 p-1.5 z-50 overflow-hidden"
+                                    className="absolute right-0 mt-2 w-48 glass-strong rounded-2xl shadow-xl border border-border/50 p-1.5 z-50 overflow-hidden"
                                 >
                                     <button 
                                         onClick={() => { setPanelTab("settings"); setShowPanel(true); setShowMenu(false); }}
@@ -485,10 +487,9 @@ export default function GroupChatPage() {
                                                   relative
                                                   ${msg.sharedPost
                                                         ? "p-0 bg-transparent shadow-none border-none"
-                                                        : `p-3 rounded-2xl ${isMe
-                                                            ? "bg-gradient-primary text-primary-foreground rounded-br-md"
-                                                            : "glass rounded-bl-md"
-                                                        }`
+                                                : `p-3 rounded-2xl shadow-sm ${isMe
+                                                            ? "bg-linear-to-r from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-500 text-gray-900 border border-amber-400/20 rounded-br-none font-medium"
+                                                            : "bg-secondary/10 dark:bg-muted/80 text-foreground border border-border/50 rounded-bl-none"}`
                                                     }
                                                 `}
                                             >
@@ -617,7 +618,7 @@ export default function GroupChatPage() {
                         initial={{ y: 100 }}
                         animate={{ y: 0 }}
                         exit={{ y: 100 }}
-                        className="fixed bottom-0 inset-x-0 glass-strong p-4 flex items-center justify-between z-50 border-t border-white/10"
+                        className="fixed bottom-0 inset-x-0 glass-strong p-4 flex items-center justify-between z-50 border-t border-border/50"
                     >
                         <div className="flex items-center gap-4">
                             <button 
@@ -665,7 +666,7 @@ export default function GroupChatPage() {
                         >
                             <EmojiPicker
                                 onEmojiClick={onEmojiClick}
-                                theme={Theme.DARK}
+                                theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
                                 searchDisabled
                                 width="100%"
                                 height={350}

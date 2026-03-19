@@ -251,7 +251,14 @@ export default function ChatListPage() {
               <div className="p-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
-                  <Input autoFocus placeholder="Search people..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 bg-white/5 border-white/10 focus:border-primary/50" />
+                  <Input 
+                    autoFocus 
+                    placeholder="Search people..." 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    className="pl-9 h-11"
+                    variant="glass"
+                  />
                 </div>
               </div>
 
@@ -260,12 +267,16 @@ export default function ChatListPage() {
                   <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
                 ) : (Array.isArray(searchResults) && searchResults.length > 0) ? (
                   searchResults.map((user) => (
-                    <div key={user._id} onClick={() => handleStartChat(user._id)} className="flex items-center gap-3 p-3 hover:bg-white/10 rounded-xl cursor-pointer transition-colors group">
+                    <div 
+                      key={user._id} 
+                      onClick={() => handleStartChat(user._id)} 
+                      className="flex items-center gap-3 p-3 hover:bg-muted/80 rounded-2xl cursor-pointer transition-all active:scale-[0.98] border border-transparent hover:border-border/30 group"
+                    >
                       <AvatarRing src={user.profilePic} isOnline={user.isOnline} size="md" />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm text-white">{user.name || user.username}</h4>
-                        <p className="text-xs text-muted-foreground">@{user.username}</p>
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-sm text-foreground truncate">{user.name || user.username}</h4>
+                      <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
+                    </div>
                       <MessageCircle className="w-5 h-5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   ))
@@ -299,7 +310,7 @@ export default function ChatListPage() {
             >
               <ArrowLeft className="w-5 h-5" />
             </motion.button>
-            <h1 className="text-2xl font-display font-bold bg-linear-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">Messages</h1>
+            <h1 className="text-2xl font-display font-bold bg-linear-to-r from-amber-400 to-emerald-400 bg-clip-text text-transparent">Messages</h1>
           </div>
           <div className="flex gap-2">
             {/* ✅ NEW: CREATE GROUP BUTTON */}

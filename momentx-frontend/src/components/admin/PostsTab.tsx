@@ -138,13 +138,13 @@ export function PostsTab({ searchQuery }: PostsTabProps) {
                             <div className="flex bg-white/5 p-1 rounded-lg">
                                 <button
                                     onClick={() => { setActiveTab("posts"); setPage(1); }}
-                                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === "posts" ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-white"}`}
+                                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === "posts" ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:bg-muted"}`}
                                 >
                                     <ImageIcon className="w-4 h-4" /> Posts
                                 </button>
                                 <button
                                     onClick={() => { setActiveTab("reels"); setPage(1); }}
-                                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === "reels" ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-white"}`}
+                                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === "reels" ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:bg-muted"}`}
                                 >
                                     <Video className="w-4 h-4" /> Reels
                                 </button>
@@ -165,7 +165,7 @@ export function PostsTab({ searchQuery }: PostsTabProps) {
                     <div className="overflow-x-auto min-h-100">
                         <table className="w-full">
                             <thead>
-                                <tr className="border-b border-border/50 bg-white/5">
+                                <tr className="border-b border-border/50 bg-muted/30">
                                     <th className="text-left p-4 font-medium pl-6">Content</th>
                                     <th className="text-left p-4 font-medium hidden md:table-cell">Author</th>
                                     <th className="text-left p-4 font-medium hidden sm:table-cell">Stats</th>
@@ -186,7 +186,7 @@ export function PostsTab({ searchQuery }: PostsTabProps) {
                                                 initial={{ opacity: 0, x: -10 }}
                                                 animate={{ opacity: 1, x: 0 }}
                                                 transition={{ delay: index * 0.05 }}
-                                                className="border-b border-border/50 hover:bg-white/5 transition-colors group"
+                                                className="border-b border-border/50 hover:bg-muted/30 transition-colors group"
                                             >
                                                 <td className="p-4 pl-6">
                                                     <div className="flex items-center gap-3">
@@ -200,7 +200,7 @@ export function PostsTab({ searchQuery }: PostsTabProps) {
                                                             )}
                                                         </div>
                                                         <div className="min-w-0 max-w-50">
-                                                            <p className="font-medium truncate text-white">{post.caption || "No Caption"}</p>
+                                                            <p className="font-medium truncate text-foreground">{post.caption || "No Caption"}</p>
                                                             <p className="text-xs text-muted-foreground mt-1">
                                                                 {new Date(post.createdAt).toLocaleDateString()}
                                                             </p>
@@ -212,7 +212,7 @@ export function PostsTab({ searchQuery }: PostsTabProps) {
                                                     <div className="flex items-center gap-2">
                                                         <AvatarRing src={post.user?.profilePic} size="sm" />
                                                         <div>
-                                                            <p className="font-medium text-sm text-white">{post.user?.name}</p>
+                                                            <p className="font-medium text-sm text-foreground">{post.user?.name}</p>
                                                             <p className="text-xs text-muted-foreground">@{post.user?.username}</p>
                                                         </div>
                                                     </div>

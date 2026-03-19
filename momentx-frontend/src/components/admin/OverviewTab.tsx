@@ -106,7 +106,7 @@ export function OverviewTab() {
                         <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-all" />
 
                         <div className="flex justify-between items-start mb-4 relative z-10">
-                            <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-primary">
+                            <div className="p-3 bg-muted rounded-xl border border-border text-primary">
                                 <stat.icon className="w-5 h-5" />
                             </div>
                             <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full border ${stat.trend === "up"
@@ -118,7 +118,7 @@ export function OverviewTab() {
                             </span>
                         </div>
                         <div className="relative z-10">
-                            <h3 className="text-3xl font-bold tracking-tight text-white">{stat.value}</h3>
+                            <h3 className="text-3xl font-bold tracking-tight text-foreground">{stat.value}</h3>
                             <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
                         </div>
                     </motion.div>
@@ -135,7 +135,7 @@ export function OverviewTab() {
                 {/* Chart Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                     <div>
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
                             <TrendingUp className="w-5 h-5 text-primary" />
                             Activity Overview
                         </h3>

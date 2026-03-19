@@ -160,7 +160,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
     const shareOptions = [
         { icon: LinkIcon, label: "Copy link", color: "bg-white/10", action: handleCopyLink },
         { icon: FacebookIcon, label: "Facebook", color: "bg-blue-600", action: () => { } },
-        { icon: MessengerIcon, label: "Messenger", color: "bg-gradient-to-br from-purple-500 to-pink-500", action: () => { } },
+        { icon: MessengerIcon, label: "Messenger", color: "bg-gradient-to-br from-amber-500 to-teal-500", action: () => { } },
         { icon: WhatsAppIcon, label: "WhatsApp", color: "bg-green-500", action: () => { } },
         { icon: MailIcon, label: "Email", color: "bg-white/10", action: () => { } },
         { icon: ThreadsIcon, label: "Threads", color: "bg-white/10", action: () => { } },

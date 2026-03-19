@@ -135,11 +135,9 @@ export function StoriesBar({
           whileTap={{ scale: 0.95 }}
         >
           <div className="relative" onClick={() => {
-            if (myStory) {
-              onStoryClick(myStory._id);
-            } else {
-              triggerUpload();
-            }
+            // Always trigger upload when clicking own story avatar
+            // (own story is excluded from viewer; + badge is for adding more)
+            triggerUpload();
           }}>
             <AvatarRing
               src={myStory ? (myStory.type === 'image' ? myStory.url : getUserAvatar(currentUser)) : getUserAvatar(currentUser)}

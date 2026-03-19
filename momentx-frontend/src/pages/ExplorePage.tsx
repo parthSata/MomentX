@@ -80,12 +80,11 @@ export default function ExplorePage() {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative group"
+            className="relative group pr-2"
           >
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors z-10" />
-            {/* ✅ Fix: Removed 'glass' which might be dark-only, used 'bg-secondary/30' for adaptable bg */}
-            <div className="w-full h-14 pl-12 pr-6 bg-secondary/30 rounded-2xl flex items-center text-muted-foreground shadow-sm hover:shadow-md hover:border-primary/50 transition-all border border-border/50">
-              Search users, hashtags...
+            <div className="w-full h-14 pl-12 pr-6 bg-muted/50 backdrop-blur-sm rounded-2xl flex items-center text-muted-foreground shadow-sm group-hover:shadow-md group-hover:border-primary/30 transition-all border border-border/50">
+              Search users, hashtags, or trends...
             </div>
           </motion.div>
         </Link>
@@ -98,7 +97,7 @@ export default function ExplorePage() {
               <TrendingUp className="w-5 h-5 text-primary" />
               <h3 className="font-bold text-lg text-foreground">Trending Now</h3>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2.5">
               {trendingHashtags.map((hashtag, index) => (
                 <motion.button
                   key={hashtag.tag}
@@ -106,11 +105,11 @@ export default function ExplorePage() {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.05 }}
                   whileHover={{ scale: 1.05 }}
-                  // ✅ Fix: Replaced hardcoded white styles with theme vars (bg-card, text-foreground)
-                  className="px-4 py-2 rounded-full bg-card hover:bg-secondary border border-border text-sm font-medium transition-all flex items-center gap-2 text-foreground shadow-sm"
+                  className="px-4 py-2 rounded-xl bg-muted/40 hover:bg-primary/10 border border-border/50 text-sm font-medium transition-all flex items-center gap-2 text-foreground active:scale-95 shadow-xs"
                 >
-                  <span className="text-muted-foreground">{hashtag.tag}</span>
-                  <span className="text-xs opacity-80 bg-secondary px-1.5 py-0.5 rounded-md text-foreground">
+                  <span className="text-primary font-bold">#</span>
+                  <span>{hashtag.tag}</span>
+                  <span className="text-[10px] opacity-60 bg-muted px-1.5 py-0.5 rounded-lg font-bold">
                     {formatNumber(hashtag.posts)}
                   </span>
                 </motion.button>
@@ -129,16 +128,14 @@ export default function ExplorePage() {
                 <Link to={`/u/${user.username}`} key={user._id}>
                   <motion.div
                     whileHover={{ y: -5 }}
-                    // ✅ Fix: Replaced bg-white/5 with bg-card
-                    className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-card hover:bg-secondary/50 hover:border-primary/20 transition-all shrink-0 w-36 shadow-sm border border-border"
+                    className="flex flex-col items-center gap-3 p-4 rounded-3xl bg-muted/30 hover:bg-muted/50 border border-border/50 hover:border-primary/30 transition-all shrink-0 w-36 shadow-sm"
                   >
-                    <AvatarRing src={user.avatar} alt={user.username} size="lg" className="shadow-md" />
+                    <AvatarRing src={user.avatar} alt={user.username} size="lg" className="shadow-amber-500/10" />
                     <div className="text-center w-full">
-                      {/* ✅ Fix: text-white -> text-foreground */}
                       <p className="font-bold text-sm truncate text-foreground">{user.displayName || user.username}</p>
-                      <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
+                      <p className="text-[10px] text-muted-foreground truncate font-medium">@{user.username}</p>
                     </div>
-                    <div className="text-[12px] font-medium px-2 py-1 bg-secondary rounded-md text-muted-foreground">
+                    <div className="text-[10px] font-bold px-2 py-1 bg-primary/10 text-primary rounded-lg uppercase tracking-tight">
                       {formatNumber(user.followers)} Followers
                     </div>
                   </motion.div>

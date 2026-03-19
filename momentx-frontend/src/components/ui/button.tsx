@@ -9,16 +9,16 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-neon",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-border bg-transparent hover:bg-muted hover:text-foreground",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-neon transform active:scale-95",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors",
+        outline: "border border-border bg-transparent hover:bg-muted hover:text-foreground active:bg-muted/50",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-muted hover:text-foreground",
+        ghost: "hover:bg-muted hover:text-foreground transition-colors",
         link: "text-primary underline-offset-4 hover:underline",
-        gradient: "bg-gradient-to-r from-neon-indigo via-neon-violet to-neon-pink text-primary-foreground hover:shadow-neon hover:scale-105 active:scale-95",
-        glass: "bg-card/80 backdrop-blur-xl border border-border/50 hover:bg-card/90 text-foreground",
-        glow: "bg-primary text-primary-foreground shadow-neon hover:shadow-[0_0_30px_hsl(244_100%_69%_/_0.5)] hover:scale-105 active:scale-95",
-        neon: "bg-transparent border-2 border-primary text-primary hover:bg-primary/10 hover:shadow-neon",
+        gradient: "bg-gradient-primary text-white hover:shadow-neon hover:scale-105 active:scale-95",
+        glass: "glass hover:bg-card/90 text-foreground transition-all",
+        glow: "bg-primary text-primary-foreground shadow-neon hover:scale-105 active:scale-95 border border-primary/20",
+        neon: "bg-transparent border-2 border-primary text-primary hover:bg-primary/10 hover:shadow-neon transition-all",
       },
       size: {
         default: "h-10 px-4 py-2",

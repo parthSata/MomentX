@@ -75,13 +75,13 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-600 rounded-full blur-[120px] mix-blend-screen pointer-events-none"
+                className="absolute top-1/4 left-1/4 w-72 h-72 bg-amber-500 rounded-full blur-[120px] mix-blend-screen pointer-events-none"
             />
             <motion.div
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.4, 0.2] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600 rounded-full blur-[150px] mix-blend-screen pointer-events-none"
+                className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-700 rounded-full blur-[150px] mix-blend-screen pointer-events-none"
             />
 
             {/* Main Content Wrapper (Centered vertically) */}
@@ -101,8 +101,8 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                         initial={{ rotate: -90, scale: 0 }}
                         animate={{ rotate: 0, scale: 1 }}
                         transition={{ delay: 0.4, type: "spring", stiffness: 200, damping: 10 }}
-                        // Fix (Canonical class suggestions): change bg-gradient-to-br to bg-linear-to-br (v4)
-                        className="text-transparent bg-clip-text bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 drop-shadow-[0_0_20px_rgba(168,85,247,0.5)]"
+                        // Theme: amber-gold to emerald accent on the X letter
+                        className="text-transparent bg-clip-text bg-linear-to-br from-amber-400 via-amber-300 to-emerald-400 drop-shadow-[0_0_20px_rgba(245,158,11,0.5)]"
                     >
                         X
                     </motion.span>
@@ -135,15 +135,15 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 1.6 }}
-                    // Fix (Canonical class suggestions): change bg-linear-to-r suggestion
-                    className="h-px w-20 bg-linear-to-r from-blue-500/0 via-white/30 to-blue-500/0 mb-3"
+                    // Theme: amber accent divider line
+                    className="h-px w-20 bg-linear-to-r from-amber-500/0 via-amber-400/40 to-amber-500/0 mb-3"
                 />
                 <div className="text-gray-500 text-xs font-mono flex items-center gap-1.5">
                     <span>Developed By</span>
                     <motion.span
-                        // Fix (Canonical class suggestions): change bg-linear-to-r suggestion
-                        className="font-bold relative text-transparent bg-clip-text bg-linear-to-r from-cyan-400 via-white to-purple-400"
-                        style={{ filter: "drop-shadow(0 0 8px rgba(34, 211, 238, 0.5))" }}
+                        // Theme: amber-gold credit text
+                        className="font-bold relative text-transparent bg-clip-text bg-linear-to-r from-amber-400 via-white to-emerald-400"
+                        style={{ filter: "drop-shadow(0 0 8px rgba(245, 158, 11, 0.5))" }}
                     >
                         {staggeredText("Parth Sata")}
                     </motion.span>

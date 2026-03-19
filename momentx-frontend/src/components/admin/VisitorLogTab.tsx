@@ -61,7 +61,7 @@ export function VisitorLogTab() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center glass-strong p-4 rounded-2xl">
                 <div>
-                    <h3 className="font-semibold text-lg flex items-center gap-2 text-white">
+                    <h3 className="font-semibold text-lg flex items-center gap-2 text-foreground">
                         <Activity className="w-5 h-5 text-primary" /> Visitor Activity Log
                     </h3>
                     <p className="text-sm text-muted-foreground">{totalLogs} total visits tracked</p>
@@ -70,15 +70,15 @@ export function VisitorLogTab() {
                     <button 
                         onClick={() => setPage(p => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="p-2 rounded-lg bg-white/5 disabled:opacity-30 hover:bg-white/10 text-white"
+                        className="p-2 rounded-lg bg-muted disabled:opacity-30 hover:bg-muted/80 text-foreground"
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <span className="text-sm font-medium text-white">Page {page} of {totalPages}</span>
+                    <span className="text-sm font-medium text-foreground">Page {page} of {totalPages}</span>
                     <button 
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                         disabled={page === totalPages}
-                        className="p-2 rounded-lg bg-white/5 disabled:opacity-30 hover:bg-white/10 text-white"
+                        className="p-2 rounded-lg bg-muted disabled:opacity-30 hover:bg-muted/80 text-foreground"
                     >
                         <ChevronRight className="w-5 h-5" />
                     </button>
@@ -109,7 +109,7 @@ export function VisitorLogTab() {
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         transition={{ delay: index * 0.02 }}
-                                        className="hover:bg-white/[0.02] transition-colors"
+                                        className="hover:bg-muted/20 transition-colors"
                                     >
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
@@ -121,13 +121,13 @@ export function VisitorLogTab() {
                                                     </div>
                                                 )}
                                                 <div>
-                                                    <div className="font-medium text-white">{log.user?.name || "Anonymous / Deleted"}</div>
+                                                    <div className="font-medium text-foreground">{log.user?.name || "Anonymous / Deleted"}</div>
                                                     <div className="text-[10px] text-muted-foreground">@{log.user?.username || "unknown"}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <div className="flex items-center gap-2 text-white">
+                                            <div className="flex items-center gap-2 text-foreground">
                                                 {getDeviceIcon(log.device)}
                                                 <span className="capitalize">{log.device}</span>
                                             </div>
@@ -141,7 +141,7 @@ export function VisitorLogTab() {
                                             </code>
                                         </td>
                                         <td className="p-4 whitespace-nowrap">
-                                            <div className="flex items-center gap-1.5 text-white">
+                                            <div className="flex items-center gap-1.5 text-foreground">
                                                 <Clock className="w-3 h-3 text-muted-foreground" />
                                                 {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </div>

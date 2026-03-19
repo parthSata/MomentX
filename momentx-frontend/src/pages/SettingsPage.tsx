@@ -20,16 +20,16 @@ const settingsSections = [
   {
     title: "Account",
     items: [
-      { id: "profile", label: "Edit Profile", icon: User, description: "Update your personal information", color: "from-blue-500 to-cyan-500" },
-      { id: "saved", label: "Saved Content", icon: Bookmark, description: "View your saved posts and reels", color: "from-purple-500 to-indigo-500" },
-      { id: "privacy", label: "Privacy", icon: Lock, description: "Control who can see your content", color: "from-emerald-500 to-teal-500" },
+      { id: "profile", label: "Edit Profile", icon: User, description: "Update your personal information", color: "from-amber-500 to-yellow-400" },
+      { id: "saved", label: "Saved Content", icon: Bookmark, description: "View your saved posts and reels", color: "from-emerald-500 to-teal-500" },
+      { id: "privacy", label: "Privacy", icon: Lock, description: "Control who can see your content", color: "from-green-500 to-emerald-600" },
       { id: "security", label: "Security", icon: Shield, description: "Password and two-factor authentication", color: "from-orange-500 to-red-500" },
     ],
   },
   {
     title: "Preferences",
     items: [
-      { id: "appearance", label: "Appearance", icon: Palette, description: "Theme and display settings", color: "from-pink-500 to-rose-500" },
+      { id: "appearance", label: "Appearance", icon: Palette, description: "Theme and display settings", color: "from-amber-400 to-orange-500" },
     ],
   }
 ];
