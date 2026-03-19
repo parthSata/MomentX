@@ -5,6 +5,7 @@ import {
     Users, Crown, Check, CheckCheck,
     X, Play, Music, Settings
 } from "lucide-react";
+import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,11 @@ export default function GroupChatPage() {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
     const [showMenu, setShowMenu] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+    const onEmojiClick = (emojiData: EmojiClickData) => {
+        setMessageText((prev) => prev + emojiData.emoji);
+    };
 
     // Media Upload & Recording States
     const [selectedMedia, setSelectedMedia] = useState<{
@@ -329,14 +335,14 @@ export default function GroupChatPage() {
     const memberWithRole = (senderId: string) => members.find(m => m.id === senderId);
 
     return (
-        <div className="h-screen flex flex-col bg-background">
+        <div className="h-full flex flex-col bg-background dark:bg-[#0b141a] relative overflow-hidden w-full">
             <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 className="glass-strong p-4 flex items-center justify-between z-40"
             >
                 <div className="flex items-center gap-3">
-                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate("/chat")} className="p-2 glass rounded-full">
+                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => navigate("/chat")} className="p-2 glass rounded-full md:hidden">
                         <ArrowLeft className="w-5 h-5" />
                     </motion.button>
                     <motion.div
@@ -394,10 +400,17 @@ export default function GroupChatPage() {
                                     </button>
                                     <button 
                                         onClick={() => { setIsSelectionMode(true); setShowMenu(false); }}
-                                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 rounded-xl transition-colors flex items-center gap-2"
+                                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/10 rounded-xl transition-colors flex items-center gap-2 border-b border-border/50"
                                     >
                                         <Check className="w-4 h-4 text-primary" />
                                         Select Messages
+                                    </button>
+                                    <button 
+                                        onClick={() => { setShowMenu(false); navigate("/chat"); }}
+                                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-red-500/10 text-red-500 rounded-xl transition-colors flex items-center gap-2 border-b border-border/50"
+                                    >
+                                        <X className="w-4 h-4" />
+                                        Close chat
                                     </button>
                                     <button 
                                         onClick={handleClearChat}
@@ -415,7 +428,7 @@ export default function GroupChatPage() {
 
             <div
                 className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide"
-                onClick={() => { }} // Placeholder for emoji picker close if added
+                onClick={() => setShowEmojiPicker(false)}
             >
                 <AnimatePresence>
                     {messages.map((msg: any, index: number) => {
@@ -632,13 +645,34 @@ export default function GroupChatPage() {
             </AnimatePresence>
 
             {/* Input Component */}
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass-strong p-4">
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass-strong p-4 relative">
                 <input
                     type="file"
                     ref={fileInputRef}
                     className="hidden"
                     onChange={handleFileSelect}
                 />
+
+                {/* Emoji Picker */}
+                <AnimatePresence>
+                    {showEmojiPicker && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 20 }}
+                            className="absolute bottom-full left-0 right-0 sm:left-auto sm:right-4 mb-2 z-50"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <EmojiPicker
+                                onEmojiClick={onEmojiClick}
+                                theme={Theme.DARK}
+                                searchDisabled
+                                width="100%"
+                                height={350}
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 <div className="flex items-center gap-2">
                     {!isRecording && (
@@ -674,7 +708,10 @@ export default function GroupChatPage() {
                                     className="pr-20 h-10"
                                 />
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                    <button className="p-1.5 hover:bg-muted rounded-full transition-colors hidden lg:block">
+                                    <button
+                                        className="p-1.5 hover:bg-muted rounded-full transition-colors"
+                                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    >
                                         <Smile className="w-5 h-5 text-muted-foreground" />
                                     </button>
                                     <button

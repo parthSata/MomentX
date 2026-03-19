@@ -13,8 +13,9 @@ import SignupPage from "@/pages/auth/SignupPage";
 import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
 import AdminLoginPage from "@/pages/auth/AdminLoginPage";
 import NotFound from "@/pages/NotFound";
-import ChatListPage from "@/pages/ChatListPage";
 import ChatPage from "@/pages/ChatPage";
+import ChatLayout from "@/components/chat/layout/ChatLayout";
+import ChatEmptyState from "@/components/chat/layout/ChatEmptyState";
 import ReelsPage from "@/pages/ReelsPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import SearchPage from "@/pages/SearchPage";
@@ -75,7 +76,7 @@ export function AnimatedRoutes() {
 
       <div className={showSplash ? "hidden" : "block"}>
         <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
+          <Routes location={location} key={location.pathname.startsWith('/chat') || location.pathname.startsWith('/group-chat') ? 'chat-area' : location.pathname}>
             <Route
               path="/"
               element={
@@ -101,11 +102,13 @@ export function AnimatedRoutes() {
               element={
                 <ProtectedRoute>
                   <PageTransition>
-                    <GroupChatPage />
+                    <ChatLayout />
                   </PageTransition>
                 </ProtectedRoute>
               }
-            />
+            >
+              <Route index element={<GroupChatPage />} />
+            </Route>
 
             <Route
               path="/explore"
@@ -213,21 +216,14 @@ export function AnimatedRoutes() {
               element={
                 <ProtectedRoute>
                   <PageTransition>
-                    <ChatListPage />
+                    <ChatLayout />
                   </PageTransition>
                 </ProtectedRoute>
               }
-            />
-            <Route
-              path="/chat/:id"
-              element={
-                <ProtectedRoute>
-                  <PageTransition>
-                    <ChatPage />
-                  </PageTransition>
-                </ProtectedRoute>
-              }
-            />
+            >
+              <Route index element={<ChatEmptyState />} />
+              <Route path=":id" element={<ChatPage />} />
+            </Route>
             <Route
               path="/reels"
               element={

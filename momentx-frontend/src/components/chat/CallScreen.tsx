@@ -325,72 +325,75 @@ export function CallScreen({
                 </div>
 
                 {/* BOTTOM ACTION BAR */}
-                <div className="h-40 bg-gradient-to-t from-black via-black/90 to-transparent flex items-center justify-center px-6">
+                <div className="absolute bottom-0 left-0 right-0 pb-8 pt-16 bg-gradient-to-t from-black/70 via-black/30 to-transparent flex items-end justify-center px-6">
                     <motion.div
                         initial={{ y: 50, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
-                        className="glass-strong rounded-[40px] p-5 flex items-center gap-6 sm:gap-10 shadow-3xl border border-white/5"
+                        className="bg-black/40 backdrop-blur-xl rounded-3xl px-6 py-4 flex items-center gap-5 sm:gap-8 shadow-2xl border border-white/10"
                     >
                         {isIncoming && !remoteStream ? (
-                            <div className="flex items-center gap-14 px-8">
-                                <div className="flex flex-col items-center gap-3">
+                            <div className="flex items-center gap-10 px-4">
+                                <div className="flex flex-col items-center gap-2">
                                     <motion.button
                                         whileHover={{ scale: 1.1 }}
                                         whileTap={{ scale: 0.9 }}
                                         onClick={endCall}
-                                        className="p-7 rounded-3xl bg-red-500 shadow-2xl shadow-red-500/40 text-white"
+                                        className="p-4 rounded-2xl bg-red-500 shadow-lg shadow-red-500/40 text-white"
                                     >
-                                        <PhoneOff className="w-9 h-9" />
+                                        <PhoneOff className="w-6 h-6" />
                                     </motion.button>
                                     <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Decline</span>
                                 </div>
 
-                                <div className="flex flex-col items-center gap-3">
+                                <div className="flex flex-col items-center gap-2">
                                     <motion.button
                                         whileHover={{ scale: 1.1 }}
                                         whileTap={{ scale: 0.9 }}
                                         onClick={answerCall}
-                                        className="p-7 rounded-3xl bg-green-500 shadow-2xl shadow-green-500/40 text-white animate-pulse"
+                                        className="p-4 rounded-2xl bg-green-500 shadow-lg shadow-green-500/40 text-white animate-pulse"
                                     >
-                                        <Phone className="w-9 h-9" />
+                                        <Phone className="w-6 h-6" />
                                     </motion.button>
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-green-500">Accept</span>
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="flex flex-col items-center gap-2">
+                                <div className="flex flex-col items-center gap-1.5">
                                     <motion.button
                                         whileHover={{ scale: 1.1 }}
                                         whileTap={{ scale: 0.9 }}
                                         onClick={() => setIsMuted(!isMuted)}
-                                        className={`p-5 rounded-2xl transition-all duration-300 ${isMuted ? "bg-red-500 text-white shadow-xl shadow-red-500/30" : "bg-white/10 hover:bg-white/20"}`}
+                                        className={`p-4 rounded-2xl transition-all duration-300 ${isMuted ? "bg-red-500 text-white shadow-lg shadow-red-500/30" : "bg-white/15 hover:bg-white/25"}`}
                                     >
                                         {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                                     </motion.button>
-                                    <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">{isMuted ? "Muted" : "Mute"}</span>
+                                    <span className="text-[9px] font-bold uppercase tracking-widest opacity-50">{isMuted ? "Muted" : "Mute"}</span>
                                 </div>
 
-                                <motion.button
-                                    whileHover={{ scale: 1.1, rotate: 135 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={endCall}
-                                    className="p-7 rounded-[32px] bg-red-600 shadow-2xl shadow-red-600/50 text-white border border-white/10 group"
-                                >
-                                    <PhoneOff className="w-10 h-10 transition-transform group-hover:scale-90" />
-                                </motion.button>
+                                <div className="flex flex-col items-center gap-1.5">
+                                    <motion.button
+                                        whileHover={{ scale: 1.1 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        onClick={endCall}
+                                        className="p-4 rounded-2xl bg-red-600 shadow-lg shadow-red-600/50 text-white border border-white/10"
+                                    >
+                                        <PhoneOff className="w-6 h-6" />
+                                    </motion.button>
+                                    <span className="text-[9px] font-bold uppercase tracking-widest opacity-50">End</span>
+                                </div>
 
                                 {(callType === "video" || hasRemoteVideo) && (
-                                    <div className="flex flex-col items-center gap-2">
+                                    <div className="flex flex-col items-center gap-1.5">
                                         <motion.button
                                             whileHover={{ scale: 1.1 }}
                                             whileTap={{ scale: 0.9 }}
                                             onClick={() => setIsCameraOff(!isCameraOff)}
-                                            className={`p-5 rounded-2xl transition-all duration-300 ${isCameraOff ? "bg-neutral-700 text-white shadow-xl" : "bg-white/10 hover:bg-white/20"}`}
+                                            className={`p-4 rounded-2xl transition-all duration-300 ${isCameraOff ? "bg-neutral-600 text-white shadow-lg" : "bg-white/15 hover:bg-white/25"}`}
                                         >
                                             {isCameraOff ? <VideoOff className="w-6 h-6" /> : <VideoIcon className="w-6 h-6" />}
                                         </motion.button>
-                                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-40">{isCameraOff ? "Hidden" : "Camera"}</span>
+                                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-50">{isCameraOff ? "Hidden" : "Camera"}</span>
                                     </div>
                                 )}
                             </>

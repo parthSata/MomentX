@@ -10,7 +10,6 @@ import { AvatarRing } from "@/components/ui/avatar-ring";
 import { Input } from "@/components/ui/input";
 import { useChat, type ChatUser } from "@/hooks/useChat";
 import { useAuth } from "@/context/AuthContext";
-import { useSocket } from "@/context/SocketContext";
 import { useCall } from "@/context/CallContext";
 import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 import { api } from "@/lib/axios";
@@ -64,12 +63,11 @@ export default function ChatPage() {
     deleteMessages,
     chats,
     fetchChats,
+    socket
   } = useChat(chatId);
 
-  const socket = useSocket();
   const { initiateCall } = useCall();
 
-  const [localMessages, setLocalMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -99,8 +97,6 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [hasInitializedUser, setHasInitializedUser] = useState(false);
-
   const [chatUser, setChatUser] = useState<ChatUser>(
     state?.user || {
       _id: "",
@@ -111,18 +107,23 @@ export default function ChatPage() {
     }
   );
 
+  // Reset chatUser whenever the chat changes (handles sidebar navigation without unmount)
   useEffect(() => {
-    if (!hasInitializedUser && state?.user) {
+    if (state?.user) {
+      // state.user is passed from the sidebar on every navigation — always up to date
       setChatUser(state.user);
-      setHasInitializedUser(true);
     }
-  }, []);
+  }, [chatId]);
 
+  // Fallback: resolve user from chats list if state.user wasn't provided
   useEffect(() => {
-    if (!chatId || chats.length === 0 || chatUser._id !== "") return;
+    if (!chatId || chats.length === 0) return;
     const found = chats.find((c) => c._id === chatId);
     if (found?.user) {
-      setChatUser(found.user);
+      setChatUser((prev) =>
+        // Only update if the user actually changed (different chat)
+        prev._id === found.user._id ? prev : found.user
+      );
     }
   }, [chats, chatId]);
 
@@ -130,12 +131,11 @@ export default function ChatPage() {
     if (!chatId) return;
     fetchMessages();
     fetchChats();
-    setLocalMessages([]);
   }, [chatId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, localMessages, isTyping, selectedMedia]);
+  }, [messages, isTyping, selectedMedia]);
 
   useEffect(() => {
     const fetchUserStatus = async () => {
@@ -165,33 +165,6 @@ export default function ChatPage() {
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewMessage = (newMessage: any) => {
-      if (!newMessage || newMessage.chatId !== chatId) return;
-
-      const incomingSenderId =
-        typeof newMessage.sender === "string" ? newMessage.sender : newMessage.sender?._id;
-
-      const isMe = String(incomingSenderId) === String(currentUser?._id);
-
-      if (isMe) return;
-
-      const decryptedNewMessage = {
-        ...newMessage,
-        text: newMessage.text ? decryptMessage(newMessage.text) : ""
-      };
-
-      setLocalMessages((prev) => {
-        const exists = prev.some((m) => m._id === decryptedNewMessage._id) || messages.some((m) => m._id === decryptedNewMessage._id);
-        if (exists) return prev;
-
-        // Prevent duplicate spam
-        const isRecentDuplicate = prev.some((m) => m.text === decryptedNewMessage.text && (typeof m.sender === "string" ? m.sender : m.sender?._id) === incomingSenderId && Math.abs(new Date(m.createdAt).getTime() - new Date(decryptedNewMessage.createdAt).getTime()) < 1000);
-        if (isRecentDuplicate) return prev;
-
-        return [...prev, decryptedNewMessage];
-      });
-    };
-
     const handleOnline = (userId: string) => {
       if (String(userId) === String(chatUser._id)) {
         setChatUser((prev) => ({ ...prev, isOnline: true }));
@@ -216,20 +189,18 @@ export default function ChatPage() {
       }
     };
 
-    socket.on("newMessage", handleNewMessage);
     socket.on("user_online", handleOnline);
     socket.on("user_offline", handleOffline);
     socket.on("typing", handleTyping);
     socket.on("stopTyping", handleStopTyping);
 
     return () => {
-      socket.off("newMessage", handleNewMessage);
       socket.off("user_online", handleOnline);
       socket.off("user_offline", handleOffline);
       socket.off("typing", handleTyping);
       socket.off("stopTyping", handleStopTyping);
     };
-  }, [chatId, currentUser?._id, chatUser._id, messages, socket]);
+  }, [chatId, currentUser?._id, chatUser._id, socket]);
 
   const handleInitiateCall = (type: "voice" | "video") => {
     initiateCall(chatUser, type);
@@ -270,27 +241,13 @@ export default function ChatPage() {
     // ✅ ENCRYPT INSTANTLY (1 Argument)
     const encryptedText = encryptMessage(inputText);
 
-    const tempId = `temp-${Date.now()}`;
-    const tempMessage = {
-      _id: tempId,
-      chatId,
-      text: inputText,
-      sender: { _id: currentUser?._id },
-      createdAt: new Date().toISOString(),
-      isOptimistic: true,
-    };
-
-    setLocalMessages((prev) => [...prev, tempMessage]);
     setInputText("");
     setShowEmojiPicker(false);
 
     try {
-      const serverMessage = await sendMessage(chatUser._id, encryptedText, "text");
-      const smoothServerMessage = { ...serverMessage, text: tempMessage.text };
-      setLocalMessages((prev) => prev.map((m) => (m._id === tempId ? smoothServerMessage : m)));
+      await sendMessage(chatUser._id, encryptedText, "text");
     } catch (error) {
       console.error("Failed to send message:", error);
-      setLocalMessages((prev) => prev.filter((m) => m._id !== tempId));
     }
 
     socket?.emit("stopTyping", { chatId, senderId: currentUser?._id });
@@ -429,12 +386,10 @@ export default function ChatPage() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const allMessages = [...messages, ...localMessages]
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-    .filter((msg, index, self) => index === self.findIndex((m) => m._id === msg._id));
+  const allMessages = messages;
 
   return (
-    <div className="h-screen flex flex-col bg-background relative overflow-hidden">
+    <div className="h-full flex flex-col bg-background dark:bg-[#0b141a] relative overflow-hidden w-full">
 
 
       <AnimatePresence>
@@ -585,7 +540,7 @@ export default function ChatPage() {
         ) : (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <motion.button onClick={() => navigate("/chat")} className="p-2 glass rounded-full">
+              <motion.button onClick={() => navigate("/chat")} className="p-2 glass dark:hover:bg-white/5 rounded-full md:hidden transition-colors">
                 <ArrowLeft className="w-5 h-5" />
               </motion.button>
               <AvatarRing src={chatUser.profilePic} isOnline={chatUser.isOnline} size="sm" />
@@ -622,10 +577,20 @@ export default function ChatPage() {
                           setIsSelectionMode(true);
                           setShowMenu(false);
                         }}
-                        className="w-full text-left px-4 py-3 hover:bg-muted flex items-center gap-2 text-sm transition-colors"
+                        className="w-full text-left px-4 py-3 hover:bg-muted flex items-center gap-2 text-sm transition-colors border-b border-border/50"
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         Select Messages
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          navigate("/chat");
+                        }}
+                        className="w-full text-left px-4 py-3 hover:bg-muted flex items-center gap-2 text-sm transition-colors text-red-500"
+                      >
+                        <X className="w-4 h-4" />
+                        Close chat
                       </button>
                     </div>
                   </>

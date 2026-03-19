@@ -19,29 +19,24 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return;
         }
 
-        // Only create if not exists
         if (!socket) {
             const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000', {
                 transports: ['websocket'],
                 withCredentials: true,
                 reconnection: true,
-                reconnectionAttempts: 5
+                reconnectionAttempts: 10,
+                timeout: 20000
             });
 
             newSocket.on('connect', () => {
                 newSocket.emit('join_user_room', user._id);
             });
 
-            newSocket.on('connect_error', (err) => {
-                console.error("[Socket] Connection error:", err.message);
-            });
-
             setSocket(newSocket);
+        } else {
+            // Re-join just in case
+            socket.emit('join_user_room', user._id);
         }
-
-        return () => {
-            // Cleanup logic if needed when user changes
-        };
     }, [user?._id, socket]);
 
     return (
