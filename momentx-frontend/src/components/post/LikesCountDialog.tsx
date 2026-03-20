@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, X, Loader2, User } from "lucide-react";
+import { Heart, X } from "lucide-react";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/axios";
@@ -83,8 +83,8 @@ export function LikesCountDialog({ isOpen, onClose, postId, likesCount }: LikesC
                                     </p>
                                 </div>
                             </div>
-                            <button 
-                                onClick={onClose} 
+                            <button
+                                onClick={onClose}
                                 className="p-3 hover:bg-white/5 rounded-2xl transition-all border border-transparent hover:border-white/10 group"
                             >
                                 <X className="w-6 h-6 text-muted-foreground group-hover:text-white transition-colors" />
@@ -105,8 +105,8 @@ export function LikesCountDialog({ isOpen, onClose, postId, likesCount }: LikesC
                                 </div>
                             ) : (
                                 likedUsers.map((user, i) => (
-                                    <motion.div 
-                                        key={user._id} 
+                                    <motion.div
+                                        key={user._id}
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: i * 0.05 }}
@@ -143,4 +143,4 @@ export function LikesCountDialog({ isOpen, onClose, postId, likesCount }: LikesC
         </AnimatePresence>,
         document.body
     );
-}
+}
