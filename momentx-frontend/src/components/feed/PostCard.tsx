@@ -33,6 +33,8 @@ export function PostCard({ post }: PostCardProps) {
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [viewsCount, setViewsCount] = useState(post.viewsCount || 0)
+  const hasIncrementedView = useRef(false)
 
   // ✅ GLOBAL MUTE LOGIC: Read initial state from localStorage
   const [isMuted, setIsMuted] = useState(() => {
@@ -119,6 +121,28 @@ export function PostCard({ post }: PostCardProps) {
     observer.observe(videoRef.current);
     return () => observer.disconnect();
   }, [hasVideo, isMuted]);
+
+  useEffect(() => {
+    if (hasVideo && isPlaying && !hasIncrementedView.current) {
+      const viewedKey = `viewed_post_${post._id}`;
+      if (sessionStorage.getItem(viewedKey)) {
+        hasIncrementedView.current = true;
+        return;
+      }
+
+      const timer = setTimeout(async () => {
+        try {
+          await api.patch(`/posts/${post._id}/view`);
+          setViewsCount((prev: number) => prev + 1);
+          hasIncrementedView.current = true;
+          sessionStorage.setItem(viewedKey, 'true');
+        } catch (error) {
+          console.error("Failed to increment Post view count", error);
+        }
+      }, 3000); // 3 seconds watch time
+      return () => clearTimeout(timer);
+    }
+  }, [hasVideo, isPlaying, post._id]);
 
   const handleMediaInteract = () => {
     const now = Date.now();
@@ -264,7 +288,13 @@ export function PostCard({ post }: PostCardProps) {
         onDelete={handleDeletePost}
       />
 
-      <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={post._id} likesCount={likes} />
+      <LikesCountDialog
+        isOpen={isLikesOpen}
+        onClose={() => setIsLikesOpen(false)}
+        postId={post._id}
+        likesCount={likes}
+        viewsCount={viewsCount}
+      />
       <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} post={post} />
     </>
   )

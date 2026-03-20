@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Heart, MoreHorizontal, Smile, Trash2 } from "lucide-react"
+import { X, Heart, MoreHorizontal, Smile, Trash2, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Post, Comment } from "@/types"
 import { AvatarRing } from "@/components/ui/avatar-ring"
@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { api } from "@/lib/axios"
 import EmojiPicker, { Theme } from "emoji-picker-react"
 import type { EmojiClickData } from "emoji-picker-react"
+import { LikesCountDialog } from "@/components/post/LikesCountDialog"
 
 interface PostModalProps {
   post: Post | null
@@ -34,6 +35,7 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showPostSettings, setShowPostSettings] = useState(false)
+  const [isLikesOpen, setIsLikesOpen] = useState(false);
 
   const commentsEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -296,9 +298,29 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
 
                 {/* Comments List */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
-                  <div className="flex gap-3 mb-6">
-                    <AvatarRing src={post.user.profilePic || ""} size="sm" />
-                    <p className="text-sm pt-1"><span className="font-semibold mr-2">{post.user.username}</span>{post.caption}</p>
+                  <div className="flex flex-col gap-3 mb-6">
+                    <div className="flex gap-3">
+                      <AvatarRing src={post.user.profilePic || ""} size="sm" />
+                      <p className="text-sm pt-1">
+                        <span className="font-semibold mr-2">{post.user.username}</span>
+                        {post.caption}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-4 ml-11">
+                      <button
+                        onClick={() => setIsLikesOpen(true)}
+                        className="flex items-center gap-1.5 hover:opacity-70 transition-opacity"
+                      >
+                        <Heart className={cn("w-4 h-4", post.isLiked ? "text-red-500 fill-red-500" : "text-muted-foreground")} />
+                        <span className="text-xs font-bold text-muted-foreground">{post.likes} <span className="hidden sm:inline">likes</span></span>
+                      </button>
+
+                      <div className="flex items-center gap-1.5 opacity-60">
+                        <Eye className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs font-bold text-muted-foreground">{post.viewsCount || 0} <span className="hidden sm:inline">views</span></span>
+                      </div>
+                    </div>
                   </div>
 
                   {isCommentsLoading ? (
@@ -374,6 +396,14 @@ export function PostModal({ post, isOpen, onClose }: PostModalProps) {
               </div>
             </div>
           </motion.div>
+
+          <LikesCountDialog
+            isOpen={isLikesOpen}
+            onClose={() => setIsLikesOpen(false)}
+            postId={post._id}
+            likesCount={post.likes}
+            viewsCount={post.viewsCount}
+          />
         </>
       )}
     </AnimatePresence>

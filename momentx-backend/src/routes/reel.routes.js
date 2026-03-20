@@ -6,6 +6,7 @@ import {
   getReelsFeed,
   toggleLikeReel,
   getReelById,
+  incrementReelView,
 } from '../controllers/reel.controller.js';
 
 const router = express.Router();
@@ -20,6 +21,10 @@ router.route('/feed').get(getReelsFeed);
 
 // Like/Unlike
 router.route('/like/:reelId').post(toggleLikeReel);
+
+// View Count
+router.route('/:reelId/view').patch(incrementReelView);
+
 router.route('/:reelId').get(getReelById).put(getReelById);
 
 export default router;

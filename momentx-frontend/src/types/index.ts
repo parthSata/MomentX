@@ -23,6 +23,7 @@ export interface Post {
   hashtags: string[];
   videoUrl: string; // Optional video URL
   commentsCount: number;
+  viewsCount: number;
 }
 
 export interface Comment {

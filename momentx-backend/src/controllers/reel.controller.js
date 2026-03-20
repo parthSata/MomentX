@@ -98,6 +98,7 @@ export const getReelsFeed = asyncHandler(async (req, res) => {
         likes: reelObj.likes.length, // Number: shows count
         commentsCount: commentCount, // Number: shows real comment count
         sharesCount: reelObj.sharesCount || 0,
+        viewsCount: reelObj.viewsCount || 0,
         user: {
           ...reelObj.user,
           avatar: reelObj.user.profilePic, // Map profilePic to avatar for consistency
@@ -145,6 +146,32 @@ export const toggleLikeReel = asyncHandler(async (req, res) => {
   }
 });
 
+// ✅ Increment Reel View Count
+export const incrementReelView = asyncHandler(async (req, res) => {
+  const { reelId } = req.params;
+  const userId = req.user._id;
+
+  let reel = await Reel.findById(reelId);
+  if (!reel) throw new ApiError(404, 'Reel not found');
+
+  const alreadyViewed = reel.viewers?.includes(userId);
+
+  if (!alreadyViewed) {
+    reel = await Reel.findByIdAndUpdate(
+      reelId,
+      {
+        $addToSet: { viewers: userId },
+        $inc: { viewsCount: 1 },
+      },
+      { new: true },
+    );
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { viewsCount: reel.viewsCount }, 'View incremented'));
+});
+
 export const getReelById = asyncHandler(async (req, res) => {
   const { reelId } = req.params;
   const currentUserId = req.user._id;
@@ -168,6 +195,7 @@ export const getReelById = asyncHandler(async (req, res) => {
     likes: reel.likes.length,
     commentsCount: commentCount,
     sharesCount: reel.sharesCount || 0,
+    viewsCount: reel.viewsCount || 0,
     user: {
       ...reel.user,
       avatar: reel.user.profilePic,

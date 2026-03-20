@@ -25,6 +25,7 @@ export interface Reel {
     likes: number;
     commentsCount: number;
     sharesCount: number;
+    viewsCount: number;
     music?: string;
     location?: string;
     isLiked?: boolean;
@@ -51,6 +52,8 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
     const [isFollowing, setIsFollowing] = useState(false);
     const [isLikesOpen, setIsLikesOpen] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
+    const [viewsCount, setViewsCount] = useState(reel.viewsCount || 0);
+    const hasIncrementedView = useRef(false);
 
     useEffect(() => {
         const authUser = currentUser as any;
@@ -68,6 +71,8 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
         setLikeCount(reel.likes || 0);
         setCommentCount(reel.commentsCount || 0);
         setIsSaved(reel.isSaved || false);
+        setViewsCount(reel.viewsCount || 0);
+        hasIncrementedView.current = false;
     }, [reel]);
 
     useEffect(() => {
@@ -84,11 +89,36 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
         }
     }, [isActive, reel.videoUrl]);
 
+    useEffect(() => {
+        if (isActive && !hasIncrementedView.current) {
+            const viewedKey = `viewed_reel_${reel._id}`;
+            if (sessionStorage.getItem(viewedKey)) {
+                hasIncrementedView.current = true;
+                return;
+            }
+
+            const incrementView = async () => {
+                try {
+                    await api.patch(`/reels/${reel._id}/view`);
+                    setViewsCount((prev: number) => prev + 1);
+                    hasIncrementedView.current = true;
+                    sessionStorage.setItem(viewedKey, 'true');
+                } catch (error) {
+                    console.error("Failed to increment view count", error);
+                }
+            };
+
+            // Increment view after 2 seconds of watch time
+            const timer = setTimeout(incrementView, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [isActive, reel._id]);
+
     const handleLike = async () => {
         const prevLiked = isLiked;
         const prevCount = likeCount;
         setIsLiked(!prevLiked);
-        setLikeCount(prev => prevLiked ? prev - 1 : prev + 1);
+        setLikeCount((prev: number) => prevLiked ? prev - 1 : prev + 1);
         try {
             await api.post(`/posts/${reel._id}/like`);
         } catch (error) {
@@ -258,8 +288,8 @@ export function ReelCard({ reel, isActive, muted, onToggleMute }: ReelCardProps)
                     </div>
                 </div>
 
-                <ReelCommentsSheet isOpen={showComments} onClose={() => setShowComments(false)} postId={reel._id} commentCount={commentCount.toString()} onCommentAdded={() => setCommentCount(prev => prev + 1)} />
-                <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={reel._id} likesCount={likeCount} />
+                <ReelCommentsSheet isOpen={showComments} onClose={() => setShowComments(false)} postId={reel._id} commentCount={commentCount.toString()} onCommentAdded={() => setCommentCount((prev: number) => prev + 1)} />
+                <LikesCountDialog isOpen={isLikesOpen} onClose={() => setIsLikesOpen(false)} postId={reel._id} likesCount={likeCount} viewsCount={viewsCount} />
 
                 <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} post={reel} />
             </div>

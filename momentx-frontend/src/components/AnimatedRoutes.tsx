@@ -29,6 +29,8 @@ import ActivityPage from "@/pages/ActivityPage";
 import SettingsPage from "@/pages/SettingsPage";
 import { SplashScreen } from "@/components/SplashScreen"; // ✅ IMPORT SPLASH SCREEN
 import GroupChatPage from "@/pages/GroupChatPage";
+import SinglePostPage from "@/pages/SinglePostPage";
+import SingleReelPage from "@/pages/SingleReelPage";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 
 // Admin route protection
@@ -282,11 +284,41 @@ export function AnimatedRoutes() {
             />
 
             <Route
+              path="/p/:id"
+              element={
+                <ProtectedRoute>
+                  <PageTransition>
+                    <SinglePostPage />
+                  </PageTransition>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reel/:id"
+              element={
+                <ProtectedRoute>
+                  <PageTransition>
+                    <SingleReelPage />
+                  </PageTransition>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/followers"
               element={<Navigate to="/followers/followers" replace />}
             />
             <Route
               path="/followers/:type"
+              element={
+                <ProtectedRoute>
+                  <PageTransition>
+                    <FollowersPage />
+                  </PageTransition>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/followers/:type/:id"
               element={
                 <ProtectedRoute>
                   <PageTransition>

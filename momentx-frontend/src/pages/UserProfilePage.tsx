@@ -11,6 +11,7 @@ import type { Post } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { ProfileImageViewDialog } from "@/components/profile/ProfileQuickViewDialog";
+import { AvatarRing } from "@/components/ui/avatar-ring";
 
 type TabType = "posts" | "reels" | "tagged";
 
@@ -34,6 +35,8 @@ export default function UserProfilePage() {
 
     // ✅ Image View Dialog State
     const [isProfilePicOpen, setIsProfilePicOpen] = useState(false);
+    // Suggestions State
+    const [suggestions, setSuggestions] = useState<any[]>([]);
 
     // Tabs
     const tabs = [
@@ -67,6 +70,19 @@ export default function UserProfilePage() {
         };
         fetchProfile();
     }, [username]);
+
+    // 1.5 Fetch Suggestions
+    useEffect(() => {
+        const fetchSuggestions = async () => {
+            try {
+                const { data } = await api.get("/explore/suggestions");
+                setSuggestions(data.data || []);
+            } catch (error) {
+                console.error("Failed to fetch suggestions", error);
+            }
+        };
+        fetchSuggestions();
+    }, []);
 
     // 2. Fetch Tab Content (Posts/Reels)
     useEffect(() => {
@@ -246,14 +262,14 @@ export default function UserProfilePage() {
                                     <p className="font-bold text-lg">{formatNumber(profile.postsCount)}</p>
                                     <p className="text-sm text-muted-foreground">Posts</p>
                                 </div>
-                                <div className="text-center">
+                                <Link to={`/followers/followers/${profile._id}`} className="text-center hover:opacity-80 transition-opacity">
                                     <p className="font-bold text-lg">{formatNumber(profile.followersCount)}</p>
                                     <p className="text-sm text-muted-foreground">Followers</p>
-                                </div>
-                                <div className="text-center">
+                                </Link>
+                                <Link to={`/followers/following/${profile._id}`} className="text-center hover:opacity-80 transition-opacity">
                                     <p className="font-bold text-lg">{formatNumber(profile.followingCount)}</p>
                                     <p className="text-sm text-muted-foreground">Following</p>
-                                </div>
+                                </Link>
                             </div>
 
                             <div className="space-y-1">
@@ -270,6 +286,47 @@ export default function UserProfilePage() {
                         </div>
                     </div>
                 </motion.div>
+
+                {/* --- Suggestions Row --- */}
+                {suggestions.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="space-y-4 py-2"
+                    >
+                        <div className="flex items-center justify-between px-1">
+                            <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Suggested for you</h3>
+                            <Link to="/explore" className="text-[10px] font-black text-primary uppercase hover:underline">See All</Link>
+                        </div>
+                        
+                        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2">
+                            {suggestions.map((user) => (
+                                <Link to={`/u/${user.username}`} key={user._id}>
+                                    <motion.div
+                                        whileHover={{ y: -5 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        className="flex flex-col items-center gap-2 p-4 rounded-[2rem] bg-card/50 hover:bg-card border border-border/50 hover:border-primary/20 transition-all shrink-0 w-32 shadow-sm"
+                                    >
+                                        <AvatarRing 
+                                            src={user.avatar || user.profilePic || "/image.png"} 
+                                            alt={user.username} 
+                                            size="md" 
+                                        />
+                                        <div className="text-center w-full">
+                                            <p className="font-bold text-xs truncate text-foreground">{user.username}</p>
+                                            <p className="text-[10px] text-muted-foreground truncate font-medium">
+                                                {user.displayName || user.name || "Node"}
+                                            </p>
+                                        </div>
+                                        <div className="mt-1 px-3 py-1 bg-primary/10 rounded-full">
+                                            <span className="text-[8px] font-black text-primary uppercase">Connect</span>
+                                        </div>
+                                    </motion.div>
+                                </Link>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* --- Tabs --- */}
                 <div className="glass rounded-2xl overflow-hidden min-h-[50vh]">

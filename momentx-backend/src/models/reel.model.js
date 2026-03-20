@@ -18,6 +18,8 @@ const reelSchema = new mongoose.Schema(
       },
     ],
     duration: { type: Number }, // Video duration in seconds
+    viewsCount: { type: Number, default: 0 },
+    viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true },
 );

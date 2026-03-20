@@ -301,11 +301,11 @@ export default function ProfilePage() {
                   <p className="font-bold text-lg">{formatNumber(profileData.postsCount)}</p>
                   <p className="text-sm text-muted-foreground">Posts</p>
                 </div>
-                <Link to={`/followers/${profileData._id}?tab=followers`} className="text-center hover:opacity-80 transition-opacity">
+                <Link to={`/followers/followers/${profileData._id}`} className="text-center hover:opacity-80 transition-opacity">
                   <p className="font-bold text-lg">{formatNumber(profileData.followers.length)}</p>
                   <p className="text-sm text-muted-foreground">Followers</p>
                 </Link>
-                <Link to={`/followers/${profileData._id}?tab=following`} className="text-center hover:opacity-80 transition-opacity">
+                <Link to={`/followers/following/${profileData._id}`} className="text-center hover:opacity-80 transition-opacity">
                   <p className="font-bold text-lg">{formatNumber(profileData.following.length)}</p>
                   <p className="text-sm text-muted-foreground">Following</p>
                 </Link>

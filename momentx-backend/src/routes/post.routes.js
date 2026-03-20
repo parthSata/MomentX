@@ -14,6 +14,8 @@ import {
   editPost,
   getPostById, // ✅ IMPORT NEW CONTROLLER
   getPostLikes, // ✅ IMPORT NEW CONTROLLER
+  incrementView,
+  incrementShare,
 } from '../controllers/post.controller.js';
 
 const router = Router();
@@ -41,6 +43,8 @@ router.route('/:postId/delete').delete(deletePost);
 
 // ✅ FIXED: Added GET request for fetching a single post by ID
 router.route('/:postId').get(getPostById).put(editPost);
+router.route('/:postId/view').patch(incrementView);
+router.route('/:postId/share').patch(incrementShare);
 router.route('/:postId/likes').get(getPostLikes); // ✅ ADDED LIKES ROUTE
 
 export default router;

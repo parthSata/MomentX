@@ -38,6 +38,9 @@ const postSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    sharesCount: { type: Number, default: 0 },
+    viewsCount: { type: Number, default: 0 },
+    viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true },
 );

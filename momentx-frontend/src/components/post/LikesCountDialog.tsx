@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, X } from "lucide-react";
+import { Heart, X, Eye } from "lucide-react";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/axios";
@@ -12,6 +12,7 @@ interface LikesCountDialogProps {
     onClose: () => void;
     postId: string;
     likesCount: number;
+    viewsCount?: number;
 }
 
 const formatNumber = (num: number) => {
@@ -20,7 +21,7 @@ const formatNumber = (num: number) => {
     return num.toString();
 }
 
-export function LikesCountDialog({ isOpen, onClose, postId, likesCount }: LikesCountDialogProps) {
+export function LikesCountDialog({ isOpen, onClose, postId, likesCount, viewsCount }: LikesCountDialogProps) {
     const [likedUsers, setLikedUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -71,16 +72,29 @@ export function LikesCountDialog({ isOpen, onClose, postId, likesCount }: LikesC
                         {/* Header */}
                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-card/30">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-red-500/10 rounded-2xl">
-                                    <Heart className="w-6 h-6 text-red-500 fill-red-500" />
+                                <div className="p-3 bg-primary/10 rounded-2xl">
+                                    <div className="flex items-center gap-2">
+                                        <Heart className="w-5 h-5 text-red-500 fill-red-500" />
+                                        {viewsCount !== undefined && <Eye className="w-5 h-5 text-primary" />}
+                                    </div>
                                 </div>
                                 <div className="space-y-0.5">
-                                    <h2 className="text-xl font-black tracking-tighter uppercase italic">
-                                        Endorsement <span className="gradient-text">Log</span>
+                                    <h2 className="text-xl font-black tracking-tighter uppercase italic line-clamp-1">
+                                        Insight <span className="gradient-text">Statistics</span>
                                     </h2>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                                        {formatNumber(likesCount)} Global Resonances
-                                    </p>
+                                    <div className="flex items-center gap-3">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap">
+                                            {formatNumber(likesCount)} Resonances
+                                        </p>
+                                        {viewsCount !== undefined && (
+                                            <>
+                                                <div className="w-1 h-1 bg-white/20 rounded-full" />
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap">
+                                                    {formatNumber(viewsCount)} Global Views
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             <button

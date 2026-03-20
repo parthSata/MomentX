@@ -67,6 +67,8 @@ const formatPosts = async (posts, currentUserId) => {
         likes: postObj.likes.length,
         commentsCount: commentCount,
         comments: commentCount,
+        viewsCount: postObj.viewsCount || 0,
+        sharesCount: postObj.sharesCount || 0,
       };
     }),
   );
@@ -573,6 +575,78 @@ const getPostLikes = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, item.likes, 'Likes fetched successfully'));
 });
 
+const incrementView = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+  const userId = req.user._id;
+
+  // 1. Try finding in Posts first
+  let item = await Post.findById(postId);
+  let type = 'post';
+
+  // 2. If not found, try Reels
+  if (!item) {
+    item = await Reel.findById(postId);
+    type = 'reel';
+  }
+
+  if (!item) throw new ApiError(404, 'Post or Reel not found');
+
+  // 3. Check if user already viewed it
+  const alreadyViewed = item.viewers?.includes(userId);
+
+  if (!alreadyViewed) {
+    if (type === 'post') {
+      item = await Post.findByIdAndUpdate(
+        postId,
+        {
+          $addToSet: { viewers: userId },
+          $inc: { viewsCount: 1 },
+        },
+        { new: true },
+      );
+    } else {
+      item = await Reel.findByIdAndUpdate(
+        postId,
+        {
+          $addToSet: { viewers: userId },
+          $inc: { viewsCount: 1 },
+        },
+        { new: true },
+      );
+    }
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { viewsCount: item.viewsCount }, 'View status updated'));
+});
+
+const incrementShare = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+
+  // 1. Try finding in Posts first
+  let item = await Post.findByIdAndUpdate(
+    postId,
+    { $inc: { sharesCount: 1 } },
+    { new: true }
+  );
+
+  // 2. If not found, try Reels
+  if (!item) {
+    item = await Reel.findByIdAndUpdate(
+      postId,
+      { $inc: { sharesCount: 1 } },
+      { new: true }
+    );
+  }
+
+  if (!item) throw new ApiError(404, 'Post or Reel not found');
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { sharesCount: item.sharesCount }, 'Share count updated'));
+});
+
 export {
   createPost,
   getHomeFeed,
@@ -586,4 +660,6 @@ export {
   editPost,
   getPostById,
   getPostLikes,
+  incrementView,
+  incrementShare,
 };

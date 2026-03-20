@@ -14,6 +14,7 @@ import {
     Volume2,
     AlertCircle,
     Trash2,
+    Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +59,7 @@ export function PostViewDialog({ isOpen, onClose, post, showEditOption }: PostVi
     const [isLiked, setIsLiked] = useState(false);
     const [likesCount, setLikesCount] = useState(0);
     const [isSaved, setIsSaved] = useState(false);
+    const [viewsCount, setViewsCount] = useState(0);
 
     const [muted, setMuted] = useState(true);
     const [isPlaying, setIsPlaying] = useState(true);
@@ -86,6 +88,7 @@ export function PostViewDialog({ isOpen, onClose, post, showEditOption }: PostVi
             setIsLiked(!!freshPost.isLiked);
             setIsSaved(!!freshPost.isSaved);
             setLikesCount(getSafeLikesCount(freshPost.likes));
+            setViewsCount(freshPost.viewsCount || 0);
         } catch (err) {
             console.error("Failed to refresh post data", err);
         }
@@ -125,6 +128,7 @@ export function PostViewDialog({ isOpen, onClose, post, showEditOption }: PostVi
             setLikesCount(getSafeLikesCount(localPostData.likes));
             setIsLiked(!!localPostData.isLiked);
             setIsSaved(!!localPostData.isSaved);
+            setViewsCount(localPostData.viewsCount || 0);
             setIsPlaying(true);
 
             if (typeof localPostData.user === "string") {
@@ -151,6 +155,27 @@ export function PostViewDialog({ isOpen, onClose, post, showEditOption }: PostVi
             }, 150);
         }
         return () => clearTimeout(timeoutId);
+    }, [isOpen, localPostData?._id]);
+
+    // Track View within Dialog
+    useEffect(() => {
+        if (isOpen && localPostData?._id) {
+            const viewedKey = `viewed_post_${localPostData._id}`;
+            if (sessionStorage.getItem(viewedKey)) return;
+
+            const incrementView = async () => {
+                try {
+                    await api.patch(`/posts/${localPostData._id}/view`);
+                    setViewsCount((prev) => prev + 1);
+                    sessionStorage.setItem(viewedKey, "true");
+                } catch (e) {
+                    console.error("Failed to increment view in dialog", e);
+                }
+            };
+
+            const timer = setTimeout(incrementView, 3000); // 3 seconds engagement
+            return () => clearTimeout(timer);
+        }
     }, [isOpen, localPostData?._id]);
 
     const fetchUserDetails = async (userId: string) => {
@@ -569,9 +594,15 @@ export function PostViewDialog({ isOpen, onClose, post, showEditOption }: PostVi
                                         </div>
 
                                         <div className="space-y-1 text-left">
-                                            <button onClick={() => setIsLikesOpen(true)} className="font-black text-sm hover:text-amber-500 transition-colors">
-                                                {likesCount.toLocaleString()} {likesCount === 1 ? 'Like' : 'Likes'}
-                                            </button>
+                                            <div className="flex items-center gap-4">
+                                                <button onClick={() => setIsLikesOpen(true)} className="font-black text-sm hover:text-amber-500 transition-colors">
+                                                    {likesCount.toLocaleString()} {likesCount === 1 ? 'Like' : 'Likes'}
+                                                </button>
+                                                <div className="flex items-center gap-1.5 opacity-50">
+                                                    <Eye className="w-4 h-4 text-muted-foreground" />
+                                                    <span className="text-xs font-bold text-muted-foreground">{viewsCount.toLocaleString()} <span className="hidden sm:inline">Views</span></span>
+                                                </div>
+                                            </div>
                                             <div className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
                                                 {formatPostDate(normalizedPost.createdAt)}
                                             </div>
@@ -628,11 +659,12 @@ export function PostViewDialog({ isOpen, onClose, post, showEditOption }: PostVi
                         caption={normalizedPost.caption || ""}
                         onSave={handleEditPost}
                     />
-                    <LikesCountDialog
+                     <LikesCountDialog
                         isOpen={isLikesOpen}
                         onClose={() => setIsLikesOpen(false)}
                         likesCount={likesCount}
                         postId={normalizedPost._id}
+                        viewsCount={viewsCount}
                     />
                     <ShareDialog
                         isOpen={isShareOpen}

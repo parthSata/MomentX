@@ -107,6 +107,15 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
         );
     };
 
+    const incrementShareCount = async () => {
+        if (!post?._id) return;
+        try {
+            await api.patch(`/posts/${post._id}/share`);
+        } catch (error) {
+            console.error("Failed to increment share count", error);
+        }
+    };
+
     const handleSend = async () => {
         if (selectedProfiles.length === 0 || !post) return;
         setIsSending(true);
@@ -127,6 +136,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                 )
             );
 
+            await incrementShareCount();
             toast.success(`Sent to ${selectedProfiles.length} chat${selectedProfiles.length > 1 ? 's' : ''}!`);
             onClose();
         } catch (error) {
@@ -138,21 +148,58 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
         }
     };
 
-    const handleCopyLink = () => {
+    const handleCopyLink = async () => {
         if (!post?._id) return;
-        navigator.clipboard.writeText(`${window.location.origin}/p/${post._id}`);
+        const type = (post.videoUrl || post.isVideo) ? "reel" : "p";
+        navigator.clipboard.writeText(`${window.location.origin}/${type}/${post._id}`);
+        await incrementShareCount();
         toast.success("Link copied to clipboard!");
         onClose();
     };
 
+    const handleSocialShare = (platform: string) => {
+        if (!post?._id) return;
+        const type = (post.videoUrl || post.isVideo) ? "reel" : "p";
+        const shareUrl = `${window.location.origin}/${type}/${post._id}`;
+        const text = `Check out this ${type === 'reel' ? 'reel' : 'post'} by @${post.user?.username || 'someone'} on MomentX!`;
+        
+        let url = "";
+        switch (platform) {
+            case "whatsapp":
+                url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text + " " + shareUrl)}`;
+                break;
+            case "facebook":
+                url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+                break;
+            case "messenger":
+                url = `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`;
+                break;
+            case "x":
+                url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+                break;
+            case "threads":
+                url = `https://www.threads.net/intent/post?text=${encodeURIComponent(text + " " + shareUrl)}`;
+                break;
+            case "email":
+                url = `mailto:?subject=${encodeURIComponent("Check out this post on MomentX")}&body=${encodeURIComponent(text + "\n\n" + shareUrl)}`;
+                break;
+        }
+
+        if (url) {
+            incrementShareCount();
+            window.open(url, "_blank", "noopener,noreferrer");
+            onClose();
+        }
+    };
+
     const shareOptions = [
-        { icon: LinkIcon, label: "Copy link", color: "bg-white/10", action: handleCopyLink },
-        { icon: FacebookIcon, label: "Facebook", color: "bg-blue-600", action: () => { } },
-        { icon: MessengerIcon, label: "Messenger", color: "bg-gradient-to-br from-amber-500 to-teal-500", action: () => { } },
-        { icon: WhatsAppIcon, label: "WhatsApp", color: "bg-green-500", action: () => { } },
-        { icon: MailIcon, label: "Email", color: "bg-white/10", action: () => { } },
-        { icon: ThreadsIcon, label: "Threads", color: "bg-white/10", action: () => { } },
-        { icon: XIcon, label: "X", color: "bg-white/10", action: () => { } },
+        { icon: LinkIcon, label: "Copy link", color: "bg-muted text-foreground", action: handleCopyLink },
+        { icon: FacebookIcon, label: "Facebook", color: "bg-blue-600 text-white", action: () => handleSocialShare("facebook") },
+        { icon: MessengerIcon, label: "Messenger", color: "bg-gradient-to-br from-amber-500 to-teal-500 text-white", action: () => handleSocialShare("messenger") },
+        { icon: WhatsAppIcon, label: "WhatsApp", color: "bg-green-500 text-white", action: () => handleSocialShare("whatsapp") },
+        { icon: MailIcon, label: "Email", color: "bg-muted text-foreground", action: () => handleSocialShare("email") },
+        { icon: ThreadsIcon, label: "Threads", color: "bg-muted text-foreground", action: () => handleSocialShare("threads") },
+        { icon: XIcon, label: "X", color: "bg-muted text-foreground", action: () => handleSocialShare("x") },
     ];
 
     return createPortal(
@@ -172,18 +219,18 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: "100%", opacity: 0 }}
                         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="relative w-full max-w-lg bg-background/95 glass-strong border-t sm:border border-white/10 rounded-t-[2.5rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col z-[121] max-h-[85vh]"
+                        className="relative w-full max-w-lg bg-card/95 glass-strong border-t sm:border border-border rounded-t-[2.5rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col z-[121] max-h-[85vh]"
                     >
                         <div className="flex justify-center py-4 shrink-0 sm:hidden">
-                            <div className="w-12 h-1.5 bg-white/20 rounded-full" />
+                            <div className="w-12 h-1.5 bg-muted rounded-full" />
                         </div>
 
-                        <div className="px-6 py-4 flex items-center justify-between border-b border-white/5 bg-card/10">
+                        <div className="px-6 py-4 flex items-center justify-between border-b border-border bg-muted/20">
                             <button
                                 onClick={onClose}
-                                className="p-2 hover:bg-white/5 rounded-2xl transition-all border border-transparent hover:border-white/10 group"
+                                className="p-2 hover:bg-muted rounded-2xl transition-all border border-transparent hover:border-border group"
                             >
-                                <X className="w-6 h-6 text-muted-foreground group-hover:text-white transition-colors" />
+                                <X className="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors" />
                             </button>
                             <h2 className="text-xl font-black tracking-tighter uppercase italic">
                                 Transmission <span className="gradient-text">Hub</span>
@@ -199,7 +246,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                                     placeholder="Search recipients..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-white/5 text-white placeholder:text-muted-foreground/50 rounded-2xl pl-12 pr-4 py-4 outline-none border border-transparent focus:border-primary/30 focus:bg-white/10 transition-all font-bold text-sm"
+                                    className="w-full bg-muted text-foreground placeholder:text-muted-foreground/50 rounded-2xl pl-12 pr-4 py-4 outline-none border border-transparent focus:border-primary/30 focus:bg-muted/80 transition-all font-bold text-sm"
                                 />
                             </div>
                         </div>
@@ -231,8 +278,8 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                                                     className={cn(
                                                         "w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 transition-all duration-300",
                                                         selectedProfiles.includes(profile._id)
-                                                            ? "border-primary p-1 scale-110 shadow-[0_0_20px_rgba(255,191,0,0.3)]"
-                                                            : "border-transparent group-hover/target:border-white/20"
+                                                            ? "border-primary p-1 scale-110 shadow-[0_0_20px_rgba(var(--primary),0.3)]"
+                                                            : "border-transparent group-hover/target:border-muted-foreground/20"
                                                     )}
                                                 >
                                                     <img
@@ -263,9 +310,9 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                                                     </div>
                                                 )}
                                             </div>
-                                            <span className={cn(
+                                             <span className={cn(
                                                 "text-[10px] font-black uppercase tracking-tighter truncate w-full text-center group-hover/target:text-primary transition-colors",
-                                                selectedProfiles.includes(profile._id) ? "text-primary" : "text-muted-foreground"
+                                                selectedProfiles.includes(profile._id) ? "text-primary" : "text-foreground/70"
                                             )}>
                                                 {profile.name}
                                             </span>
@@ -275,7 +322,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                             )}
                         </div>
 
-                        <div className="px-6 py-6 border-t border-white/5 bg-card/5">
+                         <div className="px-6 py-6 border-t border-border bg-muted/10">
                             <div className="flex gap-6 overflow-x-auto pb-2 scrollbar-hide">
                                 {shareOptions.map((option, index) => (
                                     <motion.button
@@ -288,13 +335,13 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                                     >
                                         <div
                                             className={cn(
-                                                "w-12 h-12 rounded-2xl flex items-center justify-center text-white transition-all group-hover/social:scale-110 group-hover/social:-translate-y-1 shadow-lg",
+                                                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover/social:scale-110 group-hover/social:-translate-y-1 shadow-lg",
                                                 option.color
                                             )}
                                         >
                                             <option.icon />
                                         </div>
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground group-hover/social:text-white transition-colors">
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground group-hover/social:text-foreground transition-colors">
                                             {option.label}
                                         </span>
                                     </motion.button>
@@ -308,7 +355,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                                     initial={{ opacity: 0, height: 0, y: 20 }}
                                     animate={{ opacity: 1, height: "auto", y: 0 }}
                                     exit={{ opacity: 0, height: 0, y: 20 }}
-                                    className="px-6 pb-8 pt-2 shrink-0 bg-card/20"
+                                     className="px-6 pb-8 pt-2 shrink-0 bg-muted/20"
                                 >
                                     <button
                                         onClick={handleSend}
