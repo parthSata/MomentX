@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Edit, Loader2, X, UserPlus, Trash2, ArrowLeft, Users, MoreVertical } from "lucide-react";
+import { Search, Edit, Loader2, X, UserPlus, Trash2, ArrowLeft, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -153,10 +153,20 @@ export default function ChatSidebar() {
 
   const handleGroupCreated = async (groupData: any) => {
     try {
-      const { data } = await api.post("/chats/group", {
-        name: groupData.name,
-        participants: groupData.members
+      const formData = new FormData();
+      formData.append("name", groupData.name);
+      
+      // Send as JSON string for the backend to parse
+      formData.append("participants", JSON.stringify(groupData.members));
+      
+      if (groupData.avatar) {
+        formData.append("groupAvatar", groupData.avatar);
+      }
+
+      const { data } = await api.post("/chats/group", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
       });
+      
       setIsCreateGroupOpen(false);
       fetchChats();
       navigate(`/group-chat/${data.data._id}`);
@@ -235,7 +245,6 @@ export default function ChatSidebar() {
         <div className="flex gap-1">
           <button onClick={() => setIsCreateGroupOpen(true)} className="p-2 hover:bg-muted rounded-full" title="Create Group"><Users className="w-5 h-5" /></button>
           <button onClick={() => setIsNewChatOpen(true)} className="p-2 hover:bg-muted rounded-full" title="New Chat"><Edit className="w-5 h-5" /></button>
-          <button className="p-2 hover:bg-muted rounded-full"><MoreVertical className="w-5 h-5 text-muted-foreground" /></button>
         </div>
       </div>
 

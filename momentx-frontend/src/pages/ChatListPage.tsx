@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Edit, MoreHorizontal, Loader2, X, UserPlus, MessageCircle, Trash2, ArrowLeft, Users } from "lucide-react"; // ✅ Added ArrowLeft
+import { Search, Edit, Loader2, X, UserPlus, MessageCircle, Trash2, ArrowLeft, Users } from "lucide-react"; // ✅ Removed MoreHorizontal
 import { Input } from "@/components/ui/input";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { useNavigate } from "react-router-dom";
@@ -303,12 +303,13 @@ export default function ChatListPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              whileHover={{ x: -4 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => navigate("/")}
-              className="p-2 glass rounded-full"
+              className="flex items-center gap-2.5 px-3 py-2 glass rounded-2xl hover:bg-primary/10 transition-all border border-white/10 group"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 group-hover:text-primary transition-colors" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] hidden xs:inline">Back</span>
             </motion.button>
             <h1 className="text-2xl font-display font-bold bg-linear-to-r from-amber-400 to-emerald-400 bg-clip-text text-transparent">Messages</h1>
           </div>
@@ -418,14 +419,7 @@ export default function ChatListPage() {
                 </div>
               </div>
 
-              <motion.button
-                initial={{ opacity: 0 }}
-                whileHover={{ opacity: 1 }}
-                onClick={(e) => { e.stopPropagation(); handleContextMenu(e, chat._id); }}
-                className="p-2 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <MoreHorizontal className="w-5 h-5 text-muted-foreground hover:text-foreground" />
-              </motion.button>
+              {/* Three dots removed as per request - delete accessible via context menu */}
             </motion.div>
           );
         })}

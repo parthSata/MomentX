@@ -32,7 +32,7 @@ router.route('/upload').post(upload.single('file'), uploadChatMedia);
 router.post('/delete-messages', verifyJWT, deleteMessages);
 // ✅ Routes
 router.post('/cleanup', verifyJWT, cleanDuplicateChats);
-router.route('/group').post(verifyJWT, createGroupChat);
+router.route('/group').post(verifyJWT, upload.single('groupAvatar'), createGroupChat);
 router.route('/group/:chatId/members').patch(verifyJWT, updateGroupMembers);
 router.route('/group/:chatId/details').patch(verifyJWT, upload.single('groupAvatar'), updateGroupDetails);
 router.route('/group/:chatId').get(verifyJWT, getGroupInfo);

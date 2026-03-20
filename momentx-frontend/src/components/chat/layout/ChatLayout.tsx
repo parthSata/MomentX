@@ -20,12 +20,12 @@ export default function ChatLayout() {
          </div>
 
          {/* Sidebar: Visible on desktop, hidden on mobile if a chat conversation is open */}
-         <div className={`w-full md:w-[380px] lg:w-[420px] flex-shrink-0 border-r border-border ${isChatOpen ? "hidden md:flex" : "flex"} flex-col h-full bg-background relative z-10`}>
+         <div className={`w-full md:w-[380px] lg:w-[420px] flex-shrink-0 border-r border-border ${isChatOpen ? "hidden md:flex" : "flex"} flex-col h-full bg-background`}>
             <ChatSidebar />
          </div>
 
          {/* Main Chat Area (Outlet): Full screen on mobile if chat open, hidden on mobile otherwise */}
-         <div className={`flex-1 ${!isChatOpen ? "hidden md:flex" : "flex"} h-full relative z-0 bg-background`}>
+         <div className={`flex-1 ${!isChatOpen ? "hidden md:flex" : "flex"} h-full bg-background`}>
             <Outlet />
          </div>
       </div>

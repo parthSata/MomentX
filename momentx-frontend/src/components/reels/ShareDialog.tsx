@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Link as LinkIconLucide, Mail, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -49,20 +50,16 @@ const MailIcon = () => <Mail className="w-5 h-5" />;
 interface ShareDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    // ✅ Changed from postId: string to post: any to access all content details for sharing
     post: any;
 }
 
 export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
-
-    // Real State Variables
     const [targets, setTargets] = useState<ShareableTarget[]>([]);
     const [loading, setLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
 
-    // Fetch REAL Users and Groups dynamically when the dialog opens
     useEffect(() => {
         if (!isOpen) {
             setSearchQuery("");
@@ -71,18 +68,15 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
         }
 
         setLoading(true);
-
         Promise.all([
             api.get("/users/all").catch(() => ({ data: [] })),
             api.get("/chats").catch(() => ({ data: { data: [] } }))
         ]).then(([usersRes, chatsRes]) => {
             const usersPayload = usersRes.data?.data || usersRes.data?.users || usersRes.data?.docs || usersRes.data;
             const fetchedUsers = Array.isArray(usersPayload) ? usersPayload : [];
-
             const chatsPayload = chatsRes.data?.data || [];
             const fetchedGroups = Array.isArray(chatsPayload) ? chatsPayload.filter(c => c.isGroupChat) : [];
 
-            // Map users to ShareableTarget
             const mappedUsers: ShareableTarget[] = fetchedUsers.map(u => ({
                 _id: u._id,
                 name: u.username || u.name || "Unknown",
@@ -90,22 +84,19 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                 isGroup: false
             }));
 
-            // Map groups to ShareableTarget
             const mappedGroups: ShareableTarget[] = fetchedGroups.map(g => ({
-                _id: g._id, // group chat uses its own _id as receiverId
+                _id: g._id,
                 name: g.groupName || "Unnamed Group",
                 profilePic: g.groupAvatar || "/group-avatar.png",
                 isGroup: true
             }));
 
-            // Combine them, putting groups first, then users
             setTargets([...mappedGroups, ...mappedUsers]);
         }).finally(() => {
             setLoading(false);
         });
     }, [isOpen]);
 
-    // Local filtering based on what is typed in the search bar
     const filteredProfiles = searchQuery
         ? targets.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
         : targets;
@@ -116,13 +107,11 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
         );
     };
 
-    // ✅ Actual Backend Share Logic
     const handleSend = async () => {
         if (selectedProfiles.length === 0 || !post) return;
         setIsSending(true);
 
         try {
-            // Build the robust sharedPost payload
             const sharedData = {
                 type: (post.videoUrl || post.isVideo) ? "reel" : "post",
                 postId: post._id,
@@ -132,7 +121,6 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                 caption: post.caption
             };
 
-            // Loop through selected users and send message via Chat API
             await Promise.all(
                 selectedProfiles.map(userId =>
                     api.post(`/chats/send/${userId}`, { sharedPost: sharedData })
@@ -167,135 +155,148 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
         { icon: XIcon, label: "X", color: "bg-white/10", action: () => { } },
     ];
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
-                <>
+                <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-70"
+                        className="fixed inset-0 bg-background/80 backdrop-blur-md"
                     />
+
                     <motion.div
-                        initial={{ y: "100%" }}
-                        animate={{ y: 0 }}
-                        exit={{ y: "100%" }}
-                        transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                        className="fixed bottom-0 left-0 right-0 z-70 bg-zinc-900 rounded-t-3xl max-h-[85vh] flex flex-col md:max-w-md md:left-1/2 md:-translate-x-1/2 md:bottom-4 md:rounded-3xl border border-white/10 shadow-2xl"
+                        initial={{ y: "100%", opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: "100%", opacity: 0 }}
+                        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                        className="relative w-full max-w-lg bg-background/95 glass-strong border-t sm:border border-white/10 rounded-t-[2.5rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col z-[121] max-h-[85vh]"
                     >
-                        <div className="flex justify-center py-3 shrink-0 md:hidden">
-                            <div className="w-10 h-1 bg-white/30 rounded-full" />
+                        <div className="flex justify-center py-4 shrink-0 sm:hidden">
+                            <div className="w-12 h-1.5 bg-white/20 rounded-full" />
                         </div>
-                        <div className="flex items-center justify-between px-4 pb-3 shrink-0">
-                            <button onClick={onClose} className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors">
-                                <X className="w-6 h-6 text-white" />
+
+                        <div className="px-6 py-4 flex items-center justify-between border-b border-white/5 bg-card/10">
+                            <button
+                                onClick={onClose}
+                                className="p-2 hover:bg-white/5 rounded-2xl transition-all border border-transparent hover:border-white/10 group"
+                            >
+                                <X className="w-6 h-6 text-muted-foreground group-hover:text-white transition-colors" />
                             </button>
-                            <h2 className="text-white font-semibold text-lg">Share</h2>
+                            <h2 className="text-xl font-black tracking-tighter uppercase italic">
+                                Transmission <span className="gradient-text">Hub</span>
+                            </h2>
                             <div className="w-10" />
                         </div>
 
-                        <div className="px-4 pb-4 shrink-0">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50 z-10" />
+                        <div className="p-6 pb-2">
+                            <div className="relative group/search">
+                                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within/search:text-primary transition-colors z-10" />
                                 <input
                                     type="text"
-                                    placeholder="Search"
+                                    placeholder="Search recipients..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-white/10 text-white placeholder:text-white/50 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-white/20"
+                                    className="w-full bg-white/5 text-white placeholder:text-muted-foreground/50 rounded-2xl pl-12 pr-4 py-4 outline-none border border-transparent focus:border-primary/30 focus:bg-white/10 transition-all font-bold text-sm"
                                 />
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto min-h-0">
-                            <div className="px-4 pb-4">
-                                {loading ? (
-                                    <div className="flex justify-center items-center py-10">
-                                        <Loader2 className="w-8 h-8 animate-spin text-white/50" />
-                                    </div>
-                                ) : filteredProfiles.length === 0 ? (
-                                    <div className="text-center text-white/50 py-10">
-                                        No users found.
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-4 gap-3">
-                                        {filteredProfiles.map((profile, index) => (
-                                            <motion.button
-                                                key={profile._id}
-                                                initial={{ opacity: 0, scale: 0.8 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                transition={{ delay: index * 0.02 }}
-                                                onClick={() => toggleProfile(profile._id)}
-                                                className="flex flex-col items-center gap-2"
-                                            >
-                                                <div className="relative">
-                                                    <div
-                                                        className={cn(
-                                                            "w-16 h-16 rounded-full overflow-hidden border-2 transition-all",
-                                                            selectedProfiles.includes(profile._id)
-                                                                ? "border-blue-500"
-                                                                : "border-transparent"
-                                                        )}
-                                                    >
-                                                        <img
-                                                            src={profile.profilePic}
-                                                            alt={profile.name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
+                        <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar p-4">
+                            {loading ? (
+                                <div className="flex flex-col items-center justify-center py-10 gap-4">
+                                    <div className="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Scanning Signal...</p>
+                                </div>
+                            ) : filteredProfiles.length === 0 ? (
+                                <div className="text-center py-10 opacity-30">
+                                    <Search className="w-12 h-12 mx-auto mb-2" />
+                                    <p className="text-xs font-black uppercase tracking-widest">No Frequencies Found</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-4 gap-4 p-2">
+                                    {filteredProfiles.map((profile, index) => (
+                                        <motion.button
+                                            key={profile._id}
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ delay: index * 0.02 }}
+                                            onClick={() => toggleProfile(profile._id)}
+                                            className="flex flex-col items-center gap-2 group/target"
+                                        >
+                                            <div className="relative">
+                                                <div
+                                                    className={cn(
+                                                        "w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 transition-all duration-300",
+                                                        selectedProfiles.includes(profile._id)
+                                                            ? "border-primary p-1 scale-110 shadow-[0_0_20px_rgba(255,191,0,0.3)]"
+                                                            : "border-transparent group-hover/target:border-white/20"
+                                                    )}
+                                                >
+                                                    <img
+                                                        src={profile.profilePic || "/image.png"}
+                                                        alt={profile.name}
+                                                        className="w-full h-full object-cover rounded-full"
+                                                    />
+                                                </div>
+                                                <AnimatePresence>
                                                     {selectedProfiles.includes(profile._id) && (
                                                         <motion.div
                                                             initial={{ scale: 0 }}
                                                             animate={{ scale: 1 }}
-                                                            className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center"
+                                                            exit={{ scale: 0 }}
+                                                            className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center border-2 border-background shadow-lg shadow-primary/20"
                                                         >
-                                                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                            <svg className="w-3.5 h-3.5 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                             </svg>
                                                         </motion.div>
                                                     )}
-                                                    {profile.isGroup && (
-                                                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-white/20 rounded-full flex items-center justify-center shadow-lg backdrop-blur-md">
-                                                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5m10 0v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5m10 0H7" />
-                                                            </svg>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <span className="text-white text-xs truncate w-full text-center">
-                                                    {profile.name.length > 10
-                                                        ? profile.name.slice(0, 10) + "..."
-                                                        : profile.name}
-                                                </span>
-                                            </motion.button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                                                </AnimatePresence>
+                                                {profile.isGroup && !selectedProfiles.includes(profile._id) && (
+                                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg border border-background">
+                                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 20h5V4H2v16h5m10 0v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5m10 0H7" />
+                                                        </svg>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <span className={cn(
+                                                "text-[10px] font-black uppercase tracking-tighter truncate w-full text-center group-hover/target:text-primary transition-colors",
+                                                selectedProfiles.includes(profile._id) ? "text-primary" : "text-muted-foreground"
+                                            )}>
+                                                {profile.name}
+                                            </span>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
-                        <div className="px-4 py-4 border-t border-white/10 shrink-0">
-                            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                        <div className="px-6 py-6 border-t border-white/5 bg-card/5">
+                            <div className="flex gap-6 overflow-x-auto pb-2 scrollbar-hide">
                                 {shareOptions.map((option, index) => (
                                     <motion.button
                                         key={option.label}
                                         onClick={option.action}
-                                        initial={{ opacity: 0, y: 20 }}
+                                        initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: index * 0.05 }}
-                                        className="flex flex-col items-center gap-2 min-w-15 hover:opacity-80 transition-opacity"
+                                        className="flex flex-col items-center gap-2 group/social shrink-0"
                                     >
                                         <div
                                             className={cn(
-                                                "w-12 h-12 rounded-full flex items-center justify-center text-white",
+                                                "w-12 h-12 rounded-2xl flex items-center justify-center text-white transition-all group-hover/social:scale-110 group-hover/social:-translate-y-1 shadow-lg",
                                                 option.color
                                             )}
                                         >
                                             <option.icon />
                                         </div>
-                                        <span className="text-white text-xs">{option.label}</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground group-hover/social:text-white transition-colors">
+                                            {option.label}
+                                        </span>
                                     </motion.button>
                                 ))}
                             </div>
@@ -304,26 +305,32 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                         <AnimatePresence>
                             {selectedProfiles.length > 0 && (
                                 <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: "auto" }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    className="px-4 pb-6 shrink-0"
+                                    initial={{ opacity: 0, height: 0, y: 20 }}
+                                    animate={{ opacity: 1, height: "auto", y: 0 }}
+                                    exit={{ opacity: 0, height: 0, y: 20 }}
+                                    className="px-6 pb-8 pt-2 shrink-0 bg-card/20"
                                 >
                                     <button
                                         onClick={handleSend}
                                         disabled={isSending}
-                                        className="w-full bg-blue-500 text-white font-semibold py-3 rounded-xl hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                        className="w-full bg-gradient-primary text-primary-foreground font-black uppercase tracking-[0.2em] py-4 rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50 neon-glow text-xs"
                                     >
-                                        {isSending && <Loader2 className="w-5 h-5 animate-spin text-white" />}
-                                        Send ({selectedProfiles.length})
+                                        {isSending ? (
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <span>Deploy Signal to {selectedProfiles.length} Node{selectedProfiles.length > 1 ? 's' : ''}</span>
+                                            </>
+                                        )}
                                     </button>
                                 </motion.div>
                             )}
                         </AnimatePresence>
-                        <div className="h-4 shrink-0" />
+                        <div className="h-6 shrink-0 sm:hidden" />
                     </motion.div>
-                </>
+                </div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 }

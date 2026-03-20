@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Loader2, Check, UserPlus, Compass, RefreshCcw } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { MainLayout } from "@/components/navigation/MainLayout";
-import { StoriesBar } from "@/components/feed/StoriesBar";
+import { StoriesBar, type StoriesBarRef } from "@/components/feed/StoriesBar";
 import { PostCard } from "@/components/feed/PostCard";
 import { StoryViewer } from "@/components/feed/StoryViewer";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { user: currentUser, loading: authLoading, refreshUser } = useAuth();
   const { stories, markAsViewed, deleteStory, replyStory, likeStory, fetchStories } = useStories();
+  const storiesBarRef = useRef<StoriesBarRef>(null);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -77,20 +78,16 @@ export default function HomePage() {
     }
   };
 
-  // Filter out own story — viewer only shows other people's stories
-  const viewerStories = stories.filter((s) => {
-    const sUserId = typeof s.user === 'object' ? (s.user as any)._id?.toString() : s.user?.toString();
-    return sUserId !== currentUser?._id?.toString();
-  });
+  // ✅ COMPREHENSIVE VIEW: Include ALL stories, including OWNER'S
+  const viewerStories = stories;
 
   const handleStoryClick = (storyId: string) => {
-    // Only open viewer for other people's stories
+    // Open viewer for ANY story that exists in the feed
     const index = viewerStories.findIndex((s) => s._id === storyId);
     if (index !== -1) {
       setSelectedStoryIndex(index);
       setStoryViewerOpen(true);
     }
-    // If it's the user's own story, do nothing (StoriesBar handles upload)
   };
 
   const observer = useRef<IntersectionObserver | null>(null);
@@ -158,6 +155,7 @@ export default function HomePage() {
     <MainLayout>
       <div className="space-y-6 pb-20">
         <StoriesBar
+          ref={storiesBarRef}
           stories={stories}
           onStoryClick={handleStoryClick}
           currentUser={currentUser}
@@ -238,6 +236,10 @@ export default function HomePage() {
           onDeleteStory={deleteStory}
           onReplyStory={async (id, msg) => {
             await replyStory(id, msg);
+          }}
+          onAddStory={() => {
+            setStoryViewerOpen(false);
+            storiesBarRef.current?.triggerUpload();
           }}
           onLikeStory={likeStory}
           currentUserId={currentUser?._id}

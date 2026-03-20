@@ -226,18 +226,33 @@ export const deleteChat = asyncHandler(async (req, res) => {
 });
 
 export const createGroupChat = asyncHandler(async (req, res) => {
-  const { name, participants } = req.body; // participants is an array of IDs
+  const { name, participants } = req.body; // participants is a comma-separated string or array
   const adminId = req.user._id;
 
-  if (!name || !participants || participants.length < 1) {
+  if (!name || !participants) {
     throw new ApiError(400, 'Group name and at least one member required');
   }
 
+  // Parse participants if they come as a JSON string
+  let parsedParticipants = Array.isArray(participants) ? participants : JSON.parse(participants);
+
+  if (parsedParticipants.length < 1) {
+    throw new ApiError(400, 'At least one participant is required');
+  }
+
   // Add current user to participants if not already there
-  const allParticipants = [...new Set([...participants, adminId.toString()])];
+  const allParticipants = [...new Set([...parsedParticipants, adminId.toString()])];
+
+  let groupAvatar = '';
+  if (req.file) {
+    const cloudResponse = await uploadInCloudinary(req.file.path);
+    if (!cloudResponse) throw new ApiError(500, 'Failed to upload group avatar');
+    groupAvatar = cloudResponse.secure_url;
+  }
 
   const chat = await Chat.create({
     groupName: name,
+    groupAvatar: groupAvatar,
     participants: allParticipants,
     isGroupChat: true,
     groupAdmins: [adminId],

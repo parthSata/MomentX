@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, ChevronLeft, ChevronRight, Trash2, Eye, Heart, Send } from "lucide-react"
+import { X, ChevronLeft, ChevronRight, Trash2, Eye, Heart, Send, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AvatarRing } from "@/components/ui/avatar-ring"
 import { type Story } from "@/hooks/useStories"
@@ -15,6 +15,7 @@ interface StoryViewerProps {
   onDeleteStory?: (id: string) => void
   onLikeStory?: (id: string) => void
   onReplyStory?: (id: string, message: string) => Promise<void>
+  onAddStory?: () => void
   currentUserId?: string
 }
 
@@ -27,6 +28,7 @@ export function StoryViewer({
   onDeleteStory,
   onLikeStory,
   onReplyStory,
+  onAddStory,
   currentUserId
 }: StoryViewerProps) {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(initialIndex)
@@ -247,13 +249,27 @@ export function StoryViewer({
 
               <div className="flex items-center gap-4">
                 {isOwner && (
-                  <button
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="p-2 bg-black/20 hover:bg-red-500/80 backdrop-blur-md rounded-full transition-colors pointer-events-auto"
-                  >
-                    <Trash2 className="w-5 h-5 text-white/90" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {onAddStory && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddStory();
+                        }}
+                        className="p-2 bg-primary/20 hover:bg-primary/40 backdrop-blur-md rounded-full transition-colors border border-primary/30"
+                        title="Add Story"
+                      >
+                        <Plus className="w-5 h-5 text-white" />
+                      </button>
+                    )}
+                    <button
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="p-2 bg-black/20 hover:bg-red-500/80 backdrop-blur-md rounded-full transition-colors pointer-events-auto"
+                    >
+                      <Trash2 className="w-5 h-5 text-white/90" />
+                    </button>
+                  </div>
                 )}
                 <button onClick={onClose} className="p-2 bg-black/20 hover:bg-white/20 backdrop-blur-md rounded-full transition-colors pointer-events-auto">
                   <X className="w-5 h-5 text-white" />

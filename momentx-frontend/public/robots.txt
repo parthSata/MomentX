@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# Disallow admin paths and private settings
+Disallow: /admin/
+Disallow: /settings/
+Disallow: /activity/
+Disallow: /notifications/
+Disallow: /reset-password/
+
+# Sitemap link
+Sitemap: https://momentx-connect.vercel.app/sitemap.xml

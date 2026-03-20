@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Camera, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -96,7 +97,7 @@ export function EditProfileDialog({ isOpen, onClose, user, onProfileUpdate }: Ed
     }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -105,125 +106,160 @@ export function EditProfileDialog({ isOpen, onClose, user, onProfileUpdate }: Ed
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[110]"
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", duration: 0.5 }}
-            className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-16px)] sm:w-[calc(100%-32px)] max-w-125 md:max-w-150 lg:max-w-175 xl:max-w-200 max-h-[calc(100vh-32px)] sm:max-h-[calc(100vh-64px)]"
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed z-[111] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-24px)] max-w-2xl max-h-[calc(100vh-48px)] flex flex-col"
           >
-            <div className="h-auto max-h-[calc(100vh-32px)] sm:max-h-[calc(100vh-64px)] glass-strong rounded-2xl overflow-hidden flex flex-col shadow-2xl">
-              <div className="flex items-center justify-between p-4 md:p-6 border-b border-border shrink-0">
-                <h2 className="text-xl md:text-2xl font-display font-bold">Edit Profile</h2>
+            <div className="glass-strong rounded-[2rem] overflow-hidden flex flex-col shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] border border-white/10 bg-background/90">
+              {/* Header */}
+              <div className="flex items-center justify-between p-7 border-b border-white/5 bg-card/30 shrink-0">
+                <div className="space-y-1">
+                    <h2 className="text-2xl font-black tracking-tight">Identity Configuration</h2>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Modify your MomentX Presence</p>
+                </div>
                 <motion.button
-                  whileHover={{ scale: 1.1 }}
+                  whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={onClose}
-                  className="p-2 md:p-3 glass rounded-full"
+                  className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-colors border border-white/5"
                 >
-                  <X className="w-5 h-5 md:w-6 md:h-6" />
+                  <X className="w-5 h-5 text-muted-foreground" />
                 </motion.button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 md:space-y-8">
-                <div className="flex justify-center">
-                  <div className="relative group">
-                    <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 rounded-full bg-linear-to-r from-neon-indigo via-neon-violet to-neon-pink p-1">
-                      <div className="w-full h-full rounded-full bg-background p-1">
-                        <img
-                          src={previewImage || "/image.png"}
-                          alt={displayName}
-                          className="w-full h-full rounded-full object-cover"
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-10">
+                {/* Avatar Section */}
+                <div className="flex flex-col items-center gap-6">
+                    <div className="relative group/avatar">
+                        <motion.div
+                            whileHover={{ scale: 1.02 }}
+                            className="w-32 h-32 md:w-36 md:h-36 rounded-full bg-linear-to-tr from-amber-400 via-orange-500 to-emerald-500 p-[3px] shadow-2xl shadow-amber-500/20"
+                        >
+                            <div className="w-full h-full rounded-full border-4 border-background overflow-hidden bg-muted">
+                                <img
+                                    src={previewImage || "/image.png"}
+                                    alt={displayName}
+                                    className="w-full h-full object-cover transition-transform group-hover/avatar:scale-110 duration-500"
+                                />
+                                <div 
+                                    className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity cursor-pointer"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <Camera className="w-8 h-8 text-white" />
+                                </div>
+                            </div>
+                        </motion.div>
+
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept="image/*"
+                            onChange={handleImageChange}
                         />
-                      </div>
+
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => fileInputRef.current?.click()}
+                            className="absolute bottom-1 right-1 p-3 bg-background border border-white/10 rounded-2xl shadow-xl text-primary"
+                        >
+                            <Camera className="w-4 h-4" />
+                        </motion.button>
                     </div>
-
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                    />
-
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => fileInputRef.current?.click()}
-                      className="absolute bottom-0 right-0 p-2 sm:p-3 md:p-4 bg-gradient-primary rounded-full shadow-lg"
-                    >
-                      <Camera className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                    </motion.button>
-                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm md:text-base font-medium text-muted-foreground">Display Name</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-1">Displayed Identity</label>
                     <Input
                       variant="glass"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      placeholder="Your display name"
+                      placeholder="Enter name..."
                       maxLength={30}
-                      className="h-11 md:h-12 text-base"
+                      className="h-14 text-base font-bold bg-white/5 border-white/5 focus:border-primary/50 rounded-2xl px-5"
                     />
-                    <p className="text-xs text-muted-foreground text-right">{displayName.length}/30</p>
+                    <div className="flex justify-end pr-2">
+                        <span className="text-[8px] font-black text-muted-foreground/50">{displayName.length}/30</span>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm md:text-base font-medium text-muted-foreground">Username</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-1">System Handle</label>
+                    <div className="relative group/input">
+                      <span className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground/50 font-black text-lg group-focus-within/input:text-primary transition-colors">@</span>
                       <Input
                         variant="glass"
                         value={username}
                         onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ""))}
-                        placeholder="username"
-                        className="pl-10 h-11 md:h-12 text-base"
+                        placeholder="handle"
+                        className="pl-11 h-14 text-base font-bold bg-white/5 border-white/5 focus:border-primary/50 rounded-2xl"
                         maxLength={20}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground text-right">{username.length}/20</p>
+                    <div className="flex justify-end pr-2">
+                        <span className="text-[8px] font-black text-muted-foreground/50">{username.length}/20</span>
+                    </div>
                   </div>
 
-                  <div className="space-y-2 lg:col-span-2">
-                    <label className="text-sm md:text-base font-medium text-muted-foreground">Bio</label>
+                  <div className="space-y-3 md:col-span-2">
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-1">Professional Abstract</label>
                     <Textarea
                       value={bio}
                       onChange={(e) => setBio(e.target.value)}
-                      placeholder="Tell us about yourself..."
-                      className="min-h-25 md:min-h-30 glass-strong border-border/50 focus:border-primary/50 resize-none text-base"
+                      placeholder="Synchronize your story..."
+                      className="min-h-32 glass-strong bg-white/5 border-white/5 focus:border-primary/50 rounded-2xl p-5 text-base font-medium resize-none"
                       maxLength={150}
                     />
-                    <p className="text-xs text-muted-foreground text-right">{bio.length}/150</p>
+                    <div className="flex justify-end pr-2">
+                        <span className="text-[8px] font-black text-muted-foreground/50">{bio.length}/150</span>
+                    </div>
                   </div>
 
-                  <div className="space-y-2 lg:col-span-2">
-                    <label className="text-sm md:text-base font-medium text-muted-foreground">Website</label>
+                  <div className="space-y-3 md:col-span-2">
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-1">Digital Domain</label>
                     <Input
                       variant="glass"
                       value={website}
                       onChange={(e) => setWebsite(e.target.value)}
-                      placeholder="yourwebsite.com"
-                      className="h-11 md:h-12 text-base"
+                      placeholder="https://example.com"
+                      className="h-14 text-base font-bold bg-white/5 border-white/5 focus:border-primary/50 rounded-2xl px-5"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="p-4 md:p-6 border-t border-border flex gap-3 md:gap-4 shrink-0">
-                <Button variant="glass" onClick={onClose} className="flex-1 h-11 md:h-12 text-base" disabled={isLoading}>Cancel</Button>
-                <Button variant="gradient" onClick={handleSave} className="flex-1 h-11 md:h-12 text-base" disabled={isLoading}>
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Changes"}
+              {/* Footer */}
+              <div className="p-7 border-t border-white/5 flex gap-4 bg-card/20 shrink-0">
+                <Button 
+                    variant="glass" 
+                    onClick={onClose} 
+                    className="flex-1 h-14 text-xs font-black uppercase tracking-[0.2em] rounded-2xl border-white/5 hover:bg-white/10" 
+                    disabled={isLoading}
+                >
+                    Discard Changes
+                </Button>
+                <Button 
+                    variant="gradient" 
+                    onClick={handleSave} 
+                    className="flex-1 h-14 text-xs font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-primary/10" 
+                    disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Authorize & Save"}
                 </Button>
               </div>
             </div>
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

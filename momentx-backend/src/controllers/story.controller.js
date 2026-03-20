@@ -135,6 +135,11 @@ export const viewStory = async (req, res) => {
     const story = await Story.findById(storyId);
     if (!story) return res.status(404).json({ message: 'Story not found' });
 
+    // ✅ Only count views from other profiles (Author view excluded)
+    if (story.user.toString() === userId.toString()) {
+      return res.status(200).json({ success: true, message: "Author view not counted" });
+    }
+
     const alreadyViewed = story.viewers.some(
       (v) => v.user.toString() === userId.toString(),
     );

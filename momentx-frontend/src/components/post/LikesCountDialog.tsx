@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, X, Loader2 } from "lucide-react";
+import { Heart, X, Loader2, User } from "lucide-react";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/axios";
@@ -41,85 +42,105 @@ export function LikesCountDialog({ isOpen, onClose, postId, likesCount }: LikesC
         navigate(`/u/${username}`);
     };
 
-    return (
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
-                <>
+                <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-70"
+                        className="fixed inset-0 bg-background/80 backdrop-blur-md"
                     />
 
-                    {/* Bottom Sheet Modal */}
+                    {/* Dialog Container */}
                     <motion.div
-                        initial={{ y: "100%" }}
-                        animate={{ y: 0 }}
-                        exit={{ y: "100%" }}
-                        transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                        className="fixed bottom-0 left-0 right-0 z-70 bg-zinc-900 rounded-t-3xl max-h-[85vh] flex flex-col md:max-w-md md:left-1/2 md:-translate-x-1/2 md:bottom-4 md:rounded-3xl border border-white/10 shadow-2xl"
+                        initial={{ y: "100%", opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: "100%", opacity: 0 }}
+                        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                        className="relative w-full max-w-lg bg-background/95 glass-strong border-t sm:border border-white/10 rounded-t-[2.5rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col z-[111] max-h-[85vh]"
                     >
                         {/* Drag Handle for Mobile */}
-                        <div className="flex justify-center py-3 shrink-0 md:hidden">
-                            <div className="w-10 h-1 bg-white/30 rounded-full" />
+                        <div className="flex justify-center py-4 shrink-0 sm:hidden">
+                            <div className="w-12 h-1.5 bg-white/20 rounded-full" />
                         </div>
 
                         {/* Header */}
-                        <div className="flex items-center justify-between px-4 pb-3 border-b border-white/10 shrink-0">
-                            <div className="flex items-center gap-2">
-                                <Heart className="w-5 h-5 text-red-500 fill-red-500" />
-                                <h2 className="text-white font-semibold text-lg font-display">Likes</h2>
-                                <span className="text-sm text-white/50">({formatNumber(likesCount)})</span>
+                        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-card/30">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-red-500/10 rounded-2xl">
+                                    <Heart className="w-6 h-6 text-red-500 fill-red-500" />
+                                </div>
+                                <div className="space-y-0.5">
+                                    <h2 className="text-xl font-black tracking-tighter uppercase italic">
+                                        Endorsement <span className="gradient-text">Log</span>
+                                    </h2>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
+                                        {formatNumber(likesCount)} Global Resonances
+                                    </p>
+                                </div>
                             </div>
-                            <button onClick={onClose} className="p-2 -mr-2 hover:bg-white/10 rounded-full transition-colors">
-                                <X className="w-6 h-6 text-white" />
+                            <button 
+                                onClick={onClose} 
+                                className="p-3 hover:bg-white/5 rounded-2xl transition-all border border-transparent hover:border-white/10 group"
+                            >
+                                <X className="w-6 h-6 text-muted-foreground group-hover:text-white transition-colors" />
                             </button>
                         </div>
 
                         {/* Content Area */}
-                        <div className="overflow-y-auto flex-1 p-2 min-h-75 scrollbar-hide">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
                             {loading ? (
-                                <div className="flex items-center justify-center h-full py-10">
-                                    <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+                                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                                    <div className="w-10 s-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Accessing Node Database...</p>
                                 </div>
                             ) : likedUsers.length === 0 ? (
-                                <p className="text-center text-sm text-white/50 py-10">No likes yet.</p>
-                            ) : (
-                                <div className="space-y-1">
-                                    {likedUsers.map((user) => (
-                                        <div key={user._id} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors">
-                                            <div
-                                                className="flex items-center gap-3 cursor-pointer flex-1"
-                                                onClick={() => handleNavigate(user.username)}
-                                            >
-                                                <AvatarRing src={user.profilePic || "/image.png"} alt={user.name} size="sm" />
-                                                <div>
-                                                    <p className="text-sm font-semibold text-white">{user.username}</p>
-                                                    <p className="text-xs text-white/50">{user.name}</p>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="text-xs h-8 bg-transparent border-white/20 text-white hover:bg-white/10"
-                                                onClick={() => handleNavigate(user.username)}
-                                            >
-                                                View
-                                            </Button>
-                                        </div>
-                                    ))}
+                                <div className="flex flex-col items-center justify-center py-20 opacity-30 text-center">
+                                    <Heart className="w-16 h-16 mb-4" />
+                                    <p className="text-xs font-black uppercase tracking-widest">No Resonances Detected</p>
                                 </div>
+                            ) : (
+                                likedUsers.map((user, i) => (
+                                    <motion.div 
+                                        key={user._id} 
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: i * 0.05 }}
+                                        className="group flex items-center justify-between p-4 rounded-3xl hover:bg-white/5 border border-transparent hover:border-white/5 transition-all"
+                                    >
+                                        <div
+                                            className="flex items-center gap-4 cursor-pointer flex-1"
+                                            onClick={() => handleNavigate(user.username)}
+                                        >
+                                            <AvatarRing src={user.profilePic || "/image.png"} alt={user.name} size="md" />
+                                            <div>
+                                                <p className="font-bold text-sm group-hover:text-primary transition-colors">{user.username}</p>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">{user.name}</p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="glass"
+                                            size="sm"
+                                            className="h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest border-white/5 group-hover:border-primary/30 group-hover:text-primary transition-all"
+                                            onClick={() => handleNavigate(user.username)}
+                                        >
+                                            Inspect Profile
+                                        </Button>
+                                    </motion.div>
+                                ))
                             )}
                         </div>
 
                         {/* Safe area padding for bottom of mobile screens */}
-                        <div className="h-4 shrink-0" />
+                        <div className="h-6 shrink-0 sm:hidden" />
                     </motion.div>
-                </>
+                </div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
-}
+}

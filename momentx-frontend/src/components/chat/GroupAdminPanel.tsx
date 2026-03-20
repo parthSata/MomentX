@@ -1,11 +1,13 @@
 import { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Search, Users, Crown, UserPlus, UserMinus, Shield,
-  LogOut, Settings, ShieldCheck, ShieldMinus, Camera
+  X, Search, Users, Crown, UserPlus, UserMinus, ShieldCheck, ShieldMinus, Camera, LogOut, Settings
 } from "lucide-react";
 import { AvatarRing } from "@/components/ui/avatar-ring";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { api } from "@/lib/axios";
 
@@ -115,7 +117,7 @@ export default function GroupAdminPanel({
     onClose();
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {showPanel && (
         <>
@@ -124,14 +126,14 @@ export default function GroupAdminPanel({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
-            className="fixed inset-0 bg-background/70 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-background/70 backdrop-blur-sm z-[110]"
           />
           <motion.div
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 w-[85%] max-w-sm z-50 glass-strong flex flex-col border-l border-border/50 shadow-2xl"
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed right-0 top-0 bottom-0 w-full sm:w-[400px] z-[111] bg-background/95 glass-strong flex flex-col border-l border-white/10 shadow-2xl"
           >
             {/* Hidden file input */}
             <input
@@ -143,136 +145,155 @@ export default function GroupAdminPanel({
             />
 
             {/* Panel Header */}
-            <div className="p-5 border-b border-border/50">
-              <div className="flex items-center justify-between mb-4">
-                <motion.button whileTap={{ scale: 0.9 }} onClick={handleClose}>
-                  <X className="w-5 h-5" />
+            <div className="p-6 border-b border-white/5 bg-card/30">
+              <div className="flex items-center justify-between mb-6">
+                <motion.button 
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }} 
+                    onClick={handleClose}
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-5 h-5 text-muted-foreground" />
                 </motion.button>
-                <h3 className="font-display font-bold gradient-text">Group Info</h3>
-                <div className="w-5" />
+                <h3 className="font-black text-xs uppercase tracking-[0.3em] text-muted-foreground">Group Intelligence</h3>
+                <div className="w-9" />
               </div>
 
               {/* Group avatar with upload */}
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center gap-4">
                 <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", damping: 12 }}
-                  className="relative mb-3"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", damping: 15 }}
+                  className="relative"
                 >
                   <div
-                    className="w-24 h-24 rounded-full bg-gradient-primary p-[3px] animate-glow cursor-pointer overflow-hidden"
+                    className="w-28 h-28 rounded-full bg-linear-to-tr from-amber-400 to-emerald-500 p-[3px] shadow-2xl shadow-amber-500/10 cursor-pointer overflow-hidden group/avatar"
                     onClick={() => isCurrentUserAdmin && fileInputRef.current?.click()}
                   >
-                    {groupAvatar ? (
-                      <img src={groupAvatar} className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
-                        <Users className="w-10 h-10 text-primary" />
-                      </div>
-                    )}
+                    <div className="w-full h-full rounded-full border-4 border-background overflow-hidden relative">
+                        {groupAvatar ? (
+                        <img src={groupAvatar} className="w-full h-full object-cover transition-transform group-hover/avatar:scale-110" />
+                        ) : (
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <Users className="w-10 h-10 text-muted-foreground/50" />
+                        </div>
+                        )}
+                        {isCurrentUserAdmin && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                                <Camera className="w-6 h-6 text-white" />
+                            </div>
+                        )}
+                    </div>
                   </div>
                   {isCurrentUserAdmin && (
                     <motion.button
+                      whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={() => fileInputRef.current?.click()}
-                      className="absolute -bottom-1 -right-1 p-2.5 bg-gradient-primary rounded-full ring-3 ring-background shadow-lg text-primary-foreground"
+                      className="absolute bottom-1 right-1 p-2.5 bg-background border border-white/10 rounded-full shadow-xl text-primary"
                     >
-                      <Camera className="w-4 h-4 text-primary-foreground" />
+                      <Camera className="w-4 h-4" />
                     </motion.button>
                   )}
                 </motion.div>
                 
-                {isEditingName ? (
-                  <div className="flex items-center gap-2 mt-2">
-                    <Input 
-                      value={editNameValue} 
-                      onChange={e => setEditNameValue(e.target.value)}
-                      className="h-8 text-sm"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          onGroupNameChange(editNameValue);
-                          setIsEditingName(false);
-                        } else if (e.key === 'Escape') {
-                          setEditNameValue(groupName || "");
-                          setIsEditingName(false);
-                        }
-                      }}
-                    />
-                    <motion.button 
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => {
-                        onGroupNameChange(editNameValue);
-                        setIsEditingName(false);
-                      }}
-                      className="p-1.5 glass rounded-md bg-primary text-primary-foreground"
-                    >
-                      <Crown className="w-4 h-4" />
-                    </motion.button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mt-2">
-                    <h2 className="font-display font-bold text-lg">{groupName || members[0]?.name || "Group Settings"}</h2>
-                    {isCurrentUserAdmin && (
-                      <motion.button whileTap={{ scale: 0.9 }} onClick={() => {
-                        setEditNameValue(groupName || "");
-                        setIsEditingName(false);
-                        setIsEditingName(!isEditingName);
-                      }}>
-                        <Settings className="w-4 h-4 text-muted-foreground" />
-                      </motion.button>
+                <div className="text-center w-full px-4">
+                    {isEditingName ? (
+                    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-2">
+                        <Input 
+                        value={editNameValue} 
+                        onChange={e => setEditNameValue(e.target.value)}
+                        className="h-10 text-center font-bold text-lg bg-white/5 border-white/10 focus:border-primary/50"
+                        autoFocus
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                            onGroupNameChange(editNameValue);
+                            setIsEditingName(false);
+                            } else if (e.key === 'Escape') {
+                            setEditNameValue(groupName || "");
+                            setIsEditingName(false);
+                            }
+                        }}
+                        />
+                        <div className="flex gap-2 justify-center">
+                            <Button size="sm" variant="ghost" onClick={() => setIsEditingName(false)} className="h-8 text-[10px] font-black uppercase">Cancel</Button>
+                            <Button size="sm" variant="gradient" onClick={() => { onGroupNameChange(editNameValue); setIsEditingName(false); }} className="h-8 text-[10px] font-black uppercase">Save Name</Button>
+                        </div>
+                    </motion.div>
+                    ) : (
+                    <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-2 group/title justify-center">
+                            <h2 className="font-black text-2xl tracking-tight leading-none truncate max-w-[250px]">
+                                {groupName || "Group Name"}
+                            </h2>
+                            {isCurrentUserAdmin && (
+                            <motion.button 
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }} 
+                                onClick={() => {
+                                    setEditNameValue(groupName || "");
+                                    setIsEditingName(true);
+                                }}
+                                className="opacity-0 group-hover/title:opacity-100 p-1 rounded-md hover:bg-white/5 transition-all text-muted-foreground"
+                            >
+                                <Settings className="w-4 h-4" />
+                            </motion.button>
+                            )}
+                        </div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                            MomentX Workspace · {members.length} Members
+                        </p>
+                    </div>
                     )}
-                  </div>
-                )}
-                
-                <p className="text-xs text-muted-foreground mt-0.5">Group · {members.length} members</p>
+                </div>
 
-                {/* Admin badge */}
                 {isCurrentUserAdmin && (
                   <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.2, type: "spring" }}
-                    className="mt-3 flex items-center justify-center gap-2 px-6 py-2 bg-primary/10 rounded-full ring-1 ring-primary/20 w-fit"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="mt-2 flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full"
                   >
-                    <Shield className="w-4 h-4 text-primary" />
-                    <span className="text-xs font-bold text-primary uppercase tracking-wider">You are Admin</span>
+                    <Crown className="w-3 h-3 text-amber-500 fill-amber-500" />
+                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Administrator</span>
                   </motion.div>
-                )}              </div>
+                )}
+              </div>
             </div>
 
             {/* Tabs Navigation */}
-            <div className="flex p-2 gap-1 bg-muted/30 mx-4 mt-2 rounded-xl">
+            <div className="flex p-1.5 gap-1.5 bg-white/5 mx-6 mt-6 rounded-2xl border border-white/5">
               <button 
                 onClick={() => setActiveTab("members")}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === "members" ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:bg-primary/5"}`}
+                className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === "members" ? "bg-white/10 text-white shadow-lg border border-white/10" : "text-muted-foreground hover:bg-white/5"}`}
               >
-                Members
+                Intelligence
               </button>
               <button 
                 onClick={() => setActiveTab("settings")}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === "settings" ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:bg-primary/5"}`}
+                className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === "settings" ? "bg-white/10 text-white shadow-lg border border-white/10" : "text-muted-foreground hover:bg-white/5"}`}
               >
-                Settings
+                Configuration
               </button>
             </div>
 
             {/* Members Tab */}
             {activeTab === "members" && (
-              <div className="flex-1 overflow-y-auto">
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Members · {members.length}
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="p-6 pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                        Participant Registry ({members.length})
                     </p>
                     {isCurrentUserAdmin && (
                       <motion.button
-                        whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => setShowAddMember(!showAddMember)}
-                        className="p-1.5 glass rounded-full"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl transition-colors"
                       >
-                        <UserPlus className="w-4 h-4 text-primary" />
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Enlist</span>
                       </motion.button>
                     )}
                   </div>
@@ -284,160 +305,164 @@ export default function GroupAdminPanel({
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="mb-3 overflow-hidden"
+                        className="mb-6 overflow-hidden"
                       >
-                        <div className="p-3 glass rounded-2xl space-y-2">
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-4">
                           <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground z-10" />
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                               variant="glass"
-                              placeholder="Search to add..."
+                              placeholder="Search username..."
                               value={addSearch}
                               onChange={(e) => handleSearch(e.target.value)}
-                              className="pl-9 h-9 text-sm"
+                              className="pl-11 h-10 text-sm border-white/5 bg-black/20"
                               autoFocus
                             />
                           </div>
-                          {searchResults.map((user) => (
-                            <motion.div
-                              key={user._id}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              className="flex items-center gap-2 p-2 rounded-xl hover:bg-primary/10 cursor-pointer transition-colors"
-                              onClick={() => {
-                                onAddMember({ id: user._id, name: user.name, username: user.username, avatar: user.profilePic });
-                                setShowAddMember(false);
-                                setAddSearch("");
-                                setSearchResults([]);
-                              }}
-                            >
-                              <img src={user.profilePic || "/image.png"} className="w-8 h-8 rounded-full object-cover" />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">{user.name}</p>
-                                <p className="text-[10px] text-muted-foreground">@{user.username}</p>
-                              </div>
-                              <div className="p-1 bg-gradient-primary rounded-full">
-                                <UserPlus className="w-3 h-3 text-primary-foreground" />
-                              </div>
-                            </motion.div>
-                          ))}
-                          {addSearch.length >= 2 && searchResults.length === 0 && (
-                            <p className="text-xs text-muted-foreground text-center py-2">No users found</p>
-                          )}
+                          <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar px-1">
+                            {searchResults.map((user) => (
+                                <motion.div
+                                    key={user._id}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 cursor-pointer transition-all border border-transparent hover:border-white/5 group/res"
+                                    onClick={() => {
+                                        onAddMember({ id: user._id, name: user.name, username: user.username, avatar: user.profilePic });
+                                        setShowAddMember(false);
+                                        setAddSearch("");
+                                        setSearchResults([]);
+                                    }}
+                                >
+                                    <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10">
+                                        <img src={user.profilePic || "/image.png"} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-white/90 leading-none">{user.name}</p>
+                                        <p className="text-[10px] text-muted-foreground mt-1 uppercase font-black tracking-tighter">@{user.username}</p>
+                                    </div>
+                                    <div className="p-2 bg-primary/10 group-hover/res:bg-primary text-primary group-hover/res:text-primary-foreground rounded-lg transition-colors">
+                                        <UserPlus className="w-3.5 h-3.5" />
+                                    </div>
+                                </motion.div>
+                            ))}
+                            {addSearch.length >= 2 && searchResults.length === 0 && (
+                                <div className="text-center py-4 opacity-50">
+                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Entity Not Found</p>
+                                </div>
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
                   {/* Member list */}
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {members.map((member, i) => (
                       <motion.div
                         key={member.id}
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.04 }}
-                        className="relative"
+                        transition={{ delay: i * 0.03 }}
+                        className="group/member"
                       >
                         <div
-                          className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/40 transition-colors cursor-pointer"
+                          className={cn(
+                              "flex items-center gap-3 p-3 rounded-2xl transition-all border border-transparent",
+                              memberAction === member.id ? "bg-white/10 border-white/10" : "hover:bg-white/5"
+                          )}
                           onClick={() => {
                             if (isCurrentUserAdmin && member.id !== currentUserId) {
                               setMemberAction(memberAction === member.id ? null : member.id);
                             }
                           }}
                         >
-                          {member.id === currentUserId ? (
-                            <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center shrink-0">
-                              <span className="text-xs font-bold text-primary-foreground">You</span>
-                            </div>
-                          ) : (
-                            <div className="relative shrink-0">
-                              <AvatarRing src={member.avatar} size="sm" isOnline={member.isOnline} />
-                            </div>
-                          )}
+                          <div className="relative shrink-0">
+                            {member.id === currentUserId ? (
+                                <div className="w-10 h-10 rounded-full bg-linear-to-tr from-amber-400 to-amber-600 p-[2px] shadow-lg">
+                                    <div className="w-full h-full rounded-full border-2 border-background overflow-hidden">
+                                        <img src={member.avatar || "/image.png"} className="w-full h-full object-cover" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <AvatarRing src={member.avatar} size="md" isOnline={member.isOnline} />
+                            )}
+                          </div>
+                          
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className="text-sm font-semibold truncate">{member.id === currentUserId ? "You" : member.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className={cn("text-sm font-bold truncate", member.id === currentUserId ? "text-amber-500" : "text-white/90")}>
+                                {member.id === currentUserId ? "Security Protocol (You)" : member.name}
+                              </p>
                               {member.role === "admin" && (
-                                <motion.div
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  className="flex items-center gap-0.5 px-1.5 py-0.5 bg-primary/15 rounded-full shrink-0"
-                                >
-                                  <Crown className="w-3 h-3 text-primary fill-primary" />
-                                  <span className="text-[8px] font-bold text-primary uppercase tracking-wider">Admin</span>
-                                </motion.div>
+                                <Crown className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />
                               )}
                             </div>
-                            <p className="text-[10px] text-muted-foreground truncate">
-                              {member.id === currentUserId ? "@you" : `@${member.username}`}
-                              {member.isOnline && member.id !== currentUserId && (
-                                <span className="ml-1 text-green-500">● Online</span>
-                              )}
+                            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter mt-0.5">
+                              @{member.username} {member.isOnline && "· ACTIVE NOW"}
                             </p>
                           </div>
 
-                          {/* Admin indicator for non-me members */}
                           {isCurrentUserAdmin && member.id !== currentUserId && (
                             <motion.div
                               animate={{ rotate: memberAction === member.id ? 90 : 0 }}
-                              className="p-1.5 glass rounded-full shrink-0"
+                              className="p-2 text-muted-foreground/30 group-hover/member:text-white transition-colors"
                             >
-                              <Settings className="w-3.5 h-3.5 text-muted-foreground" />
+                              <Settings className="w-4 h-4" />
                             </motion.div>
                           )}
                         </div>
 
-                        {/* Admin action buttons for selected member */}
+                        {/* Admin action buttons */}
                         <AnimatePresence>
                           {memberAction === member.id && isCurrentUserAdmin && member.id !== currentUserId && (
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
-                              className="overflow-hidden"
+                              className="overflow-hidden bg-white/5 rounded-b-2xl mx-1"
                             >
-                              <div className="flex gap-2 px-3 pb-2 pt-1">
-                                {/* Toggle admin */}
+                              <div className="flex gap-2 p-3 pt-0">
                                 <motion.button
-                                  whileTap={{ scale: 0.95 }}
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onToggleAdmin(member.id);
                                     setMemberAction(null);
                                   }}
-                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-colors ${
-                                    member.role === "admin"
-                                      ? "bg-accent text-accent-foreground hover:bg-accent/80"
-                                      : "bg-primary/10 text-primary hover:bg-primary/20"
-                                  }`}
+                                  className={cn(
+                                      "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                                      member.role === "admin"
+                                        ? "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+                                        : "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/20"
+                                  )}
                                 >
                                   {member.role === "admin" ? (
                                     <>
                                       <ShieldMinus className="w-3.5 h-3.5" />
-                                      Remove Admin
+                                      Revoke Admin
                                     </>
                                   ) : (
                                     <>
                                       <ShieldCheck className="w-3.5 h-3.5" />
-                                      Make Admin
+                                      Grant Admin
                                     </>
                                   )}
                                 </motion.button>
 
-                                {/* Remove member */}
                                 <motion.button
-                                  whileTap={{ scale: 0.95 }}
+                                  whileHover={{ scale: 1.02, backgroundColor: "rgba(239, 68, 68, 0.2)" }}
+                                  whileTap={{ scale: 0.98 }}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onRemoveMember(member.id);
                                     setMemberAction(null);
                                   }}
-                                  className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 transition-all"
                                 >
                                   <UserMinus className="w-3.5 h-3.5" />
-                                  Remove
+                                  Expel
                                 </motion.button>
                               </div>
                             </motion.div>
@@ -452,40 +477,49 @@ export default function GroupAdminPanel({
 
             {/* Settings Tab */}
             {activeTab === "settings" && (
-              <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                  <div>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Group Identity</h4>
-                    <div className="glass-strong p-4 rounded-2xl border border-border/50 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Group Photo</span>
-                        <button 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="text-xs font-bold text-primary hover:underline"
-                        >
-                          Change
-                        </button>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Group Name</span>
-                        <button 
-                          onClick={() => setIsEditingName(true)}
-                          className="text-xs font-bold text-primary hover:underline"
-                        >
-                          Edit
-                        </button>
-                      </div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Group Core Identity</h4>
+                    <div className="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors group/set"
+                      >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-white/5 text-muted-foreground group-hover/set:text-primary transition-colors">
+                                <Camera className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm font-bold">Visual Identity</span>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">Modify</span>
+                      </button>
+                      <div className="h-px bg-white/5 mx-4" />
+                      <button 
+                        onClick={() => setIsEditingName(true)}
+                        className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors group/set"
+                      >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-white/5 text-muted-foreground group-hover/set:text-primary transition-colors">
+                                <Settings className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm font-bold">Designation</span>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">Rename</span>
+                      </button>
                     </div>
                   </div>
 
-                  <div>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Permissions</h4>
-                    <div className="glass-strong p-4 rounded-2xl border border-border/50 space-y-4">
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Access Protocols</h4>
+                    <div className="bg-white/5 rounded-2xl border border-white/5 p-4 space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <p className="text-sm font-medium">Only Admins can Edit</p>
-                          <p className="text-[10px] text-muted-foreground">Restrict name/avatar changes</p>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold">Admin-Only Modification</p>
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-tight">Restrict profile changes to leaders</p>
                         </div>
-                        <div className="w-8 h-4 bg-primary/20 rounded-full" />
+                        <div className="w-10 h-5 bg-amber-500/20 rounded-full flex items-center px-1 border border-amber-500/30">
+                            <div className="w-3 h-3 bg-amber-500 rounded-full" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -493,19 +527,21 @@ export default function GroupAdminPanel({
             )}
 
             {/* Leave group */}
-            <div className="p-4 border-t border-border/50">
+            <div className="p-6 border-t border-white/5 bg-card/20">
               <motion.button
+                whileHover={{ scale: 1.02, backgroundColor: "rgba(239, 68, 68, 0.1)" }}
                 whileTap={{ scale: 0.98 }}
                 onClick={onLeaveGroup}
-                className="w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-destructive hover:bg-destructive/10 transition-colors font-medium text-sm"
+                className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-red-500 border border-red-500/10 transition-all font-black text-xs uppercase tracking-[0.2em]"
               >
                 <LogOut className="w-4 h-4" />
-                Leave Group
+                Terminate Session
               </motion.button>
             </div>
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
