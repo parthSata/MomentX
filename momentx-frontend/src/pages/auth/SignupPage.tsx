@@ -64,15 +64,57 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      // Local check before sending
-      if (formData.username.includes(' ')) {
-        const err = { username: "Username cannot contain spaces" };
-        setErrors(err);
+      // Local validation
+      const activeErrors: Record<string, string> = {};
+
+      // Trim all data
+      const cleanData = {
+        name: formData.name.trim(),
+        username: formData.username.trim().toLowerCase(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim().replace(/\D/g, ""),
+        password: formData.password, // Trimming password at start/end
+      };
+
+      // Update form data with cleaned values
+      setFormData({
+        ...cleanData,
+        password: formData.password.trim()
+      });
+
+      // 1. Username Validation
+      if (!cleanData.username || cleanData.username.includes(" ")) {
+        activeErrors.username = "Username cannot contain spaces";
+      } else if (cleanData.username.length < 3) {
+        activeErrors.username = "Username must be at least 3 characters";
+      }
+
+      // 2. Email Validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanData.email)) {
+        activeErrors.email = "Please enter a valid email address";
+      }
+
+      // 3. Phone Validation (Digits only, usually 10-15 digits)
+      if (cleanData.phone && (cleanData.phone.length < 10 || cleanData.phone.length > 11)) {
+        activeErrors.phone = "Phone number must be between 10-11 digits";
+      }
+
+      // 4. Password Validation
+      if (cleanData.password.trim().length < 6) {
+        activeErrors.password = "Password must be at least 6 characters";
+      } else if (cleanData.password.startsWith(" ") || cleanData.password.endsWith(" ")) {
+        activeErrors.password = "Password cannot start or end with spaces";
+      }
+
+      if (Object.keys(activeErrors).length > 0) {
+        setErrors(activeErrors);
         return setIsLoading(false);
       }
 
       await api.post("/users/register-otp", {
-        ...formData
+        ...cleanData,
+        password: cleanData.password.trim()
       });
 
       toast.success("Verification Code Sent", {
@@ -189,7 +231,7 @@ export default function SignupPage() {
 
                   <div className="space-y-1">
                     <div className="relative group">
-                      <Input placeholder="Username" value={formData.username} onChange={(e) => { setFormData({ ...formData, username: e.target.value.toLowerCase() }); setErrors({}); }} className={`pl-11 text-white ${errors.username ? 'border-red-500' : ''}`} required />
+                      <Input placeholder="Username" value={formData.username} onChange={(e) => { setFormData({ ...formData, username: e.target.value.trim().toLowerCase() }); setErrors({}); }} className={`pl-11 text-white ${errors.username ? 'border-red-500' : ''}`} required />
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
                     </div>
                     {errors.username && <p className="text-[10px] text-red-500 ml-1">{errors.username}</p>}
@@ -205,9 +247,20 @@ export default function SignupPage() {
 
                   <div className="space-y-1">
                     <div className="relative group">
-                      <Input type="tel" placeholder="Phone number" value={formData.phone} onChange={(e) => { setFormData({ ...formData, phone: e.target.value }); setErrors({}); }} className="pl-11 text-white" />
+                      <Input
+                        type="tel"
+                        placeholder="Phone number"
+                        value={formData.phone}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "").slice(0, 15);
+                          setFormData({ ...formData, phone: val });
+                          setErrors({});
+                        }}
+                        className={`pl-11 text-white ${errors.phone ? 'border-red-500' : ''}`}
+                      />
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
                     </div>
+                    {errors.phone && <p className="text-[10px] text-red-500 ml-1">{errors.phone}</p>}
                   </div>
 
                   <div className="space-y-1">
