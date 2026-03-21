@@ -155,7 +155,7 @@ export default function GroupAdminPanel({
                 >
                   <X className="w-5 h-5 text-muted-foreground" />
                 </motion.button>
-                <h3 className="font-black text-xs uppercase tracking-[0.3em] text-muted-foreground">Group Intelligence</h3>
+                <h3 className="font-black text-xs uppercase tracking-[0.3em] text-muted-foreground">Group Details</h3>
                 <div className="w-9" />
               </div>
 
@@ -242,7 +242,7 @@ export default function GroupAdminPanel({
                             )}
                         </div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                            MomentX Workspace · {members.length} Members
+                            Group Chat · {members.length} Members
                         </p>
                     </div>
                     )}
@@ -267,13 +267,13 @@ export default function GroupAdminPanel({
                 onClick={() => setActiveTab("members")}
                 className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === "members" ? "bg-white/10 text-white shadow-lg border border-white/10" : "text-muted-foreground hover:bg-white/5"}`}
               >
-                Intelligence
+                Members
               </button>
               <button 
                 onClick={() => setActiveTab("settings")}
                 className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === "settings" ? "bg-white/10 text-white shadow-lg border border-white/10" : "text-muted-foreground hover:bg-white/5"}`}
               >
-                Configuration
+                Settings
               </button>
             </div>
 
@@ -283,7 +283,7 @@ export default function GroupAdminPanel({
                 <div className="p-6 pt-4">
                   <div className="flex items-center justify-between mb-4">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                        Participant Registry ({members.length})
+                        Member List ({members.length})
                     </p>
                     {isCurrentUserAdmin && (
                       <motion.button
@@ -293,7 +293,7 @@ export default function GroupAdminPanel({
                         className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl transition-colors"
                       >
                         <UserPlus className="w-3.5 h-3.5" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Enlist</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Add People</span>
                       </motion.button>
                     )}
                   </div>
@@ -312,7 +312,7 @@ export default function GroupAdminPanel({
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                               variant="glass"
-                              placeholder="Search username..."
+                              placeholder="Search people..."
                               value={addSearch}
                               onChange={(e) => handleSearch(e.target.value)}
                               className="pl-11 h-10 text-sm border-white/5 bg-black/20"
@@ -347,7 +347,7 @@ export default function GroupAdminPanel({
                             ))}
                             {addSearch.length >= 2 && searchResults.length === 0 && (
                                 <div className="text-center py-4 opacity-50">
-                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Entity Not Found</p>
+                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">User Not Found</p>
                                 </div>
                             )}
                           </div>
@@ -392,14 +392,14 @@ export default function GroupAdminPanel({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className={cn("text-sm font-bold truncate", member.id === currentUserId ? "text-amber-500" : "text-white/90")}>
-                                {member.id === currentUserId ? "Security Protocol (You)" : member.name}
+                                {member.id === currentUserId ? "You" : member.name}
                               </p>
                               {member.role === "admin" && (
                                 <Crown className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />
                               )}
                             </div>
                             <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter mt-0.5">
-                              @{member.username} {member.isOnline && "· ACTIVE NOW"}
+                              @{member.username} {member.isOnline && "· ONLINE"}
                             </p>
                           </div>
 
@@ -462,7 +462,7 @@ export default function GroupAdminPanel({
                                   className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 transition-all"
                                 >
                                   <UserMinus className="w-3.5 h-3.5" />
-                                  Expel
+                                  Remove
                                 </motion.button>
                               </div>
                             </motion.div>
@@ -479,7 +479,7 @@ export default function GroupAdminPanel({
             {activeTab === "settings" && (
               <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Group Core Identity</h4>
+                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Group Info</h4>
                     <div className="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
                       <button 
                         onClick={() => fileInputRef.current?.click()}
@@ -489,7 +489,7 @@ export default function GroupAdminPanel({
                             <div className="p-2.5 rounded-xl bg-white/5 text-muted-foreground group-hover/set:text-primary transition-colors">
                                 <Camera className="w-4 h-4" />
                             </div>
-                            <span className="text-sm font-bold">Visual Identity</span>
+                            <span className="text-sm font-bold">Group Photo</span>
                         </div>
                         <span className="text-[10px] font-black uppercase tracking-widest text-primary">Modify</span>
                       </button>
@@ -502,7 +502,7 @@ export default function GroupAdminPanel({
                             <div className="p-2.5 rounded-xl bg-white/5 text-muted-foreground group-hover/set:text-primary transition-colors">
                                 <Settings className="w-4 h-4" />
                             </div>
-                            <span className="text-sm font-bold">Designation</span>
+                            <span className="text-sm font-bold">Group Name</span>
                         </div>
                         <span className="text-[10px] font-black uppercase tracking-widest text-primary">Rename</span>
                       </button>
@@ -510,12 +510,12 @@ export default function GroupAdminPanel({
                   </div>
 
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Access Protocols</h4>
+                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Permissions</h4>
                     <div className="bg-white/5 rounded-2xl border border-white/5 p-4 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
                           <p className="text-sm font-bold">Admin-Only Modification</p>
-                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-tight">Restrict profile changes to leaders</p>
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-tight">Only admins can edit group info</p>
                         </div>
                         <div className="w-10 h-5 bg-amber-500/20 rounded-full flex items-center px-1 border border-amber-500/30">
                             <div className="w-3 h-3 bg-amber-500 rounded-full" />
@@ -535,7 +535,7 @@ export default function GroupAdminPanel({
                 className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-red-500 border border-red-500/10 transition-all font-black text-xs uppercase tracking-[0.2em]"
               >
                 <LogOut className="w-4 h-4" />
-                Terminate Session
+                Leave Group
               </motion.button>
             </div>
           </motion.div>

@@ -67,9 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Exposed function
     const refreshUser = async () => {
-        setIsLoading(true); // Optional: Trigger loading state if you want UI spinners
+        // We removed setIsLoading(true) here because setting global loading can cause 
+        // unnecessary UI flickering/remounting for background refreshes (like after following a user)
         await fetchCurrentUser();
-        setIsLoading(false);
     };
 
     // --- 1. Check Session on Load ---

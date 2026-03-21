@@ -239,7 +239,7 @@ export default function ChatSidebar() {
       {/* Header */}
       <div className="flex-shrink-0 p-4 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/")} className="p-2 hover:bg-muted rounded-full hidden md:block"><ArrowLeft className="w-5 h-5" /></button>
+          <button onClick={() => navigate("/")} className="p-2 hover:bg-muted rounded-full flex items-center justify-center transition-colors"><ArrowLeft className="w-5 h-5" /></button>
           <h1 className="text-2xl font-bold font-display text-foreground">Chats</h1>
         </div>
         <div className="flex gap-1">

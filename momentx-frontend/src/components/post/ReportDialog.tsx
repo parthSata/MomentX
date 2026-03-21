@@ -100,7 +100,7 @@ export function ReportDialog({ isOpen, onClose, targetId, targetType }: ReportDi
                                 <div className="w-10" />
                             )}
                             <h2 className="text-xl font-black tracking-tighter uppercase italic text-center flex-1">
-                                Flag <span className="gradient-text">Protocol</span>
+                                Report <span className="gradient-text">Content</span>
                             </h2>
                             <button
                                 onClick={handleClose}
@@ -124,7 +124,7 @@ export function ReportDialog({ isOpen, onClose, targetId, targetType }: ReportDi
                                         className="p-6 space-y-4"
                                     >
                                         <div className="px-2">
-                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70">SELECT VIOLATION TYPE</p>
+                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70">SELECT A REASON</p>
                                             <p className="text-xs font-bold text-muted-foreground mt-1">Why are you reporting this {targetType}?</p>
                                         </div>
 
@@ -174,10 +174,10 @@ export function ReportDialog({ isOpen, onClose, targetId, targetType }: ReportDi
                                                 <div className="p-5 rounded-3xl bg-white/5 border border-white/5 space-y-3">
                                                     <div className="flex items-center gap-3 text-red-400">
                                                         <ShieldAlert className="w-4 h-4" />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">Confidentiality Protocol</span>
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">Your Privacy</span>
                                                     </div>
                                                     <p className="text-[11px] font-bold text-muted-foreground leading-relaxed">
-                                                        Your report is anonymous. Our automated systems will prioritize this frequency for human review. If someone is in immediate danger, deploy emergency services.
+                                                        Your report is anonymous. Our team will review this report shortly. If someone is in immediate danger, contact emergency services.
                                                     </p>
                                                 </div>
                                             </div>
@@ -196,7 +196,7 @@ export function ReportDialog({ isOpen, onClose, targetId, targetType }: ReportDi
                                                 disabled={isSubmitting}
                                                 className="flex-[2] py-4 px-6 rounded-2xl bg-red-500 text-white font-black uppercase tracking-[0.2em] text-[10px] shadow-xl shadow-red-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
                                             >
-                                                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Initiate Takedown"}
+                                                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit Report"}
                                             </button>
                                         </div>
                                     </motion.div>

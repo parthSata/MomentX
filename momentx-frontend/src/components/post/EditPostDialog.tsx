@@ -124,7 +124,7 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
                         const locationName = city ? `${city}, ${country}` : (data.name || data.display_name.split(',')[0]);
 
                         setLocation(locationName);
-                        toast.success(`Signal locked: ${locationName}`);
+                        toast.success(`Location updated: ${locationName}`);
                     } else {
                         setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
                         toast.success("Coordinates acquired (name resolution failed)");
@@ -139,7 +139,7 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
             },
             (err) => {
                 console.error("Geolocation error:", err);
-                toast.error("Location access denied or signal lost");
+                toast.error("Location access denied or unavailable");
                 setIsLocating(false);
             },
             { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
@@ -182,7 +182,7 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
                                 <X className="w-6 h-6 text-muted-foreground group-hover:text-white transition-colors" />
                             </button>
                             <h2 className="text-xl font-black tracking-tighter uppercase italic text-center flex-1">
-                                Calibrate <span className="gradient-text">Transmission</span>
+                                Update <span className="gradient-text">Post</span>
                             </h2>
                             <div className="w-10" />
                         </div>
@@ -191,12 +191,12 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
                         <div className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
                             {/* Caption Section */}
                             <div className="space-y-3">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 ml-2">Internal Log (Caption)</label>
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 ml-2">Post Caption</label>
                                 <div className="relative group">
                                     <Textarea
                                         value={editCaption}
                                         onChange={(e) => setEditCaption(e.target.value)}
-                                        placeholder="Transmit your message..."
+                                        placeholder="Write a caption..."
                                         className="min-h-32 bg-white/5 border-white/5 rounded-3xl p-5 focus:border-primary/30 focus:ring-1 focus:ring-primary/20 transition-all text-sm font-bold resize-none"
                                     />
                                     <div className="absolute bottom-4 right-4 text-[10px] font-black text-muted-foreground/30 uppercase tracking-widest">
@@ -207,7 +207,7 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
 
                             {/* Location Section */}
                             <div className="space-y-3">
-                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 ml-2">Signal Coordinates</label>
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 ml-2">Post Location</label>
                                 <div className="relative group">
                                     <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                                     <Input
@@ -226,7 +226,7 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
                                         ) : (
                                             <MapPin className="w-3 h-3" />
                                         )}
-                                        Detect
+                                        Find Location
                                     </button>
 
                                     {locationSuggestions.length > 0 && (
@@ -272,8 +272,8 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
                                             <UserPlus className="w-5 h-5" />
                                         </div>
                                         <div className="text-left">
-                                            <span className="text-xs font-black uppercase tracking-widest block">Tag Nodes</span>
-                                            <span className="text-[10px] text-muted-foreground font-bold">{taggedUsers.length} Users Encrypted</span>
+                                            <span className="text-xs font-black uppercase tracking-widest block">Tag People</span>
+                                            <span className="text-[10px] text-muted-foreground font-bold">{taggedUsers.length} People Tagged</span>
                                         </div>
                                     </div>
                                     <Tag className={cn("w-5 h-5 text-muted-foreground group-hover/tag:text-primary transition-all", showUserTagInput && "rotate-180")} />
@@ -300,7 +300,7 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
                                                 {userSuggestions.length > 0 && (
                                                     <div className="mt-4 bg-white/5 border border-white/10 rounded-3xl overflow-hidden flex flex-col p-1.5 animate-in slide-in-from-top-2 duration-300">
                                                         <div className="px-4 py-3 text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-white/5 mb-1 shrink-0 flex items-center justify-between">
-                                                            <span>Nodes Detected</span>
+                                                            <span>People Found</span>
                                                             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                                                         </div>
                                                         <div className="overflow-y-auto max-h-60 custom-scrollbar flex-1 px-1">
@@ -347,13 +347,13 @@ export function EditPostDialog({ isOpen, onClose, caption, initialLocation, init
                                 onClick={onClose}
                                 className="flex-1 py-4 px-6 rounded-2xl border border-white/10 hover:bg-white/5 font-black uppercase tracking-widest text-[10px] transition-all"
                             >
-                                Abort
+                                Cancel
                             </button>
                             <button
                                 onClick={handleSave}
                                 className="flex-[1.5] py-4 px-6 rounded-2xl bg-gradient-primary text-primary-foreground font-black uppercase tracking-[0.2em] text-[10px] shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] neon-glow"
                             >
-                                Deploy Changes
+                                Save Changes
                             </button>
                         </div>
                     </motion.div>

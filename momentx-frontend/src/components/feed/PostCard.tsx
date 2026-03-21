@@ -35,6 +35,9 @@ export function PostCard({ post }: PostCardProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [viewsCount, setViewsCount] = useState(post.viewsCount || 0)
   const hasIncrementedView = useRef(false)
+  
+  // ✅ LOCAL FOLLOW STATE: For optimistic UI
+  const [localIsFollowing, setLocalIsFollowing] = useState<boolean | null>(null);
 
   // ✅ GLOBAL MUTE LOGIC: Read initial state from localStorage
   const [isMuted, setIsMuted] = useState(() => {
@@ -65,20 +68,28 @@ export function PostCard({ post }: PostCardProps) {
   };
 
   const isFollowing = useMemo(() => {
+    // If we have a local override, use it
+    if (localIsFollowing !== null) return localIsFollowing;
+
     if (!authUser || !authUser.following) return true;
     return (authUser as any).following.some((id: any) =>
       (typeof id === 'string' ? id : id._id) === post.user._id
     );
-  }, [authUser, post.user._id]);
+  }, [authUser, post.user._id, localIsFollowing]);
 
   const handleFollow = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Optimistic Update
+    setLocalIsFollowing(true);
+    
     try {
       await api.post(`/users/follow/${post.user._id}`);
       toast.success(`Following ${post.user.username}`);
       await refreshUser();
     } catch (error) {
+      setLocalIsFollowing(false);
       toast.error("Failed to follow");
     }
   };

@@ -360,7 +360,7 @@ export function CreateGroupDialog({ isOpen, onClose, onCreated }: CreateGroupDia
                           </div>
                           <div className="flex-1">
                             <p className="text-sm font-bold">You</p>
-                            <p className="text-[10px] uppercase font-black tracking-tighter text-primary/70">Group Organizer</p>
+                             <p className="text-[10px] uppercase font-black tracking-tighter text-primary/70">Group Creator</p>
                           </div>
                           <span className="px-2.5 py-1 text-[10px] font-black bg-primary text-primary-foreground rounded-full uppercase tracking-tighter">
                             Admin
@@ -401,7 +401,7 @@ export function CreateGroupDialog({ isOpen, onClose, onCreated }: CreateGroupDia
                       ) : (
                         <>
                           <Sparkles className="w-5 h-5" />
-                          <span>Create Magic</span>
+                           <span>Create Group</span>
                         </>
                       )}
                     </motion.button>

@@ -61,11 +61,17 @@ export default function HomePage() {
     }
   };
 
+  // Initial fetch and pagination
   useEffect(() => {
     fetchPosts();
-    if (currentUser) fetchSuggestions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, currentUser]);
+  }, [page]);
+
+  // Initial suggestions fetch
+  useEffect(() => {
+    if (currentUser && suggestions.length === 0) {
+      fetchSuggestions();
+    }
+  }, [currentUser]);
 
   const handleFollow = async (userId: string) => {
     try {

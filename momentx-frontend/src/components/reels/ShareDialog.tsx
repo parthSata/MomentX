@@ -233,7 +233,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                                 <X className="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors" />
                             </button>
                             <h2 className="text-xl font-black tracking-tighter uppercase italic">
-                                Transmission <span className="gradient-text">Hub</span>
+                                Share <span className="gradient-text">Post</span>
                             </h2>
                             <div className="w-10" />
                         </div>
@@ -255,12 +255,12 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center py-10 gap-4">
                                     <div className="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Scanning Signal...</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Finding Contacts...</p>
                                 </div>
                             ) : filteredProfiles.length === 0 ? (
                                 <div className="text-center py-10 opacity-30">
                                     <Search className="w-12 h-12 mx-auto mb-2" />
-                                    <p className="text-xs font-black uppercase tracking-widest">No Frequencies Found</p>
+                                    <p className="text-xs font-black uppercase tracking-widest">No Results Found</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-4 gap-4 p-2">
@@ -366,7 +366,7 @@ export function ShareDialog({ isOpen, onClose, post }: ShareDialogProps) {
                                             <Loader2 className="w-5 h-5 animate-spin" />
                                         ) : (
                                             <>
-                                                <span>Deploy Signal to {selectedProfiles.length} Node{selectedProfiles.length > 1 ? 's' : ''}</span>
+                                                <span>Send to {selectedProfiles.length} person{selectedProfiles.length > 1 ? 's' : ''}</span>
                                             </>
                                         )}
                                     </button>
