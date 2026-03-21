@@ -9,4 +9,4 @@ Disallow: /notifications/
 Disallow: /reset-password/
 
 # Sitemap link
-Sitemap: https://momentx-connect.vercel.app/sitemap.xml
+Sitemap: https://momentx-live.vercel.app/sitemap.xml
