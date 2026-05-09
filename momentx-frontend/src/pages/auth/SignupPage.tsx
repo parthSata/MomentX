@@ -224,14 +224,14 @@ export default function SignupPage() {
                 <form onSubmit={handleRequestOTP} className="space-y-4">
                   <div className="space-y-1">
                     <div className="relative group">
-                      <Input placeholder="Full Name" value={formData.name} onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setErrors({}); }} className="pl-11 text-white" required />
+                      <Input placeholder="Full Name" value={formData.name} onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setErrors({}); }} className="pl-11" required />
                       <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
                     </div>
                   </div>
 
                   <div className="space-y-1">
                     <div className="relative group">
-                      <Input placeholder="Username" value={formData.username} onChange={(e) => { setFormData({ ...formData, username: e.target.value.trim().toLowerCase() }); setErrors({}); }} className={`pl-11 text-white ${errors.username ? 'border-red-500' : ''}`} required />
+                      <Input placeholder="Username" value={formData.username} onChange={(e) => { setFormData({ ...formData, username: e.target.value.trim().toLowerCase() }); setErrors({}); }} className={`pl-11 ${errors.username ? 'border-red-500' : ''}`} required />
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
                     </div>
                     {errors.username && <p className="text-[10px] text-red-500 ml-1">{errors.username}</p>}
@@ -239,7 +239,7 @@ export default function SignupPage() {
 
                   <div className="space-y-1">
                     <div className="relative group">
-                      <Input type="email" placeholder="Email address" value={formData.email} onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setErrors({}); }} className={`pl-11 text-white ${errors.email ? 'border-red-500' : ''}`} required />
+                      <Input type="email" placeholder="Email address" value={formData.email} onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setErrors({}); }} className={`pl-11 ${errors.email ? 'border-red-500' : ''}`} required />
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
                     </div>
                     {errors.email && <p className="text-[10px] text-red-500 ml-1">{errors.email}</p>}
@@ -256,7 +256,7 @@ export default function SignupPage() {
                           setFormData({ ...formData, phone: val });
                           setErrors({});
                         }}
-                        className={`pl-11 text-white ${errors.phone ? 'border-red-500' : ''}`}
+                        className={`pl-11 ${errors.phone ? 'border-red-500' : ''}`}
                       />
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
                     </div>
@@ -265,9 +265,9 @@ export default function SignupPage() {
 
                   <div className="space-y-1">
                     <div className="relative group">
-                      <Input type={showPassword ? "text" : "password"} placeholder="Password" value={formData.password} onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setErrors({}); }} className={`pl-11 pr-11 text-white ${errors.password ? 'border-red-500' : ''}`} required />
+                      <Input type={showPassword ? "text" : "password"} placeholder="Password" value={formData.password} onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setErrors({}); }} className={`pl-11 pr-11 ${errors.password ? 'border-red-500' : ''}`} required />
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10 pointer-events-none transition-colors group-focus-within:text-primary" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground z-20 hover:text-white transition-colors">
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground z-20 hover:text-foreground transition-colors">
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
                     </div>

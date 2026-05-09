@@ -73,7 +73,7 @@ export default function ExplorePage() {
 
   return (
     <MainLayout>
-      <div className="space-y-8 pb-24 px-4 md:px-0">
+      <div className="space-y-10 md:space-y-16 pb-24 px-4 md:px-0">
 
         {/* 1. Search Bar */}
         <Link to="/search">
@@ -91,9 +91,12 @@ export default function ExplorePage() {
 
         {/* 2. Trending Hashtags */}
         {trendingHashtags.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="space-y-4 pt-4 md:pt-8"
+          >
             <div className="flex items-center gap-2 px-1">
-              {/* ✅ Fix: text-white -> text-primary */}
               <TrendingUp className="w-5 h-5 text-primary" />
               <h3 className="font-bold text-lg text-foreground">Trending Now</h3>
             </div>
@@ -120,8 +123,11 @@ export default function ExplorePage() {
 
         {/* 3. Suggested Profiles */}
         {users.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-            {/* ✅ Fix: text-foreground */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="space-y-4 pt-6 md:pt-10"
+          >
             <h3 className="font-bold text-lg px-1 text-foreground">Discover People</h3>
             <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4 md:mx-0 md:px-0">
               {users.map((user) => (
